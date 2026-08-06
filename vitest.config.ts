@@ -2,6 +2,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    projects: ['packages/shared/vitest.config.ts']
+    projects: [
+      'packages/shared/vitest.config.ts',
+      'apps/desktop/vitest.config.ts',
+      'apps/server/vitest.config.ts',
+      'packages/drivers/db/vitest.config.ts'
+    ]
   }
 });

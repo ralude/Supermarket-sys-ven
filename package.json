@@ -5,11 +5,18 @@
   "packageManager": "pnpm@11.17.0",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "pnpm --filter @supermarket/shared --filter @supermarket/core --filter @supermarket/driver-db --filter @supermarket/driver-fiscal --filter @supermarket/driver-hardware --filter @supermarket/driver-logging typecheck",
-    "test:watch": "pnpm --filter @supermarket/shared test:watch"
+    "typecheck": "pnpm --filter @supermarket/shared --filter @supermarket/core --filter @supermarket/desktop --filter @supermarket/server --filter @supermarket/driver-db --filter @supermarket/driver-fiscal --filter @supermarket/driver-hardware --filter @supermarket/driver-logging typecheck",
+    "test:watch": "pnpm --filter @supermarket/shared test:watch",
+    "lint": "eslint .",
+    "pipeline": "pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.4.0",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.41.0",
     "vitest": "^3.2.4"
   }
 }

@@ -6,7 +6,7 @@ El sistema está diseñado para operar standalone o en una red LAN, con soporte 
 
 ## Estado actual
 
-La Fase 0 define la arquitectura, las decisiones técnicas y el scaffold del monorepo. El MVP funcional todavía no está implementado.
+La Fase 0 de arquitectura y la Fase 1 de infraestructura estan completadas. La Fase 2 de codigo de negocio esta en progreso (sub-fase 2.01); el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
 
 La documentación arquitectónica está organizada por responsabilidad en [`docs/architecture/README.md`](./docs/architecture/README.md).
 
@@ -57,4 +57,4 @@ pnpm typecheck
 
 ## Alcance de la Fase 0
 
-No incluye funcionalidad de ventas, caja, inventario, fiscalidad, IPC ni persistencia de negocio. Esos componentes se implementarán en la Fase 1 según los contratos documentados.
+La Fase 0 define la arquitectura. Las dependencias y smoke tests de infraestructura se completan en la Fase 1; el código de negocio inicia en la Fase 2, la persistencia en la Fase 3 y la fiscalidad fake en la Fase 7. El cronograma mantiene el detalle y el estado de cada sub-fase.

@@ -15,15 +15,13 @@ La arquitectura prioriza:
 
 ## Alcance de la Fase 0
 
-Esta fase define contratos, límites y decisiones. No implementa ventas, inventario, caja, facturación ni integración real con hardware.
+Esta fase define contratos, límites y decisiones. No implementa ventas, inventario, caja, facturación ni integración real con hardware. El scaffold y las dependencias de infraestructura pertenecen a la Fase 1 del [cronograma del proyecto](../cronograma/README.md).
 
 Incluye:
 
 - documentación arquitectónica separada por tema;
 - registros de decisiones arquitectónicas (ADR);
-- scaffold del monorepo TypeScript;
-- primitivas compartidas mínimas (`Result`, `AppError` y `Money`);
-- pruebas unitarias de esas primitivas.
+- contratos y límites que guían las fases posteriores.
 
 ## Documentos
 
@@ -54,12 +52,7 @@ Incluye:
 
 ## Estado
 
-| Fase | Estado |
-|---|---|
-| Fase 0: arquitectura y scaffold | En progreso / base creada |
-| Fase 1: MVP funcional | Pendiente |
-| Fase 2: inventario y compras | Pendiente |
-| Fase 3: sincronización y adaptadores fiscales reales | Pendiente |
+El estado de ejecución no se duplica aquí. Consulta el [cronograma maestro](../cronograma/README.md), que contiene la fase y sub-fase actual.
 
 ## Mapeo del monorepo
 

@@ -16,11 +16,27 @@ Stack aprobado:
 
 ## 2. Estado y disciplina de fases
 
-La Fase 0 define arquitectura, documentación y scaffold. La Fase 1 implementará el MVP funcional (`catalog`, `currency`, `cash`, `sales` y `fiscal-fake`).
+El cronograma oficial y el estado actual viven en [`docs/cronograma/README.md`](./docs/cronograma/README.md). Las fases son:
 
-Durante la Fase 0 está prohibido implementar ventas, inventario, caja, endpoints de negocio, IPC funcional, tablas de negocio o integración fiscal real.
+- Fase 0: arquitectura.
+- Fase 1: infraestructura.
+- Fase 2: código de negocio.
+- Fase 3: persistencia.
+- Fase 4: event store y auditoría.
+- Fase 5: caja operativa.
+- Fase 6: inventario operativo.
+- Fase 7: driver fiscal fake.
+- Fase 8: integración serial.
+- Fase 9: UI.
+- Fase 10: sincronización offline-first.
+- Fase 11: seguridad.
+- Fase 12: optimización.
 
-No adelantes una fase por conveniencia. Si una tarea requiere cambiar el alcance, detén la implementación y registra una decisión o solicita confirmación.
+No se adelanta una fase mientras la fase actual tenga tareas abiertas. Las tareas terminadas se conservan y se marcan como `- [x] ~~tarea~~` en su archivo de sub-fase. Al terminar una sub-fase o fase se actualizan sus READMEs y el índice maestro.
+
+Las restricciones de la fase actual son obligatorias: no implementar negocio durante la infraestructura, no persistir antes de la Fase 3, no usar impresora real antes de la Fase 8 y no optimizar antes de la Fase 12.
+
+Si una tarea requiere cambiar el alcance o el orden, detén la implementación y registra una decisión o solicita confirmación.
 
 ## 3. Lectura obligatoria
 
@@ -46,6 +62,7 @@ Mapa mínimo:
 | Logs/auditoría | `10-logs.md`, ADR-0006 |
 | Errores | `11-errores.md`, ADR-0006 |
 | Pruebas / TDD | ADR-0007 |
+| Fases y estado | `docs/cronograma/README.md` y README de la sub-fase |
 
 ## 4. Arquitectura obligatoria
 
@@ -107,8 +124,9 @@ Reglas estrictas:
 3. Escribir la prueba del comportamiento observable (outside-in, ADR-0007).
 4. Implementar respetando el grafo de dependencias hasta que la prueba pase.
 5. Ejecutar `pnpm test` y `pnpm typecheck`.
-6. Actualizar documentación o ADR si cambia una decisión, contrato o estructura.
-7. Reportar archivos modificados, validaciones y limitaciones.
+6. Actualizar el cronograma: marcar tareas, sub-fases o fases terminadas y registrar la fase/sub-fase afectada.
+7. Actualizar documentación o ADR si cambia una decisión, contrato o estructura.
+8. Reportar archivos modificados, fase/sub-fase, validaciones y limitaciones.
 
 No agregues dependencias, abstracciones, compatibilidad hacia atrás o funcionalidades fuera del alcance sin una necesidad concreta y documentada.
 
