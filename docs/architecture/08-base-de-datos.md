@@ -1,0 +1,56 @@
+# 08. Base de datos
+
+## Decisiones
+
+- SQLite como base local por nodo servidor.
+- Drizzle como ORM y capa de mapeo.
+- `better-sqlite3` como driver inicial por su operación síncrona y predecible en un proceso local.
+- WAL para permitir lecturas concurrentes durante escrituras.
+- Solo el proceso Fastify/servidor abre el archivo de base de datos.
+
+## Pragmas requeridos
+
+```sql
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+PRAGMA busy_timeout = 5000;
+PRAGMA synchronous = NORMAL;
+```
+
+La configuración se ejecuta y verifica al abrir la conexión.
+
+## Convenciones de almacenamiento
+
+| Dato | Representación |
+|---|---|
+| IDs | `TEXT`, UUIDv7 o ULID generado por la aplicación |
+| Dinero | entero en unidades menores + `currency_code` |
+| Tasas | entero escalado o decimal textual, nunca `float` |
+| Cantidades | entero escalado según unidad de medida |
+| Tiempo | epoch milliseconds UTC |
+| JSON | texto validado en la frontera |
+| Borrado | evitar hard delete en datos auditables; usar estado o `deleted_at` |
+
+## Tablas transversales
+
+- `outbox_event`: eventos pendientes, intentos, estado y error de publicación.
+- `audit_log`: actor, acción, entidad, cambios, terminal y timestamp.
+- `idempotency_key`: resultado asociado a una solicitud repetible.
+- `schema_migrations`: administrada por la herramienta de migración.
+
+## Transacciones
+
+Los cambios de un caso de uso se ejecutan dentro de una transacción. El agregado, sus eventos y el registro outbox se confirman juntos.
+
+No se permite una transacción abierta durante una llamada de hardware o red. La impresión debe usar un estado persistido y un mecanismo de reconciliación.
+
+## Migraciones y respaldo
+
+- Migraciones forward-only versionadas en el repositorio.
+- Las migraciones se prueban sobre una base temporal antes de arrancar producción.
+- Backups automáticos con snapshot consistente y rotación.
+- Restauración probada periódicamente, no solo creación de backups.
+
+## Fase 0
+
+No se crean tablas de negocio ni migraciones. El scaffold solo prepara el lugar para el esquema Drizzle de la Fase 1.

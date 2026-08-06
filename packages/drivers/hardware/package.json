@@ -1,0 +1,13 @@
+{
+  "name": "@supermarket/driver-hardware",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Drivers de scanner, báscula e impresión local. Pendiente de implementación en Fase 1.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

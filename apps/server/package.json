@@ -1,0 +1,7 @@
+{
+  "name": "@supermarket/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidor Fastify local o LAN. Pendiente de implementación en Fase 1."
+}

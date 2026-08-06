@@ -1,0 +1,13 @@
+{
+  "name": "@supermarket/driver-logging",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Driver de logs técnicos y auditoría. Pendiente de implementación en Fase 1.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

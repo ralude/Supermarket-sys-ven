@@ -1,0 +1,13 @@
+{
+  "name": "@supermarket/driver-fiscal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Drivers de impresora fiscal. Fake y proveedores reales aislados.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

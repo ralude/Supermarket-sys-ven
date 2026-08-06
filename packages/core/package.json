@@ -1,0 +1,13 @@
+{
+  "name": "@supermarket/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dominio y aplicación del sistema. Funcionalidad de negocio pendiente de Fase 1.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

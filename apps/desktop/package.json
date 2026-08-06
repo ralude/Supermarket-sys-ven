@@ -1,0 +1,7 @@
+{
+  "name": "@supermarket/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Aplicación Electron y React. Pendiente de implementación en Fase 1."
+}

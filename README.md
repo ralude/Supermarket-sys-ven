@@ -1,0 +1,60 @@
+# Supermarket Platform
+
+Plataforma empresarial para supermercados en Venezuela, basada en Electron, React, Fastify, SQLite, Drizzle, TypeScript y Vitest.
+
+El sistema está diseñado para operar standalone o en una red LAN, con soporte multi-moneda, trazabilidad comercial, estados fiscales recuperables e integraciones intercambiables con hardware.
+
+## Estado actual
+
+La Fase 0 define la arquitectura, las decisiones técnicas y el scaffold del monorepo. El MVP funcional todavía no está implementado.
+
+La documentación arquitectónica está organizada por responsabilidad en [`docs/architecture/README.md`](./docs/architecture/README.md).
+
+## Estructura del monorepo
+
+```text
+apps/
+  desktop/                    Electron + React
+  server/                     Fastify standalone/LAN
+packages/
+  shared/                     primitivas y contratos transversales
+  core/
+    src/domain/               entidades, agregados, VOs y eventos
+    src/application/          casos de uso, DTOs y puertos
+  drivers/
+    db/                       SQLite + Drizzle
+    fiscal/                   impresoras fiscales y fake
+    hardware/                 scanner, báscula e impresión local
+    logging/                  logs técnicos y auditoría
+docs/architecture/            arquitectura y ADRs
+```
+
+## Metodología
+
+El proyecto utiliza DDD táctico y arquitectura hexagonal/Clean Architecture.
+
+- `core/domain` contiene reglas de negocio puras.
+- `core/application` contiene casos de uso y puertos.
+- `drivers/*` implementa adaptadores externos.
+- `apps/*` compone dependencias y adapta transportes.
+- `shared` contiene únicamente primitivas verdaderamente transversales.
+
+El grafo de dependencias permitido es:
+
+```text
+apps/* -> packages/drivers/* -> packages/core/src/application -> packages/core/src/domain -> packages/shared
+```
+
+Las reglas operativas obligatorias y agente-agnósticas están en [`AGENTS.md`](./AGENTS.md). Ese archivo es la fuente única para OpenCode, Claude Code, Codex y cualquier otro agente de IA. Los puentes [`CLAUDE.md`](./CLAUDE.md) y [`CODEX.md`](./CODEX.md) apuntan al mismo documento.
+
+## Comandos
+
+```bash
+pnpm install
+pnpm test
+pnpm typecheck
+```
+
+## Alcance de la Fase 0
+
+No incluye funcionalidad de ventas, caja, inventario, fiscalidad, IPC ni persistencia de negocio. Esos componentes se implementarán en la Fase 1 según los contratos documentados.

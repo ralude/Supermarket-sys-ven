@@ -1,0 +1,15 @@
+{
+  "name": "supermarket-platform",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.17.0",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "pnpm --filter @supermarket/shared --filter @supermarket/core --filter @supermarket/driver-db --filter @supermarket/driver-fiscal --filter @supermarket/driver-hardware --filter @supermarket/driver-logging typecheck",
+    "test:watch": "pnpm --filter @supermarket/shared test:watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
