@@ -39,6 +39,7 @@ Incluye:
 | 09 | [Estados fiscales](./09-estados-fiscales.md) | Máquinas de estado y recuperación ante fallos |
 | 10 | [Logs](./10-logs.md) | Logs técnicos, auditoría y redacción |
 | 11 | [Errores](./11-errores.md) | Errores tipados, códigos y fronteras de transporte |
+| 12 | [Sincronización y ownership](./12-sincronizacion-y-ownership.md) | Nodos autónomos, autoridad de escritura y conflictos |
 
 ## ADRs
 
@@ -49,6 +50,12 @@ Incluye:
 - [ADR-0005: Eventos y outbox](./adr/0005-eventos-outbox.md)
 - [ADR-0006: Errores, logs y auditoría](./adr/0006-errores-logs-auditoria.md)
 - [ADR-0007: Outside-In TDD para funcionalidades](./adr/0007-outside-in-tdd.md)
+- [ADR-0008: Topología offline por nodo](./adr/0008-topologia-offline-por-nodo.md)
+- [ADR-0009: Estado relacional, ledger y outbox](./adr/0009-estado-relacional-ledger-outbox.md)
+
+## Alcance del producto
+
+Los niveles MVP técnico, piloto, producción soportada y plataforma empresarial se distinguen en [Alcance por nivel de entrega](../producto/alcance-entregas.md).
 
 ## Estado
 
@@ -58,12 +65,12 @@ El estado de ejecución no se duplica aquí. Consulta el [cronograma maestro](..
 
 | Ruta | Responsabilidad |
 |---|---|
-| `apps/desktop` | Electron, React, preload y composición de la estación |
-| `apps/server` | Fastify, HTTP, WebSocket y composición del nodo servidor |
+| `apps/desktop` | Electron, React, preload y supervisión del servidor local de la estación |
+| `apps/server` | Fastify, HTTP, WebSocket y composición tanto de terminales como del coordinador |
 | `packages/shared` | primitivas y contratos transversales sin lógica de negocio |
 | `packages/core/src/domain` | dominio puro: entidades, agregados, eventos e invariantes |
 | `packages/core/src/application` | casos de uso, DTOs, autorización y puertos |
-| `packages/drivers/db` | SQLite, Drizzle, repositorios, migraciones y outbox |
+| `packages/drivers/db` | SQLite por nodo, Drizzle, repositorios, migraciones, ledger y outbox |
 | `packages/drivers/fiscal` | adaptadores de impresoras fiscales |
 | `packages/drivers/hardware` | periféricos y hardware local |
 | `packages/drivers/logging` | logs técnicos y auditoría |

@@ -5,7 +5,7 @@
 
 ## Proposito
 
-Permitir operacion offline-first con una cola persistente que sincroniza eventos, nunca tablas.
+Permitir operacion offline-first entre terminales autonomas y el nodo coordinador mediante una cola persistente que sincroniza eventos, nunca tablas.
 
 ## Sub-fases
 
@@ -17,3 +17,5 @@ Permitir operacion offline-first con una cola persistente que sincroniza eventos
 ## Criterio de salida
 
 Una operacion local sobrevive cortes de red y sus eventos se entregan de forma idempotente.
+
+La autoridad de escritura y los conflictos siguen `docs/architecture/12-sincronizacion-y-ownership.md`; la sincronizacion no introduce escrituras multi-master.

@@ -2,6 +2,7 @@
 
 - Estado: Aceptado
 - Fecha: 2026-08-05
+- Precisado por: ADR-0008
 
 ## Contexto
 
@@ -9,7 +10,7 @@ El producto debe funcionar en un equipo standalone y evolucionar a múltiples te
 
 ## Decisión
 
-Fastify será el transporte de negocio mediante REST versionado. El mismo servidor podrá ejecutarse localmente dentro del entorno Electron o como nodo LAN. Electron IPC se limitará a operaciones nativas y hardware local.
+Fastify será el transporte de negocio mediante REST versionado. El servidor se ejecuta localmente en cada terminal; el nodo coordinador usa el mismo stack para sincronización y servicios de tienda. Electron IPC se limitará a operaciones nativas y hardware local.
 
 ## Consecuencias
 

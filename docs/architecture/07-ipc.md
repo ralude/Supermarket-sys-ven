@@ -12,7 +12,9 @@ Electron inicia Fastify en el proceso `main` o en un proceso hijo controlado, en
 
 ### LAN
 
-El nodo servidor inicia Fastify y SQLite. Cada estación Electron configura la URL del nodo y usa el mismo cliente HTTP. La UI no conoce si el servidor es local o remoto.
+Cada estación Electron inicia o supervisa su Fastify local y usa su SQLite local. React consume la API por loopback igual que en standalone. Un nodo coordinador de tienda expone endpoints técnicos de sincronización y distribución de datos de referencia, pero no sustituye al servidor local de la caja.
+
+La UI distingue conectividad y sincronización, pero los componentes no deciden ownership ni conflictos. Esas políticas pertenecen a aplicación e infraestructura y están documentadas en [12. Sincronización y ownership](./12-sincronizacion-y-ownership.md).
 
 ## Canales
 

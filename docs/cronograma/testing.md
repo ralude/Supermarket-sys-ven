@@ -15,10 +15,11 @@ La piramide de pruebas prioriza reglas de dominio rapidas y deterministas, y agr
 
 - Fase 2: unit tests outside-in para cada caso de uso y unit tests del dominio.
 - Fase 3: integration tests con SQLite real y transacciones reales.
-- Fase 4: pruebas de append-only, outbox, idempotencia y reconstruccion de historial.
+- Fase 4: pruebas de append-only, outbox, idempotencia y proyeccion de historial sin rehidratar el estado operativo.
 - Fases 5 y 6: flujos integrados auditados de caja e inventario.
 - Fases 7 y 8: contract tests, simulacion y reconciliacion del driver fiscal.
 - Fase 9: E2E de venta, caja, catalogo e inventario.
+- Fase 10: deduplicacion, ownership por agregado, reconexion y discrepancias de inventario.
 
 ## Escenarios de chaos testing
 

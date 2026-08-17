@@ -5,9 +5,9 @@ Los casos de uso son la API de aplicación. Orquestan una intención del usuario
 ## Flujo estándar
 
 ```text
-DTO de entrada
+DTO de entrada + contexto de ejecución
   -> validación de forma
-  -> autenticación/autorización
+  -> validar identidad y autorización
   -> cargar agregado mediante puerto
   -> ejecutar comportamiento del dominio
   -> persistir en Unit of Work
@@ -24,6 +24,12 @@ DTO de entrada
 - `UpdatePrice`
 - `FindProductByBarcode`
 
+Los comandos de catálogo validan `Category` y `UnitOfMeasure` mediante puertos,
+comprueban conflictos de barcodes activos y devuelven un snapshot serializable
+para `sales`. `UpdatePrice` es la única operación que modifica el precio y
+registra `PriceHistory`; la persistencia del agregado, ledger y outbox queda en
+las fases correspondientes.
+
 ### `currency`
 
 - `UpdateExchangeRate`
@@ -36,14 +42,28 @@ DTO de entrada
 - `RegisterCashMovement`
 - `CloseShift`
 
+En Fase 2, estos casos de uso validan ownership con `ExecutionContext`, métodos
+de efectivo mediante `PaymentMethodRepository` y permisos mediante
+`AuthorizationService`. `CashRegisterRepository` localiza la caja y
+`ShiftRepository` abstrae guardado, búsqueda y detección de un turno abierto.
+La implementación usa fakes: persistencia, auditoría, idempotencia y consumo de
+pagos de venta se incorporan en sus fases correspondientes.
+
 ### `sales`
 
 - `StartSale`
 - `AddItemToSale`
 - `RemoveItemFromSale`
+- `ApplyDiscountToSale`
 - `RegisterMixedPayment`
 - `CompleteSale`
 - `VoidSale`
+
+En la Fase 2, `ExecutionContext` y `AuthorizationService` se adelantan como
+contratos mínimos para descuentos y anulaciones; `User`, `Role` y `Permission`
+se implementan en la sub-fase 2.06. `RegisterMixedPayment` recibe un lote
+atómico, exige tasas explícitas para conversiones y conserva el snapshot del
+método y de la tasa utilizada.
 
 ### `fiscal`
 
@@ -64,6 +84,18 @@ Los primeros contratos previstos son:
 - `IdGenerator`;
 - `AuthorizationService`;
 - `AuditWriter`.
+
+## Contexto de ejecución
+
+Todo comando recibe metadatos separados del DTO de negocio:
+
+- `actorId` y roles o concesiones verificadas;
+- `terminalId` y `originNodeId`;
+- `correlationId`;
+- `idempotencyKey` cuando el comando pueda reintentarse;
+- timestamp UTC obtenido mediante `Clock`.
+
+La frontera HTTP autentica la sesión y construye este contexto. El caso de uso aplica autorización mediante `AuthorizationService`; ninguna ruta o UI puede considerarse una frontera de autorización suficiente. En Fase 2 los tests usan actores y autorizadores fake. La autenticación de transporte y las credenciales se implementan antes de exponer la UI operativa.
 
 ## Errores y resultado
 

@@ -7,6 +7,8 @@
 
 Aplicar identidad, autorizacion, proteccion de datos y observabilidad segura.
 
+Las sub-fases 11.01 a 11.03 tienen un corte minimo obligatorio antes de la Fase 9 mediante el [gate de seguridad antes de UI operativa](../gate-seguridad-pre-ui.md). La Fase 11 completa politicas, cifrado y hardening sin posponer las fronteras basicas de seguridad.
+
 ## Sub-fases
 
 - [11.01 Autenticacion](./11.01-autenticacion.md)

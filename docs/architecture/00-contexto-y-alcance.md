@@ -4,11 +4,11 @@
 
 El sistema será una plataforma de operación para supermercados empresariales en Venezuela. Debe soportar punto de venta, caja, catálogo, moneda local y extranjera, pagos mixtos, trazabilidad y futura integración fiscal.
 
-El diseño parte de un despliegue híbrido:
+El diseño parte de nodos operativos autónomos:
 
 - **Standalone:** Electron inicia un servidor Fastify local y una base SQLite local.
-- **LAN:** un nodo servidor ejecuta Fastify y SQLite; las estaciones Electron consumen la API por la red local.
-- **Evolución futura:** el nodo servidor puede incorporar sincronización externa sin acoplarla al dominio.
+- **LAN:** cada estación mantiene Fastify y SQLite local; un nodo coordinador distribuye datos de referencia y recibe eventos para consolidación.
+- **Evolución futura:** el coordinador puede sincronizar con una sede central o nube sin acoplarla al dominio.
 
 ## Objetivos arquitectónicos
 
@@ -29,8 +29,9 @@ El diseño parte de un despliegue híbrido:
 
 ## Principios
 
-- **Offline-aware:** una interrupción de red no debe destruir el estado local de una operación.
+- **Offline-first en POS:** una interrupción de LAN no impide completar una venta local permitida; la sincronización ocurre posteriormente.
 - **Single writer:** solo el proceso servidor abre la SQLite de un nodo.
+- **Single owner:** cada agregado tiene un único nodo con autoridad de escritura.
 - **Explicit boundaries:** cada módulo tiene contratos y responsabilidades claros.
 - **Immutable fiscal history:** un documento fiscal emitido no se edita; se corrige mediante el mecanismo fiscal correspondiente.
 - **Configuration over constants:** tasas, impuestos, monedas y límites fiscales son configuración versionada.
@@ -40,7 +41,7 @@ El diseño parte de un despliegue híbrido:
 ## Decisiones pendientes para fases posteriores
 
 - proveedor fiscal certificado y protocolo exacto;
-- política de sincronización con nube o sede central;
+- política definitiva de inventario offline para el piloto;
 - proveedor oficial de tasa de cambio y frecuencia de actualización;
 - política de retención y exportación de datos;
 - requisitos definitivos de hardware por modelo de tienda.

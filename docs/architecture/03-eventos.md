@@ -14,6 +14,10 @@ Son contratos entre módulos, procesos o estaciones. Se serializan, versionan y 
 
 Ejemplos: `FiscalDocumentRequested.v1`, `FiscalDocumentIssued.v1`, `ExchangeRateUpdated.v1`.
 
+### Ledger de hechos de negocio
+
+Conserva hechos seleccionados de forma append-only para explicar el historial y construir proyecciones. No es la fuente de verdad operativa y no necesita contener todo lo requerido para rehidratar un agregado.
+
 ## Convenciones
 
 - Nombre en pasado, orientado a hechos.
@@ -31,21 +35,28 @@ Ejemplos: `FiscalDocumentRequested.v1`, `FiscalDocumentIssued.v1`, `ExchangeRate
 | `catalog` | `ProductCreated`, `PriceChanged` |
 | `currency` | `ExchangeRateUpdated` |
 | `cash` | `ShiftOpened`, `ShiftClosed`, `CashMovementRegistered` |
-| `sales` | `SaleStarted`, `SaleItemAdded`, `PaymentRegistered`, `SaleCompleted`, `SaleVoided` |
+| `sales` | `SaleStarted`, `SaleItemAdded`, `SaleItemRemoved`, `DiscountApplied`, `PaymentRegistered`, `SaleCompleted`, `SaleVoided` |
 | `fiscal` | `FiscalDocumentIssued`, `FiscalDocumentFailed`, `FiscalXReportIssued`, `FiscalZReportIssued` |
 | `inventory` | `StockAdjusted`, `StockDepleted`, `BatchExpiringSoon` |
+
+En `cash`, `ShiftOpened` conserva el fondo inicial, `CashMovementRegistered`
+explica cada ingreso o retiro manual y `ShiftClosed` congela saldo esperado,
+conteo declarado y diferencia por moneda y método. La integración de pagos de
+venta con el turno queda para la Fase 5.
 
 ## Flujo de publicación
 
 ```text
 Caso de uso
   -> agregado registra evento de dominio
-  -> transacción persiste agregado + outbox
+  -> transacción persiste agregado relacional + ledger + outbox cuando corresponda
   -> relay publica evento de integración
   -> consumidor procesa con idempotencia
 ```
 
 No se debe publicar un evento externo antes del commit. Si el proceso falla después del commit, el relay reintenta desde el outbox.
+
+Las tablas relacionales son la fuente de verdad del estado actual. `business_event`, `outbox_event` y `audit_log` tienen finalidades distintas y no se sustituyen entre sí.
 
 ## Fase 0
 

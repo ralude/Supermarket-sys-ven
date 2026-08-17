@@ -20,5 +20,5 @@ Cada etapa debe detener el pipeline si falla. No se considera terminado un cambi
 - El script debe ser reproducible en Windows y en el entorno de desarrollo documentado.
 - Las pruebas de integracion usan SQLite real temporal y se ejecutan como parte de `pnpm test` (proyectos Vitest).
 - El empaquetado Electron se habilita cuando exista el scaffold funcional de desktop.
-- Un hook local pre-push puede ejecutar `pnpm ci`, pero no sustituye la ejecucion manual del pipeline.
+- Un hook local pre-push puede ejecutar `pnpm pipeline`, pero no sustituye la ejecucion manual del pipeline.
 - Si se agrega un remote, se podra trasladar el mismo orden a la plataforma elegida sin cambiar los comandos.

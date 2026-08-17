@@ -22,7 +22,7 @@ El cronograma oficial y el estado actual viven en [`docs/cronograma/README.md`](
 - Fase 1: infraestructura.
 - Fase 2: código de negocio.
 - Fase 3: persistencia.
-- Fase 4: event store y auditoría.
+- Fase 4: ledger de eventos, outbox y auditoría.
 - Fase 5: caja operativa.
 - Fase 6: inventario operativo.
 - Fase 7: driver fiscal fake.
@@ -87,6 +87,8 @@ Reglas estrictas:
 - Una integración fiscal nueva debe agregarse como driver sin modificar dominio ni casos de uso.
 - El negocio se transporta por HTTP/Fastify; Electron IPC se reserva para capacidades nativas y hardware local.
 - Las rutas, handlers IPC y componentes React solo adaptan entrada/salida y delegan en casos de uso.
+- Cada terminal POS es un nodo autónomo con Fastify y SQLite local; el nodo coordinador recibe eventos y distribuye datos de referencia.
+- Cada agregado tiene un único nodo dueño; no se usa last-write-wins para resolver escrituras concurrentes.
 
 ## 5. Reglas de dominio
 
@@ -96,6 +98,7 @@ Reglas estrictas:
 - Los eventos nombran hechos en pasado, son inmutables y sus consumidores son idempotentes.
 - Un documento fiscal emitido es inmutable; una corrección usa el mecanismo fiscal correspondiente.
 - Los estados fiscales deben ser explícitos, persistibles y recuperables después de reinicios.
+- Las tablas relacionales son la fuente de verdad operativa; el ledger append-only conserva historia y el outbox entrega eventos, sin event sourcing completo.
 
 ## 6. Reglas de datos y dinero
 

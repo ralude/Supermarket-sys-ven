@@ -7,6 +7,7 @@
 - `better-sqlite3` como driver inicial por su operación síncrona y predecible en un proceso local.
 - WAL para permitir lecturas concurrentes durante escrituras.
 - Solo el proceso Fastify/servidor abre el archivo de base de datos.
+- Las tablas relacionales de agregados son la fuente de verdad del estado operativo; el ledger no se usa para rehidratar agregados al arrancar.
 
 ## Pragmas requeridos
 
@@ -33,6 +34,7 @@ La configuración se ejecuta y verifica al abrir la conexión.
 
 ## Tablas transversales
 
+- `business_event`: hechos seleccionados append-only para historia y proyecciones.
 - `outbox_event`: eventos pendientes, intentos, estado y error de publicación.
 - `audit_log`: actor, acción, entidad, cambios, terminal y timestamp.
 - `idempotency_key`: resultado asociado a una solicitud repetible.
@@ -40,7 +42,7 @@ La configuración se ejecuta y verifica al abrir la conexión.
 
 ## Transacciones
 
-Los cambios de un caso de uso se ejecutan dentro de una transacción. El agregado, sus eventos y el registro outbox se confirman juntos.
+Los cambios de un caso de uso se ejecutan dentro de una transacción. El agregado, los hechos de ledger, la auditoría, la idempotencia y el outbox que correspondan se confirman juntos.
 
 No se permite una transacción abierta durante una llamada de hardware o red. La impresión debe usar un estado persistido y un mecanismo de reconciliación.
 

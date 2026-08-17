@@ -2,6 +2,7 @@
 
 - Estado: Aceptado
 - Fecha: 2026-08-05
+- Complementado por: ADR-0009
 
 ## Contexto
 

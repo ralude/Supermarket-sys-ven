@@ -9,3 +9,6 @@ export { err, ok } from './result.js';
 export type { Result } from './result.js';
 export { Money } from './money.js';
 export type { CurrencyCode } from './money.js';
+export { Percentage } from './percentage.js';
+export { Quantity } from './quantity.js';
+export { TaxRate } from './tax-rate.js';

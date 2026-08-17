@@ -30,9 +30,19 @@ El MVP funcional posterior a Fase 0 incluirá:
 
 `inventory` será una dependencia explícita del flujo de ventas cuando se implemente stock real. Mientras no exista ese módulo, el MVP no debe simular inventario dentro de `sales`.
 
+`purchasing`, `customers` y los reportes empresariales completos quedan fuera del MVP técnico. Las entradas de inventario de la Fase 6 usan un contrato mínimo de recepción y no implican implementar el agregado `PurchaseOrder`. Los reportes de la Fase 9 se limitan a caja, auditoría, fiscalidad y sincronización ya disponibles.
+
+La evolución posterior está delimitada en [`docs/producto/alcance-entregas.md`](../producto/alcance-entregas.md).
+
 ## Reglas entre módulos
 
 - Un módulo expone casos de uso, comandos, queries o eventos; no expone sus tablas.
 - Una operación que cruza módulos coordina mediante aplicación y eventos, no mediante llamadas SQL cruzadas.
 - Los datos compartidos se copian como snapshot en el contexto consumidor cuando sea necesario para trazabilidad.
 - Los nombres de eventos y contratos públicos se versionan.
+
+En la implementación de `catalog`, `Category` y `UnitOfMeasure` son referencias
+configurables validadas mediante puertos de aplicación. El agregado `Product`
+conserva el código y la escala de la unidad aplicados, y expone un snapshot
+estable para `sales`; ningún caso de uso de catálogo accede directamente a sus
+tablas.

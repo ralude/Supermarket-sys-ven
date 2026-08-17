@@ -8,11 +8,18 @@ Un agregado es una frontera de consistencia. Solo su raíz se carga y modifica d
 |---|---|---|
 | `Sale` | Venta, líneas y pagos | total consistente; no completar sin pago suficiente; estado válido |
 | `FiscalDocument` | Documento fiscal y líneas | inmutable una vez emitido; corrección por nota fiscal |
-| `Product` | Producto, códigos y precio vigente | barcode activo único; unidad válida; precio no negativo |
+| `Product` | Producto, códigos, precio vigente e historial de precios | barcode activo único; unidad válida; precio no negativo; cambios de precio append-only |
 | `InventoryItem` | Stock y lotes | stock no negativo; salida FEFO cuando aplique |
 | `Shift` | Turno y movimientos de caja | un turno abierto por caja; arqueo trazable |
 | `PurchaseOrder` | Orden y recepción | recepción acumulada no supera cantidad ordenada |
 | `User` | Identidad y credenciales | roles válidos; credencial nunca expuesta |
+
+El agregado `Product` contiene barcodes, precio vigente e historial append-only.
+Los códigos activos también se comprueban globalmente mediante el puerto del
+repositorio antes de guardar; la restricción transaccional definitiva pertenece
+a la persistencia de Fase 3. `Category` y `UnitOfMeasure` se validan como
+configuración externa del agregado, mientras el producto conserva la referencia
+de categoría y el código/escala de unidad usados por su snapshot.
 
 ## Agregado `Sale`
 
@@ -21,11 +28,36 @@ Es la frontera principal del MVP. Contiene líneas con snapshot de descripción,
 Debe garantizar:
 
 - total de líneas, descuentos, impuestos e IGTF calculado de forma determinista;
+- precio de snapshot neto de IVA; descuento porcentual por línea antes del IVA y redondeo por línea;
 - pago mixto con monedas y métodos permitidos;
+- lote de pagos exacto, con tasa explícita y snapshot del método cuando corresponda;
 - transición ordenada de `DRAFT` a `COMPLETED`;
 - no modificar una venta completada;
-- anulación con autorización y motivo;
+- anulación únicamente de `DRAFT`, con autorización y motivo;
 - emisión de eventos solo por hechos válidos.
+
+El IGTF no se codifica como una constante del agregado: la aplicación recibe una
+política versionada que determina elegibilidad, tasa y base cubierta por pagos
+elegibles. Registrar el lote de pagos congela líneas y descuentos.
+
+## Agregado `Shift`
+
+`Shift` es la raíz del ciclo de caja. `CashRegister` representa la caja
+configurada y `CashMovement` pertenece al turno. El agregado garantiza:
+
+- ownership único por terminal y nodo;
+- estado `OPEN` o `CLOSED` y ausencia de movimientos después del cierre;
+- fondos iniciales, ingresos y retiros manuales como movimientos inmutables;
+- montos positivos, motivo y actor obligatorios;
+- retiros que no superan el saldo de su moneda y método;
+- balances independientes por moneda y método, sin conversiones implícitas;
+- arqueo con snapshots de esperado, declarado y diferencia;
+- eventos versionados `ShiftOpened`, `CashMovementRegistered` y `ShiftClosed`.
+
+En Fase 2, la regla de un turno abierto por caja se consulta mediante
+`ShiftRepository`. La restricción transaccional se añade con SQLite. Los
+movimientos derivados de ventas, auditoría y autorización de diferencias
+pertenecen a la Fase 5.
 
 ## Agregado `FiscalDocument`
 
@@ -34,6 +66,10 @@ Su estado de impresión se persiste por separado del contenido inmutable del doc
 ## Consistencia entre agregados
 
 Una venta no debe modificar directamente el agregado `Shift` o `InventoryItem`. El caso de uso coordina transacciones y eventos según la política definida. Si el flujo requiere atomicidad multiagregado, se debe documentar como una decisión específica y probarla con SQLite.
+
+## Ownership entre nodos
+
+Cada agregado tiene un único nodo con autoridad de escritura. Una venta, turno o documento fiscal pertenece a su terminal de origen; otro nodo solo consume sus eventos o proyecciones. Catálogo y configuración se originan en el coordinador de tienda. La matriz completa y la política de inventario offline están en [12. Sincronización y ownership](./12-sincronizacion-y-ownership.md).
 
 ## Fase 0
 

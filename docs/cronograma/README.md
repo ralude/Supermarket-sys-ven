@@ -8,9 +8,9 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 |---:|---|---|
 | 0 | Arquitectura | ~~Completada~~ |
 | 1 | Infraestructura | ~~Completada~~ |
-| 2 | Codigo de negocio | En progreso: sub-fase 2.01 |
+| 2 | Codigo de negocio | En progreso: sub-fase 2.06 |
 | 3 | Persistencia | Pendiente |
-| 4 | Event store y auditoria | Pendiente |
+| 4 | Ledger, outbox y auditoria | Pendiente |
 | 5 | Caja operativa | Pendiente |
 | 6 | Inventario operativo | Pendiente |
 | 7 | Driver fiscal fake | Pendiente |
@@ -21,7 +21,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 12 | Optimizacion | Pendiente |
 
 **Fase actual:** Fase 2 - Codigo de negocio  
-**Sub-fase actual:** 2.01 - Primitivas monetarias
+**Sub-fase actual:** 2.06 - Usuario
 
 ## Fases
 
@@ -29,7 +29,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 - [~~Fase 1 - Infraestructura~~](./fase-01-infraestructura/README.md)
 - [Fase 2 - Codigo de negocio](./fase-02-dominio/README.md)
 - [Fase 3 - Persistencia](./fase-03-persistencia/README.md)
-- [Fase 4 - Event store](./fase-04-event-store/README.md)
+- [Fase 4 - Ledger, outbox y auditoria](./fase-04-event-store/README.md)
 - [Fase 5 - Caja](./fase-05-caja/README.md)
 - [Fase 6 - Inventario](./fase-06-inventario/README.md)
 - [Fase 7 - Driver fiscal fake](./fase-07-driver-fiscal-fake/README.md)
@@ -54,10 +54,23 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 - `identity` se divide: el modelo `User`/`Role`/`Permission` se crea en la Fase 2; autenticacion, JWT y cifrado quedan en la Fase 11.
 - `inventory` se divide: el dominio de movimientos se crea en la Fase 2; su flujo operativo y persistencia quedan en la Fase 6.
 - La Fase 2 no imprime ni persiste; la persistencia comienza en la Fase 3 y el driver fiscal fake en la Fase 7.
-- CI/CD se ejecuta inicialmente como scripts locales mediante `pnpm ci`, sin asumir una plataforma remota.
-- La Fase 1 se registra con su estado real: el monorepo y las herramientas base existen, pero Electron, React, Fastify, SQLite, Drizzle y ESLint quedan abiertos.
+- CI/CD se ejecuta inicialmente como scripts locales mediante `pnpm pipeline`, sin asumir una plataforma remota.
+- La actualizacion diaria de tasas se resuelve con carga manual mas sugerencia externa con confirmacion humana (el driver propone, un humano confirma via `UpdateExchangeRate`); se agrega la sub-fase 9.07 a la Fase 9. La tasa externa nunca se aplica sola y el sistema opera offline con la ultima tasa vigente.
+- La sub-fase 2.02 incluye la capa de aplicación del módulo `currency` (`UpdateExchangeRate`, `GetCurrentExchangeRate`, `CalculateMixedPaymentTotals`) porque 06-casos-de-uso.md las asigna a ese módulo y no había otra sub-fase que las cubriera.
+- La sub-fase 2.03 implementa catálogo con referencias configurables de categoría y unidad, snapshots de producto y validación de barcode por puertos; no agrega persistencia ni CRUD de configuración.
+- La sub-fase 2.04 implementa ventas puras con precio neto, descuentos porcentuales por línea, IGTF configurable, pagos mixtos exactos y autorización mínima; no modifica caja, inventario ni fiscalidad persistida.
+- La sub-fase 2.05 implementa `Shift` como agregado de caja con ownership por terminal/nodo, movimientos manuales de efectivo, balances multi-moneda y cierre con arqueo; persistencia, auditoria y pagos derivados de venta quedan para fases posteriores.
+- La Fase 1 se completó con Electron, React, Fastify, SQLite, Drizzle y ESLint instalados y verificados mediante smoke tests.
+- ADR-0008 establece terminales POS autonomas con Fastify y SQLite local; el nodo coordinador sincroniza eventos y datos de referencia.
+- ADR-0009 establece tablas relacionales como fuente de verdad, ledger append-only para historia y outbox para entrega; no se usa event sourcing completo en el MVP.
+- Antes de la Fase 9 se ejecuta el gate de seguridad de transporte autorizado el 2026-08-14; no adelanta cifrado ni hardening final de la Fase 11.
+- El [hito transversal de cierre arquitectonico](./hito-cierre-arquitectonico.md) se completo el 2026-08-14 y habilito la continuacion desde 2.03.
 
 ## Documentos transversales
 
 - [Estrategia de testing](./testing.md)
 - [CI/CD local](./ci-cd.md)
+- [Hito de cierre arquitectonico](./hito-cierre-arquitectonico.md)
+- [Gate de seguridad antes de UI operativa](./gate-seguridad-pre-ui.md)
+- [Gate de piloto y release](./gate-piloto-release.md)
+- [Alcance por nivel de entrega](../producto/alcance-entregas.md)

@@ -3,11 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Dominio y aplicación del sistema. Funcionalidad de negocio pendiente de Fase 1.",
+  "description": "Dominio y aplicación del sistema.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@supermarket/shared": "workspace:*"
+  },
   "devDependencies": {
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   }
 }

@@ -2,13 +2,14 @@
 
 Plataforma empresarial para supermercados en Venezuela, basada en Electron, React, Fastify, SQLite, Drizzle, TypeScript y Vitest.
 
-El sistema está diseñado para operar standalone o en una red LAN, con soporte multi-moneda, trazabilidad comercial, estados fiscales recuperables e integraciones intercambiables con hardware.
+El sistema está diseñado para operar standalone o en LAN mediante terminales autónomas sincronizadas, con soporte multi-moneda, trazabilidad comercial, estados fiscales recuperables e integraciones intercambiables con hardware.
 
 ## Estado actual
 
-La Fase 0 de arquitectura y la Fase 1 de infraestructura estan completadas. La Fase 2 de codigo de negocio esta en progreso (sub-fase 2.01); el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
+La Fase 0 de arquitectura y la Fase 1 de infraestructura estan completadas. La Fase 2 de codigo de negocio esta en progreso (sub-fase 2.06); el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
 
 La documentación arquitectónica está organizada por responsabilidad en [`docs/architecture/README.md`](./docs/architecture/README.md).
+El alcance del MVP, piloto, producción y plataforma empresarial se separa en [`docs/producto/alcance-entregas.md`](./docs/producto/alcance-entregas.md).
 
 ## Estructura del monorepo
 

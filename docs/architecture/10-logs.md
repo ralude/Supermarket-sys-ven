@@ -49,4 +49,4 @@ La auditoría debe ser append-only desde la aplicación. Una cadena hash opciona
 
 ## Fase 0
 
-Se define la separación y el contrato de campos. La configuración Pino y la tabla `audit_log` se implementarán junto con infraestructura en la Fase 1.
+Se define la separación y el contrato de campos. El logging técnico se compone con el transporte antes de la UI operativa; `audit_log` se implementa en la Fase 4 después de disponer de persistencia.

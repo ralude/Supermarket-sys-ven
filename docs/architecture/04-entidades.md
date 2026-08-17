@@ -6,7 +6,7 @@ Una entidad tiene identidad estable y un ciclo de vida. Sus atributos pueden cam
 
 | Módulo | Entidades |
 |---|---|
-| `catalog` | `Product`, `Category`, `Barcode`, `PriceHistory` |
+| `catalog` | `Product`, `Category`, `UnitOfMeasure`, `Barcode`, `PriceHistory` |
 | `currency` | `Currency`, `ExchangeRate`, `PaymentMethod` |
 | `cash` | `CashRegister`, `Shift`, `CashMovement` |
 | `sales` | `Sale`, `SaleItem`, `Payment`, `Discount`, `Return` |
@@ -36,7 +36,7 @@ Admite cantidades enteras y fraccionarias con escala definida por unidad de medi
 
 ### Otros
 
-`Barcode`, `TaxRate`, `Percentage`, `TerminalId`, `UserId`, `CurrencyCode` y `FiscalDocumentNumber` deben validar formato y normalización en sus constructores.
+`Barcode`, `UnitOfMeasure`, `TaxRate`, `Percentage`, `TerminalId`, `UserId`, `CurrencyCode` y `FiscalDocumentNumber` deben validar formato y normalización en sus constructores. `Barcode` tiene identidad dentro del agregado `Product`, aunque su valor normalizado sea la clave de búsqueda.
 
 ## Reglas
 
@@ -44,7 +44,9 @@ Admite cantidades enteras y fraccionarias con escala definida por unidad de medi
 - Las fechas se almacenan y transportan en UTC.
 - Los valores monetarios nunca se calculan con `float`.
 - Los snapshots de productos y precios dentro de una venta preservan el valor aplicado, aunque el catálogo cambie después.
+- `ProductSnapshot` conserva descripción, precio, impuesto, unidad y escala sin exponer una referencia mutable al agregado `Product`.
+- `CashMovement` conserva un snapshot inmutable del método, moneda, monto positivo, dirección, actor, motivo y fecha; el signo contable se deriva del tipo de movimiento.
 
-## Fase 0
+## Fases
 
-Solo se implementan los value objects compartidos mínimos definidos en `packages/shared`. Las entidades de negocio quedan documentadas para la Fase 1.
+La Fase 0 documentó estas entidades. Las primitivas compartidas se prepararon en Fase 1 y las entidades de negocio se implementan desde la Fase 2 según el cronograma.
