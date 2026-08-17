@@ -3,7 +3,7 @@ import { Money } from '@supermarket/shared';
 import { CashRegister, Shift } from '../../domain/cash/index.js';
 import { PaymentMethod } from '../../domain/currency/index.js';
 import type { ExecutionContext } from '../execution-context.js';
-import type { PaymentMethodRepository, ShiftRepository } from '../ports/index.js';
+import type { AuthorizationService, PaymentMethodRepository, ShiftRepository } from '../ports/index.js';
 import { RegisterCashMovement } from './register-cash-movement.js';
 
 const context: ExecutionContext = {
@@ -42,13 +42,16 @@ class FakePaymentMethodRepository implements PaymentMethodRepository {
   async findByCode(): Promise<PaymentMethod | null> { return method; }
 }
 
-function useCase(repository: ShiftRepository, authorized = true): RegisterCashMovement {
+function useCase(
+  repository: ShiftRepository,
+  authorization: AuthorizationService = { authorize: async () => true }
+): RegisterCashMovement {
   let movementSequence = 1;
   let eventSequence = 1;
   return new RegisterCashMovement(
     repository,
     new FakePaymentMethodRepository(),
-    { authorize: async () => authorized },
+    authorization,
     { generate: () => `movement-${++movementSequence}` },
     { generate: () => `event-${++eventSequence}` },
     { now: () => new Date('2026-08-16T09:00:00.000Z') }
@@ -58,7 +61,13 @@ function useCase(repository: ShiftRepository, authorized = true): RegisterCashMo
 describe('RegisterCashMovement', () => {
   it('registers an income and updates the matching balance', async () => {
     const repository = new FakeShiftRepository(openShift());
-    const result = await useCase(repository).execute({
+    const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
+    const result = await useCase(repository, {
+      authorize: async (...args) => {
+        authorizationCalls.push(args);
+        return true;
+      }
+    }).execute({
       shiftId: 'shift-001',
       type: 'INCOME',
       paymentMethodCode: 'CASH_USD',
@@ -72,11 +81,18 @@ describe('RegisterCashMovement', () => {
     expect(result.value.expectedBalances[0]?.minorUnits).toBe(12_500);
     expect(repository.stored?.movements.at(-1)?.registeredBy).toBe('user-001');
     expect(repository.stored?.domainEvents.at(-1)?.type).toBe('CashMovementRegistered');
+    expect(authorizationCalls).toEqual([[context, 'cash.movement.income']]);
   });
 
   it('registers a withdrawal and rejects one above the available balance', async () => {
     const repository = new FakeShiftRepository(openShift());
-    const service = useCase(repository);
+    const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
+    const service = useCase(repository, {
+      authorize: async (...args) => {
+        authorizationCalls.push(args);
+        return true;
+      }
+    });
     const withdrawn = await service.execute({
       shiftId: 'shift-001', type: 'WITHDRAWAL', paymentMethodCode: 'CASH_USD',
       currencyCode: 'USD', amountMinorUnits: 4_000, reason: 'Safe drop'
@@ -92,11 +108,15 @@ describe('RegisterCashMovement', () => {
     }, context);
     expect(excessive.ok).toBe(false);
     if (!excessive.ok) expect(excessive.error.code).toBe('CASH_WITHDRAWAL_INSUFFICIENT_FUNDS');
+    expect(authorizationCalls).toEqual([
+      [context, 'cash.movement.withdrawal'],
+      [context, 'cash.movement.withdrawal']
+    ]);
   });
 
   it('rejects a movement without permission or reason', async () => {
     const forbiddenRepository = new FakeShiftRepository(openShift());
-    const forbidden = await useCase(forbiddenRepository, false).execute({
+    const forbidden = await useCase(forbiddenRepository, { authorize: async () => false }).execute({
       shiftId: 'shift-001', type: 'WITHDRAWAL', paymentMethodCode: 'CASH_USD',
       currencyCode: 'USD', amountMinorUnits: 100, reason: 'Safe drop'
     }, context);

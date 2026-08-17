@@ -3,7 +3,7 @@ import { Money } from '@supermarket/shared';
 import { CashRegister, Shift } from '../../domain/cash/index.js';
 import { PaymentMethod } from '../../domain/currency/index.js';
 import type { ExecutionContext } from '../execution-context.js';
-import type { PaymentMethodRepository, ShiftRepository } from '../ports/index.js';
+import type { AuthorizationService, PaymentMethodRepository, ShiftRepository } from '../ports/index.js';
 import { CloseShift } from './close-shift.js';
 
 const context: ExecutionContext = {
@@ -40,11 +40,14 @@ class FakePaymentMethodRepository implements PaymentMethodRepository {
   }
 }
 
-function useCase(repository: ShiftRepository, authorized = true): CloseShift {
+function useCase(
+  repository: ShiftRepository,
+  authorization: AuthorizationService = { authorize: async () => true }
+): CloseShift {
   return new CloseShift(
     repository,
     new FakePaymentMethodRepository(),
-    { authorize: async () => authorized },
+    authorization,
     { generate: () => 'event-close' },
     { now: () => new Date('2026-08-16T18:00:00.000Z') }
   );
@@ -53,7 +56,13 @@ function useCase(repository: ShiftRepository, authorized = true): CloseShift {
 describe('CloseShift', () => {
   it('closes with expected, declared and difference snapshots', async () => {
     const repository = new FakeShiftRepository(shift());
-    const result = await useCase(repository).execute({
+    const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
+    const result = await useCase(repository, {
+      authorize: async (...args) => {
+        authorizationCalls.push(args);
+        return true;
+      }
+    }).execute({
       shiftId: 'shift-001',
       declaredBalances: [{
         paymentMethodCode: 'CASH_USD', currencyCode: 'USD', amountMinorUnits: 9_900
@@ -68,6 +77,7 @@ describe('CloseShift', () => {
       expectedMinorUnits: 10_000, declaredMinorUnits: 9_900, differenceMinorUnits: -100
     }]);
     expect(repository.stored?.domainEvents.at(-1)?.type).toBe('ShiftClosed');
+    expect(authorizationCalls).toEqual([[context, 'cash.shift.close']]);
   });
 
   it('rejects duplicate declared balance keys without saving', async () => {
@@ -119,7 +129,7 @@ describe('CloseShift', () => {
 
   it('rejects an unauthorized close or one requested by another owner', async () => {
     const forbiddenRepository = new FakeShiftRepository(shift());
-    const forbidden = await useCase(forbiddenRepository, false).execute({
+    const forbidden = await useCase(forbiddenRepository, { authorize: async () => false }).execute({
       shiftId: 'shift-001', declaredBalances: []
     }, context);
     expect(forbidden.ok).toBe(false);

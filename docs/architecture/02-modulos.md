@@ -46,3 +46,8 @@ configurables validadas mediante puertos de aplicación. El agregado `Product`
 conserva el código y la escala de la unidad aplicados, y expone un snapshot
 estable para `sales`; ningún caso de uso de catálogo accede directamente a sus
 tablas.
+
+`identity` mantiene un catálogo de permisos con códigos estables definidos por
+el módulo consumidor. Los roles configurables agrupan esos permisos y los
+usuarios reciben roles activos y asignables. Autenticación, credenciales y
+sesiones no forman parte del dominio de Fase 2.

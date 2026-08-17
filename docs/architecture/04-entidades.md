@@ -46,6 +46,7 @@ Admite cantidades enteras y fraccionarias con escala definida por unidad de medi
 - Los snapshots de productos y precios dentro de una venta preservan el valor aplicado, aunque el catálogo cambie después.
 - `ProductSnapshot` conserva descripción, precio, impuesto, unidad y escala sin exponer una referencia mutable al agregado `Product`.
 - `CashMovement` conserva un snapshot inmutable del método, moneda, monto positivo, dirección, actor, motivo y fecha; el signo contable se deriva del tipo de movimiento.
+- `Permission` usa un código estable normalizado; `Role` agrupa permisos activos y asignables, y `User` deriva sus concesiones de roles activos sin almacenar credenciales.
 
 ## Fases
 

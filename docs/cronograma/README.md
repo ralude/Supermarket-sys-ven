@@ -8,7 +8,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 |---:|---|---|
 | 0 | Arquitectura | ~~Completada~~ |
 | 1 | Infraestructura | ~~Completada~~ |
-| 2 | Codigo de negocio | En progreso: sub-fase 2.06 |
+| 2 | Codigo de negocio | En progreso: sub-fase 2.07 |
 | 3 | Persistencia | Pendiente |
 | 4 | Ledger, outbox y auditoria | Pendiente |
 | 5 | Caja operativa | Pendiente |
@@ -21,7 +21,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 12 | Optimizacion | Pendiente |
 
 **Fase actual:** Fase 2 - Codigo de negocio  
-**Sub-fase actual:** 2.06 - Usuario
+**Sub-fase actual:** 2.07 - Inventario
 
 ## Fases
 
@@ -60,6 +60,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 - La sub-fase 2.03 implementa catálogo con referencias configurables de categoría y unidad, snapshots de producto y validación de barcode por puertos; no agrega persistencia ni CRUD de configuración.
 - La sub-fase 2.04 implementa ventas puras con precio neto, descuentos porcentuales por línea, IGTF configurable, pagos mixtos exactos y autorización mínima; no modifica caja, inventario ni fiscalidad persistida.
 - La sub-fase 2.05 implementa `Shift` como agregado de caja con ownership por terminal/nodo, movimientos manuales de efectivo, balances multi-moneda y cierre con arqueo; persistencia, auditoria y pagos derivados de venta quedan para fases posteriores.
+- La sub-fase 2.06 implementa permisos de codigo estable, roles configurables y usuarios sin credenciales; autenticacion, sesiones, JWT y cifrado permanecen en la Fase 11.
 - La Fase 1 se completó con Electron, React, Fastify, SQLite, Drizzle y ESLint instalados y verificados mediante smoke tests.
 - ADR-0008 establece terminales POS autonomas con Fastify y SQLite local; el nodo coordinador sincroniza eventos y datos de referencia.
 - ADR-0009 establece tablas relacionales como fuente de verdad, ledger append-only para historia y outbox para entrega; no se usa event sourcing completo en el MVP.

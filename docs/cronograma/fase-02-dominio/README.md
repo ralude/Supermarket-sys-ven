@@ -14,7 +14,7 @@ Crear los modulos de dominio y aplicacion con TDD, sin persistencia y sin impres
 - [~~2.03 Producto~~](./2.03-producto.md)
 - [~~2.04 Venta~~](./2.04-venta.md)
 - [~~2.05 Caja~~](./2.05-caja.md)
-- [2.06 Usuario](./2.06-usuario.md)
+- [~~2.06 Usuario~~](./2.06-usuario.md)
 - [2.07 Inventario](./2.07-inventario.md)
 
 ## Restricciones

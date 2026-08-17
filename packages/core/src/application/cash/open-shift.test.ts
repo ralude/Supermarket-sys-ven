@@ -3,6 +3,7 @@ import { CashRegister, Shift } from '../../domain/cash/index.js';
 import { PaymentMethod } from '../../domain/currency/index.js';
 import type { ExecutionContext } from '../execution-context.js';
 import type {
+  AuthorizationService,
   CashRegisterRepository,
   PaymentMethodRepository,
   ShiftRepository
@@ -69,13 +70,13 @@ function register(overrides: { terminalId?: string; isActive?: boolean } = {}): 
 function createUseCase(
   cashRegisterRepository: CashRegisterRepository,
   shiftRepository: ShiftRepository,
-  authorized = true
+  authorization: AuthorizationService = { authorize: async () => true }
 ): OpenShift {
   return new OpenShift(
     cashRegisterRepository,
     shiftRepository,
     new FakePaymentMethodRepository(),
-    { authorize: async () => authorized },
+    authorization,
     { generate: () => 'shift-001' },
     { generate: () => 'movement-001' },
     { generate: () => 'event-001' },
@@ -86,7 +87,17 @@ function createUseCase(
 describe('OpenShift', () => {
   it('opens one shift for the execution terminal with its opening float', async () => {
     const repository = new FakeShiftRepository();
-    const useCase = createUseCase(new FakeCashRegisterRepository(register()), repository);
+    const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
+    const useCase = createUseCase(
+      new FakeCashRegisterRepository(register()),
+      repository,
+      {
+        authorize: async (...args) => {
+          authorizationCalls.push(args);
+          return true;
+        }
+      }
+    );
 
     const result = await useCase.execute({
       cashRegisterId: 'register-001',
@@ -108,6 +119,7 @@ describe('OpenShift', () => {
     expect(repository.stored?.movements[0]?.type).toBe('OPENING_FLOAT');
     expect(repository.stored?.domainEvents.map((event) => event.type)).toEqual(['ShiftOpened']);
     expect(repository.saves).toBe(1);
+    expect(authorizationCalls).toEqual([[context, 'cash.shift.open']]);
   });
 
   it('rejects a second open shift for the same cash register', async () => {
@@ -135,7 +147,7 @@ describe('OpenShift', () => {
     const unauthorized = createUseCase(
       new FakeCashRegisterRepository(register()),
       unauthorizedRepository,
-      false
+      { authorize: async () => false }
     );
     const forbidden = await unauthorized.execute({ cashRegisterId: 'register-001', openingFunds: [] }, context);
 

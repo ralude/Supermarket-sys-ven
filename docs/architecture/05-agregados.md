@@ -12,7 +12,7 @@ Un agregado es una frontera de consistencia. Solo su raíz se carga y modifica d
 | `InventoryItem` | Stock y lotes | stock no negativo; salida FEFO cuando aplique |
 | `Shift` | Turno y movimientos de caja | un turno abierto por caja; arqueo trazable |
 | `PurchaseOrder` | Orden y recepción | recepción acumulada no supera cantidad ordenada |
-| `User` | Identidad y credenciales | roles válidos; credencial nunca expuesta |
+| `User` | Identidad y concesiones | roles activos, asignables y sin duplicados; sin credenciales en Fase 2 |
 
 El agregado `Product` contiene barcodes, precio vigente e historial append-only.
 Los códigos activos también se comprueban globalmente mediante el puerto del
@@ -58,6 +58,14 @@ En Fase 2, la regla de un turno abierto por caja se consulta mediante
 `ShiftRepository`. La restricción transaccional se añade con SQLite. Los
 movimientos derivados de ventas, auditoría y autorización de diferencias
 pertenecen a la Fase 5.
+
+## Agregado `User`
+
+`User` conserva roles configurables y deriva sus permisos efectivos sin copiar
+concesiones. Un usuario inactivo, un rol inactivo o un permiso inactivo siempre
+deniega la operación. Solo se asignan roles y permisos marcados como
+asignables, y no se permiten duplicados por identidad o código. Contraseñas,
+PIN, tokens, sesiones y cifrado pertenecen a la Fase 11.
 
 ## Agregado `FiscalDocument`
 

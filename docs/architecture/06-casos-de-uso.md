@@ -59,11 +59,12 @@ pagos de venta se incorporan en sus fases correspondientes.
 - `CompleteSale`
 - `VoidSale`
 
-En la Fase 2, `ExecutionContext` y `AuthorizationService` se adelantan como
-contratos mínimos para descuentos y anulaciones; `User`, `Role` y `Permission`
-se implementan en la sub-fase 2.06. `RegisterMixedPayment` recibe un lote
-atómico, exige tasas explícitas para conversiones y conserva el snapshot del
-método y de la tasa utilizada.
+En la Fase 2, `ExecutionContext` identifica al actor y
+`AuthorizationService` es la frontera estable para autorizar descuentos,
+anulaciones y operaciones sensibles de caja. `User`, `Role` y `Permission`
+expresan las concesiones sin autenticar el transporte. `RegisterMixedPayment`
+recibe un lote atómico, exige tasas explícitas para conversiones y conserva el
+snapshot del método y de la tasa utilizada.
 
 ### `fiscal`
 
@@ -95,7 +96,7 @@ Todo comando recibe metadatos separados del DTO de negocio:
 - `idempotencyKey` cuando el comando pueda reintentarse;
 - timestamp UTC obtenido mediante `Clock`.
 
-La frontera HTTP autentica la sesión y construye este contexto. El caso de uso aplica autorización mediante `AuthorizationService`; ninguna ruta o UI puede considerarse una frontera de autorización suficiente. En Fase 2 los tests usan actores y autorizadores fake. La autenticación de transporte y las credenciales se implementan antes de exponer la UI operativa.
+La frontera HTTP autentica la sesión y construye este contexto. El caso de uso aplica autorización mediante `AuthorizationService`; ninguna ruta o UI puede considerarse una frontera de autorización suficiente. En Fase 2 los tests verifican los códigos estables solicitados mediante autorizadores fake. La autenticación de transporte y las credenciales se implementan antes de exponer la UI operativa.
 
 ## Errores y resultado
 

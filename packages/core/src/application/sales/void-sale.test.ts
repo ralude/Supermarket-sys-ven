@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Sale } from '../../domain/sales/index.js';
 import type { ExecutionContext } from '../execution-context.js';
-import type { SaleRepository } from '../ports/index.js';
+import type { AuthorizationService, SaleRepository } from '../ports/index.js';
 import { VoidSale } from './void-sale.js';
 
 const context: ExecutionContext = {
@@ -17,9 +17,15 @@ class FakeSaleRepository implements SaleRepository {
 describe('VoidSale', () => {
   it('authorizes and voids a draft with a reason', async () => {
     const repository = new FakeSaleRepository();
+    const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
     const useCase = new VoidSale(
       repository,
-      { authorize: async () => true },
+      {
+        authorize: async (...args) => {
+          authorizationCalls.push(args);
+          return true;
+        }
+      },
       { generate: () => 'event-002' },
       { now: () => new Date('2026-08-15T10:01:00.000Z') }
     );
@@ -28,5 +34,6 @@ describe('VoidSale', () => {
 
     expect(result.ok).toBe(true);
     expect(repository.stored.status).toBe('VOIDED');
+    expect(authorizationCalls).toEqual([[context, 'sale.void']]);
   });
 });
