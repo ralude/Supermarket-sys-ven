@@ -9,7 +9,7 @@ Un agregado es una frontera de consistencia. Solo su raíz se carga y modifica d
 | `Sale` | Venta, líneas y pagos | total consistente; no completar sin pago suficiente; estado válido |
 | `FiscalDocument` | Documento fiscal y líneas | inmutable una vez emitido; corrección por nota fiscal |
 | `Product` | Producto, códigos, precio vigente e historial de precios | barcode activo único; unidad válida; precio no negativo; cambios de precio append-only |
-| `InventoryItem` | Stock y lotes | stock no negativo; salida FEFO cuando aplique |
+| `StockItem` | Stock, lotes y movimientos | saldo derivado; stock y saldo por lote no negativos |
 | `Shift` | Turno y movimientos de caja | un turno abierto por caja; arqueo trazable |
 | `PurchaseOrder` | Orden y recepción | recepción acumulada no supera cantidad ordenada |
 | `User` | Identidad y concesiones | roles activos, asignables y sin duplicados; sin credenciales en Fase 2 |
@@ -67,13 +67,26 @@ deniega la operación. Solo se asignan roles y permisos marcados como
 asignables, y no se permiten duplicados por identidad o código. Contraseñas,
 PIN, tokens, sesiones y cifrado pertenecen a la Fase 11.
 
+## Agregado `StockItem`
+
+`StockItem` inicia con saldo cero y solo cambia mediante movimientos
+append-only. Cada movimiento usa la escala configurada del producto, conserva
+actor, motivo, referencia y timestamp, y deriva la dirección de uno de estos
+tipos: recepción de compra, salida de venta, merma, ajuste positivo o ajuste
+negativo. Las salidas nunca pueden dejar saldo negativo.
+
+Cuando `tracksBatches` está activo, todo movimiento exige un lote registrado y
+la disponibilidad se valida por lote. Sin esa marca, no se aceptan lotes. La
+selección FEFO, el consumo idempotente de ventas, el kardex y la reconciliación
+offline pertenecen a la Fase 6.
+
 ## Agregado `FiscalDocument`
 
 Su estado de impresión se persiste por separado del contenido inmutable del documento. Un error de comunicación no debe crear silenciosamente un segundo documento.
 
 ## Consistencia entre agregados
 
-Una venta no debe modificar directamente el agregado `Shift` o `InventoryItem`. El caso de uso coordina transacciones y eventos según la política definida. Si el flujo requiere atomicidad multiagregado, se debe documentar como una decisión específica y probarla con SQLite.
+Una venta no debe modificar directamente el agregado `Shift` o `StockItem`. El caso de uso coordina transacciones y eventos según la política definida. Si el flujo requiere atomicidad multiagregado, se debe documentar como una decisión específica y probarla con SQLite.
 
 ## Ownership entre nodos
 

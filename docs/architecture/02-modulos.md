@@ -51,3 +51,7 @@ tablas.
 el módulo consumidor. Los roles configurables agrupan esos permisos y los
 usuarios reciben roles activos y asignables. Autenticación, credenciales y
 sesiones no forman parte del dominio de Fase 2.
+
+`inventory` usa `StockItem` como raíz del agregado. El saldo se deriva de
+movimientos append-only con la escala del producto; los lotes son opcionales y
+se exigen únicamente cuando el artículo declara `tracksBatches`.

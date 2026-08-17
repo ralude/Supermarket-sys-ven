@@ -47,6 +47,8 @@ Admite cantidades enteras y fraccionarias con escala definida por unidad de medi
 - `ProductSnapshot` conserva descripción, precio, impuesto, unidad y escala sin exponer una referencia mutable al agregado `Product`.
 - `CashMovement` conserva un snapshot inmutable del método, moneda, monto positivo, dirección, actor, motivo y fecha; el signo contable se deriva del tipo de movimiento.
 - `Permission` usa un código estable normalizado; `Role` agrupa permisos activos y asignables, y `User` deriva sus concesiones de roles activos sin almacenar credenciales.
+- `StockMovement` conserva tipo, cantidad positiva escalada, lote opcional, actor, motivo, referencia y fecha; su dirección se deriva del tipo y nunca de una cantidad con signo.
+- `Batch` pertenece a `StockItem`, normaliza su número de lote y conserva un vencimiento UTC opcional sin exponer fechas mutables.
 
 ## Fases
 

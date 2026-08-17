@@ -16,7 +16,7 @@ Esta topología conserva la regla single-writer: cada archivo SQLite tiene un ú
 | `Product`, precios e impuestos | nodo coordinador de tienda | leer snapshot local versionado | aplicar versiones ordenadas; no usar last-write-wins |
 | tasas de cambio | nodo coordinador tras confirmación humana | usar última tasa vigente local | conservar fuente, vigencia y versión; no aplicar sugerencias automáticamente |
 | usuarios, roles y permisos | nodo coordinador de tienda | usar concesiones cacheadas según política de expiración | permisos con códigos estables y roles configurables; revocaciones se aplican al sincronizar; la política definitiva se cierra antes del piloto |
-| inventario | ledger autoritativo del nodo coordinador | vender contra una proyección local | una desconexión no garantiza stock global; registrar discrepancia si el movimiento no puede aplicarse |
+| inventario (`StockItem`) | ledger autoritativo del nodo coordinador | vender contra una proyección local | movimientos append-only y saldo derivado; una desconexión no garantiza stock global; registrar discrepancia si el movimiento no puede aplicarse |
 | reportes | proyecciones de lectura | consultar último estado sincronizado | reconstruir la proyección desde eventos idempotentes |
 
 ## Política inicial de inventario offline

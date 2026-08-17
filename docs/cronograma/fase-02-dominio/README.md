@@ -1,6 +1,6 @@
 # Fase 2: Codigo de negocio
 
-- **Estado:** En progreso
+- **Estado:** Completada
 - **Indice:** [Cronograma](../README.md)
 
 ## Proposito
@@ -15,7 +15,7 @@ Crear los modulos de dominio y aplicacion con TDD, sin persistencia y sin impres
 - [~~2.04 Venta~~](./2.04-venta.md)
 - [~~2.05 Caja~~](./2.05-caja.md)
 - [~~2.06 Usuario~~](./2.06-usuario.md)
-- [2.07 Inventario](./2.07-inventario.md)
+- [~~2.07 Inventario~~](./2.07-inventario.md)
 
 ## Restricciones
 

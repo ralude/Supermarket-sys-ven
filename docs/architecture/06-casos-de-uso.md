@@ -66,6 +66,12 @@ expresan las concesiones sin autenticar el transporte. `RegisterMixedPayment`
 recibe un lote atómico, exige tasas explícitas para conversiones y conserva el
 snapshot del método y de la tasa utilizada.
 
+### `inventory`
+
+La Fase 2 expone únicamente el agregado puro `StockItem`; no crea casos de uso,
+DTO ni repositorios. Recepciones operativas, consumo de `SaleCompleted`, mermas,
+ajustes autorizados y consultas de kardex se implementan en la Fase 6.
+
 ### `fiscal`
 
 - `IssueFiscalDocument`

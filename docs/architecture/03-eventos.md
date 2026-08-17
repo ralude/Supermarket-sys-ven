@@ -44,6 +44,11 @@ explica cada ingreso o retiro manual y `ShiftClosed` congela saldo esperado,
 conteo declarado y diferencia por moneda y método. La integración de pagos de
 venta con el turno queda para la Fase 5.
 
+En Fase 2, `inventory` conserva sus movimientos como historia inmutable dentro
+de `StockItem`, pero no publica eventos de integración. `StockAdjusted`,
+`StockDepleted` y `BatchExpiringSoon` se concretan con los flujos operativos,
+persistencia y políticas de la Fase 6.
+
 ## Flujo de publicación
 
 ```text
