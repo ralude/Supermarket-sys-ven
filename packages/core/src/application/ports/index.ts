@@ -15,3 +15,4 @@ export type { ProductSnapshotProvider } from './product-snapshot-provider.js';
 export type { SaleRepository } from './sale-repository.js';
 export type { CashRegisterRepository } from './cash-register-repository.js';
 export type { ShiftRepository } from './shift-repository.js';
+export type { UnitOfWork } from './unit-of-work.js';

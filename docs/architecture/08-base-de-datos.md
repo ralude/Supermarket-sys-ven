@@ -7,6 +7,7 @@
 - `better-sqlite3` como driver inicial por su operación síncrona y predecible en un proceso local.
 - WAL para permitir lecturas concurrentes durante escrituras.
 - Solo el proceso Fastify/servidor abre el archivo de base de datos.
+- Cada archivo adquiere un lock de ownership del nodo; otro proceso que use el driver no puede abrirlo hasta que el dueño cierre o el proceso deje de existir.
 - Las tablas relacionales de agregados son la fuente de verdad del estado operativo; el ledger no se usa para rehidratar agregados al arrancar.
 
 ## Pragmas requeridos
@@ -44,6 +45,10 @@ La configuración se ejecuta y verifica al abrir la conexión.
 
 Los cambios de un caso de uso se ejecutan dentro de una transacción. El agregado, los hechos de ledger, la auditoría, la idempotencia y el outbox que correspondan se confirman juntos.
 
+En la Fase 3, `SqliteUnitOfWork` ejecuta `BEGIN IMMEDIATE -> guardar -> COMMIT` y revierte ante cualquier error. Los repositorios Drizzle rechazan escrituras sin una transaccion activa. Una venta completada o anulada y un turno cerrado son inmutables; las versiones obsoletas se rechazan.
+
+La lectura relacional rehidrata agregados sin regenerar eventos de dominio históricos. Los snapshots comerciales de una venta se almacenan junto a la venta y no dependen de la configuracion vigente del catalogo.
+
 No se permite una transacción abierta durante una llamada de hardware o red. La impresión debe usar un estado persistido y un mecanismo de reconciliación.
 
 ## Migraciones y respaldo
@@ -52,6 +57,8 @@ No se permite una transacción abierta durante una llamada de hardware o red. La
 - Las migraciones se prueban sobre una base temporal antes de arrancar producción.
 - Backups automáticos con snapshot consistente y rotación.
 - Restauración probada periódicamente, no solo creación de backups.
+- `schema_migrations` conserva version, nombre, checksum y momento de aplicacion. Un checksum distinto detiene el arranque.
+- Antes de migrar una base existente se valida un respaldo consistente; ante una falla de migracion o validacion se restaura ese archivo. No existen scripts `down` destructivos.
 
 ## Fase 0
 

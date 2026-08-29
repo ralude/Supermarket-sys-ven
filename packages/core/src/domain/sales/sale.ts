@@ -49,6 +49,24 @@ export type RegisterPaymentsProps = {
   eventIds: string[];
 };
 
+export type RestoredSaleProps = {
+  id: string;
+  currencyCode: string;
+  terminalId: string;
+  originNodeId: string;
+  startedBy: string;
+  startedAt: Date;
+  status: SaleStatus;
+  version: number;
+  items: SaleItem[];
+  payments: Payment[];
+  financialTransactionTax: Money;
+  completedAt: Date | null;
+  voidedAt: Date | null;
+  voidReason: string | null;
+  voidedBy: string | null;
+};
+
 export class Sale {
   private readonly currentItems: SaleItem[] = [];
   private readonly currentPayments: Payment[] = [];
@@ -59,6 +77,7 @@ export class Sale {
   private currentCompletedAt: Date | null = null;
   private currentVoidedAt: Date | null = null;
   private currentVoidReason: string | null = null;
+  private currentVoidedBy: string | null = null;
 
   private constructor(
     readonly id: string,
@@ -99,6 +118,30 @@ export class Sale {
     );
   }
 
+  /** Rehydrates persisted state without publishing historical domain events. */
+  static restore(props: RestoredSaleProps): Sale {
+    const sale = Sale.start({
+      id: props.id,
+      currencyCode: props.currencyCode,
+      terminalId: props.terminalId,
+      originNodeId: props.originNodeId,
+      startedBy: props.startedBy,
+      startedAt: props.startedAt,
+      eventId: 'restored'
+    });
+    sale.currentItems.push(...props.items);
+    sale.currentPayments.push(...props.payments);
+    sale.currentStatus = props.status;
+    sale.currentVersion = props.version;
+    sale.currentFinancialTransactionTax = props.financialTransactionTax;
+    sale.currentCompletedAt = props.completedAt === null ? null : new Date(props.completedAt);
+    sale.currentVoidedAt = props.voidedAt === null ? null : new Date(props.voidedAt);
+    sale.currentVoidReason = props.voidReason;
+    sale.currentVoidedBy = props.voidedBy;
+    sale.events.splice(0);
+    return sale;
+  }
+
   get status(): SaleStatus {
     return this.currentStatus;
   }
@@ -129,6 +172,10 @@ export class Sale {
 
   get voidReason(): string | null {
     return this.currentVoidReason;
+  }
+
+  get voidedBy(): string | null {
+    return this.currentVoidedBy;
   }
 
   get domainEvents(): readonly SaleDomainEvent[] {
@@ -324,6 +371,7 @@ export class Sale {
     this.currentStatus = 'VOIDED';
     this.currentVoidedAt = new Date(props.voidedAt);
     this.currentVoidReason = reason;
+    this.currentVoidedBy = props.voidedBy.trim();
     this.recordEvent({
       type: 'SaleVoided',
       eventId: props.eventId,

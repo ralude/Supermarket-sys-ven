@@ -39,6 +39,20 @@ export type ChangePriceProps = {
   eventId: string;
 };
 
+export type RestoredProductProps = {
+  id: string;
+  name: string;
+  description: string;
+  categoryId: string;
+  unitOfMeasure: UnitOfMeasure;
+  barcodes: Barcode[];
+  price: Money;
+  taxRate: TaxRate;
+  priceHistory: PriceHistory[];
+  isActive: boolean;
+  version: number;
+};
+
 export class Product {
   private readonly events: ProductDomainEvent[];
   private readonly histories: PriceHistory[];
@@ -132,6 +146,42 @@ export class Product {
       },
       event
     );
+  }
+
+  /** Rehydrates persisted state without publishing historical domain events. */
+  static restore(props: RestoredProductProps): Product {
+    const firstHistory = props.priceHistory[0];
+    if (!firstHistory) {
+      throw new DomainError('PRODUCT_PRICE_HISTORY_REQUIRED', 'Product price history is required.');
+    }
+    const product = new Product(props.id, {
+      name: props.name,
+      description: props.description,
+      categoryId: props.categoryId,
+      unitOfMeasure: props.unitOfMeasure,
+      barcodes: props.barcodes,
+      price: props.price,
+      taxRate: props.taxRate,
+      priceHistory: firstHistory,
+      isActive: props.isActive
+    }, {
+      type: 'ProductCreated',
+      eventId: 'restored',
+      aggregateId: props.id,
+      aggregateType: 'Product',
+      aggregateVersion: props.version,
+      occurredAt: firstHistory.recordedAt,
+      payload: {
+        name: props.name,
+        description: props.description,
+        price: props.price,
+        taxRate: props.taxRate
+      }
+    });
+    product.histories.splice(0, product.histories.length, ...props.priceHistory);
+    product.events.splice(0);
+    product.currentVersion = props.version;
+    return product;
   }
 
   get name(): string {

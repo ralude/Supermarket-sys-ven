@@ -1,6 +1,6 @@
 # Fase 3: Persistencia
 
-- **Estado:** Pendiente
+- **Estado:** Completada
 - **Indice:** [Cronograma](../README.md)
 
 ## Proposito
@@ -9,10 +9,10 @@ Persistir agregados con SQLite y Drizzle mediante transacciones explicitas.
 
 ## Sub-fases
 
-- [3.01 Conexion SQLite](./3.01-conexion-sqlite.md)
-- [3.02 Migraciones](./3.02-migraciones.md)
-- [3.03 Repositorios](./3.03-repositorios.md)
-- [3.04 Integration tests](./3.04-integration-tests.md)
+- [~~3.01 Conexion SQLite~~](./3.01-conexion-sqlite.md)
+- [~~3.02 Migraciones~~](./3.02-migraciones.md)
+- [~~3.03 Repositorios~~](./3.03-repositorios.md)
+- [~~3.04 Integration tests~~](./3.04-integration-tests.md)
 
 ## Regla principal
 

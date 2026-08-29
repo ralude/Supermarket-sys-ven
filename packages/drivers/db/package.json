@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@supermarket/core": "workspace:*",
     "@supermarket/shared": "workspace:*",
     "better-sqlite3": "^12.0.0",
     "drizzle-orm": "^0.44.5"

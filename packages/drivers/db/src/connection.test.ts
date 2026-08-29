@@ -52,4 +52,21 @@ describe('SQLite connection', () => {
     expect(caught).toBeInstanceOf(InfrastructureError);
     expect((caught as InfrastructureError).code).toBe('DATABASE_OPEN_FAILED');
   });
+
+  it('allows only one owner for a node database and releases ownership on close', () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), 'supermarket-db-'));
+    const databasePath = join(temporaryDirectory, 'node.sqlite');
+    const first = openDatabase(databasePath);
+    handles.push(first);
+
+    expect(() => openDatabase(databasePath)).toThrowError(
+      expect.objectContaining({ code: 'DATABASE_NODE_LOCKED' })
+    );
+
+    first.close();
+    handles.splice(handles.indexOf(first), 1);
+    const reopened = openDatabase(databasePath);
+    reopened.close();
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  });
 });

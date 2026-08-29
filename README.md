@@ -6,7 +6,7 @@ El sistema está diseñado para operar standalone o en LAN mediante terminales a
 
 ## Estado actual
 
-Las fases 0 de arquitectura, 1 de infraestructura y 2 de codigo de negocio estan completadas. La Fase 3 de persistencia esta en progreso (sub-fase 3.01); el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
+Las fases 0 de arquitectura, 1 de infraestructura, 2 de codigo de negocio y 3 de persistencia estan completadas. La siguiente sub-fase es 4.01, ledger de eventos; el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
 
 La documentación arquitectónica está organizada por responsabilidad en [`docs/architecture/README.md`](./docs/architecture/README.md).
 El alcance del MVP, piloto, producción y plataforma empresarial se separa en [`docs/producto/alcance-entregas.md`](./docs/producto/alcance-entregas.md).

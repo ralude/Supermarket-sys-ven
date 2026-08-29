@@ -56,6 +56,21 @@ export type CloseShiftProps = {
   eventId: string;
 };
 
+export type RestoredShiftProps = {
+  id: string;
+  cashRegisterId: string;
+  terminalId: string;
+  originNodeId: string;
+  openedBy: string;
+  openedAt: Date;
+  movements: CashMovement[];
+  status: ShiftStatus;
+  version: number;
+  closingBalances: ShiftClosingBalance[] | null;
+  closedAt: Date | null;
+  closedBy: string | null;
+};
+
 const balanceKey = (paymentMethodCode: string, currencyCode: string): string =>
   `${paymentMethodCode}:${currencyCode}`;
 
@@ -131,6 +146,41 @@ export class Shift {
       movements,
       event
     );
+  }
+
+  /** Rehydrates persisted state without publishing historical domain events. */
+  static restore(props: RestoredShiftProps): Shift {
+    const shift = new Shift(
+      props.id,
+      props.cashRegisterId,
+      props.terminalId,
+      props.originNodeId,
+      props.openedBy,
+      props.openedAt,
+      props.movements,
+      {
+        type: 'ShiftOpened',
+        eventId: 'restored',
+        aggregateId: props.id,
+        aggregateType: 'Shift',
+        aggregateVersion: props.version,
+        occurredAt: props.openedAt,
+        payload: {
+          cashRegisterId: props.cashRegisterId,
+          terminalId: props.terminalId,
+          originNodeId: props.originNodeId,
+          openedBy: props.openedBy,
+          openingBalances: []
+        }
+      }
+    );
+    shift.currentStatus = props.status;
+    shift.currentVersion = props.version;
+    shift.currentClosingBalances = props.closingBalances;
+    shift.currentClosedAt = props.closedAt === null ? null : new Date(props.closedAt);
+    shift.currentClosedBy = props.closedBy;
+    shift.events.splice(0);
+    return shift;
   }
 
   get status(): ShiftStatus { return this.currentStatus; }

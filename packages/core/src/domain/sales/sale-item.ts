@@ -35,6 +35,12 @@ export class SaleItem {
     return new SaleItem(props.id, props.snapshot, props.quantity);
   }
 
+  static restore(props: SaleItemProps & { discount: Discount | null }): SaleItem {
+    const item = SaleItem.create(props);
+    item.currentDiscount = props.discount;
+    return item;
+  }
+
   get discount(): Discount | null {
     return this.currentDiscount;
   }
