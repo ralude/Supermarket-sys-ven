@@ -5,6 +5,7 @@ export { RemoveItemFromSale } from './remove-item-from-sale.js';
 export { RegisterMixedPayment } from './register-mixed-payment.js';
 export { StartSale } from './start-sale.js';
 export { VoidSale } from './void-sale.js';
+export { GetSaleHistory, type SaleHistoryVersion } from './get-sale-history.js';
 export type {
   AddItemToSaleInput,
   ApplyDiscountToSaleInput,

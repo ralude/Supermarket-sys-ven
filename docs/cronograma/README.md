@@ -10,7 +10,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 1 | Infraestructura | ~~Completada~~ |
 | 2 | Codigo de negocio | ~~Completada~~ |
 | 3 | Persistencia | ~~Completada~~ |
-| 4 | Ledger, outbox y auditoria | Pendiente |
+| 4 | Ledger, outbox y auditoria | ~~Completada~~ |
 | 5 | Caja operativa | Pendiente |
 | 6 | Inventario operativo | Pendiente |
 | 7 | Driver fiscal fake | Pendiente |
@@ -20,8 +20,8 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 11 | Seguridad | Pendiente |
 | 12 | Optimizacion | Pendiente |
 
-**Fase actual:** Fase 4 - Ledger, outbox y auditoria
-**Sub-fase actual:** 4.01 - Ledger de eventos
+**Fase actual:** Fase 5 - Caja operativa
+**Sub-fase actual:** 5.01 - Apertura
 
 ## Fases
 
@@ -29,7 +29,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 - [~~Fase 1 - Infraestructura~~](./fase-01-infraestructura/README.md)
 - [~~Fase 2 - Codigo de negocio~~](./fase-02-dominio/README.md)
 - [~~Fase 3 - Persistencia~~](./fase-03-persistencia/README.md)
-- [Fase 4 - Ledger, outbox y auditoria](./fase-04-event-store/README.md)
+- [~~Fase 4 - Ledger, outbox y auditoria~~](./fase-04-event-store/README.md)
 - [Fase 5 - Caja](./fase-05-caja/README.md)
 - [Fase 6 - Inventario](./fase-06-inventario/README.md)
 - [Fase 7 - Driver fiscal fake](./fase-07-driver-fiscal-fake/README.md)

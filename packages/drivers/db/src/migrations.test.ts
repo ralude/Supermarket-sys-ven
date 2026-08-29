@@ -26,22 +26,30 @@ describe('database migrations', () => {
     const handle = openDatabase(':memory:');
     handles.push(handle);
 
-    expect(applyMigrations(handle.sqlite)).toEqual([1]);
+    expect(applyMigrations(handle.sqlite)).toEqual(migrations.map((migration) => migration.version));
     expect(applyMigrations(handle.sqlite)).toEqual([]);
 
     const applied = handle.sqlite.prepare(
       'select version, name, checksum from schema_migrations order by version'
     ).all();
     expect(applied).toEqual([
-      expect.objectContaining({ version: 1, name: 'initial_business_schema' })
+      expect.objectContaining({ version: 1, name: 'initial_business_schema' }),
+      expect.objectContaining({ version: 2, name: 'business_event_ledger' }),
+      expect.objectContaining({ version: 3, name: 'outbox' }),
+      expect.objectContaining({ version: 4, name: 'audit_log' }),
+      expect.objectContaining({ version: 5, name: 'idempotency' })
     ]);
 
     const tables = handle.sqlite.prepare(
       "select name from sqlite_master where type = 'table' order by name"
     ).pluck().all();
     expect(tables).toEqual(expect.arrayContaining([
+      'business_event',
+      'audit_log',
       'cash_movements',
       'exchange_rates',
+      'idempotency_key',
+      'outbox_event',
       'product_barcodes',
       'product_price_history',
       'products',
@@ -60,21 +68,21 @@ describe('database migrations', () => {
     handles.push(handle);
     applyMigrations(handle.sqlite);
     const next: Migration = {
-      version: 2,
+      version: migrations.length + 1,
       name: 'add_probe',
       sql: 'create table migration_probe (id text primary key);'
     };
 
-    expect(applyMigrations(handle.sqlite, [...migrations, next])).toEqual([2]);
+    expect(applyMigrations(handle.sqlite, [...migrations, next])).toEqual([next.version]);
     expect(() => applyMigrations(handle.sqlite, [
       ...migrations,
       next,
-      { version: 3, name: 'broken', sql: 'create table' }
+      { version: next.version + 1, name: 'broken', sql: 'create table' }
     ])).toThrowError(expect.objectContaining({ code: 'DATABASE_MIGRATION_FAILED' }));
 
     expect(handle.sqlite.prepare(
-      'select count(*) from schema_migrations where version = 3'
-    ).pluck().get()).toBe(0);
+      'select count(*) from schema_migrations where version = ?'
+    ).pluck().get(next.version + 1)).toBe(0);
   });
 
   it('restores a verified backup when post-migration validation fails', () => {
@@ -89,7 +97,7 @@ describe('database migrations', () => {
     initial.close();
 
     const next: Migration = {
-      version: 2,
+      version: migrations.length + 1,
       name: 'post_backup_change',
       sql: 'create table post_backup_change (id text primary key);'
     };

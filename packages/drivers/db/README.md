@@ -18,7 +18,9 @@ Las consultas rehidratan agregados sin regenerar eventos de dominio. Los estados
 
 ## Limites actuales
 
-El ledger, outbox, auditoria e idempotencia pertenecen a la Fase 4. La persistencia de identidad y el inventario operativo se incorporan en las fases definidas por el cronograma.
+La Fase 4 agrega ledger append-only, outbox reintentable, auditoria redactada e idempotencia durable. `SaleCompleted.v1` es el primer evento de integracion; el relay actual usa el puerto `EventPublisher` y se prueba con un fake, sin adelantar transporte de red.
+
+`GetSaleHistory` lee `business_event` por version y no reemplaza la fuente de verdad relacional. La persistencia de identidad y el inventario operativo se incorporan en las fases definidas por el cronograma.
 
 Solo el proceso Fastify/servidor debe abrir el archivo SQLite. El renderer y Electron no acceden directamente a la base.
 

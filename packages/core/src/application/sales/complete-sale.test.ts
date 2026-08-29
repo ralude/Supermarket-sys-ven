@@ -4,7 +4,15 @@ import { ProductSnapshot } from '../../domain/catalog/index.js';
 import { PaymentMethod } from '../../domain/currency/index.js';
 import { Payment, Sale } from '../../domain/sales/index.js';
 import type { ExecutionContext } from '../execution-context.js';
-import type { SaleRepository } from '../ports/index.js';
+import type {
+  BusinessEventStore,
+  IdempotencyRecord,
+  IdempotencyStore,
+  OutboxStore,
+  SaleRepository,
+  UnitOfWork
+} from '../ports/index.js';
+import type { BusinessEventV1 } from '../events/index.js';
 import { CompleteSale } from './complete-sale.js';
 
 const context: ExecutionContext = {
@@ -38,7 +46,32 @@ class FakeSaleRepository implements SaleRepository {
 describe('CompleteSale', () => {
   it('completes exactly once for an idempotency key', async () => {
     const repository = new FakeSaleRepository();
-    const useCase = new CompleteSale(repository, { generate: () => 'event-004' }, { now: () => new Date('2026-08-15T10:02:00.000Z') });
+    const enqueued: BusinessEventV1[] = [];
+    let idempotentRecord: IdempotencyRecord | null = null;
+    const unitOfWork: UnitOfWork = { execute: (work) => work() };
+    const eventStore: BusinessEventStore = {
+      append: async () => undefined,
+      findByAggregate: async () => []
+    };
+    const outboxStore: OutboxStore = {
+      enqueue: async (events) => { enqueued.push(...events); },
+      claimAvailable: async () => [],
+      markPublished: async () => undefined,
+      markFailed: async () => undefined
+    };
+    const idempotencyStore: IdempotencyStore = {
+      find: async () => idempotentRecord,
+      save: async (record) => { idempotentRecord = record; }
+    };
+    const useCase = new CompleteSale(
+      repository,
+      { generate: () => 'event-004' },
+      { now: () => new Date('2026-08-15T10:02:00.000Z') },
+      unitOfWork,
+      eventStore,
+      outboxStore,
+      idempotencyStore
+    );
 
     const first = await useCase.execute({ saleId: 'sale-001' }, context);
     const second = await useCase.execute({ saleId: 'sale-001' }, context);
@@ -47,5 +80,8 @@ describe('CompleteSale', () => {
     expect(second).toEqual(first);
     expect(repository.saves).toBe(1);
     expect(repository.stored.status).toBe('COMPLETED');
+    expect(enqueued.map((event) => event.eventType)).toEqual(['SaleCompleted']);
+    const conflict = await useCase.execute({ saleId: 'sale-002' }, context);
+    expect(conflict).toMatchObject({ ok: false, error: { code: 'IDEMPOTENCY_KEY_CONFLICT' } });
   });
 });

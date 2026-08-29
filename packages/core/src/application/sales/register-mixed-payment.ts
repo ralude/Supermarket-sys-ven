@@ -10,13 +10,16 @@ import {
 import { CurrencyConverter } from '../../domain/currency/index.js';
 import { Payment } from '../../domain/sales/index.js';
 import type { ExecutionContext } from '../execution-context.js';
+import { persistBusinessChange } from '../events/index.js';
 import type {
   Clock,
   ExchangeRateRepository,
   FinancialTransactionTaxPolicyProvider,
   IdGenerator,
   PaymentMethodRepository,
-  SaleRepository
+  SaleRepository,
+  BusinessEventStore,
+  UnitOfWork
 } from '../ports/index.js';
 import type { RegisterMixedPaymentInput, SaleDto } from './dtos.js';
 import { toSaleDto } from './mappers.js';
@@ -29,7 +32,9 @@ export class RegisterMixedPayment {
     private readonly taxPolicyProvider: FinancialTransactionTaxPolicyProvider,
     private readonly paymentIdGenerator: IdGenerator,
     private readonly eventIdGenerator: IdGenerator,
-    private readonly clock: Clock
+    private readonly clock: Clock,
+    private readonly unitOfWork?: UnitOfWork,
+    private readonly eventStore?: BusinessEventStore
   ) {}
 
   async execute(input: RegisterMixedPaymentInput, context: ExecutionContext): Promise<Result<SaleDto, AppError>> {
@@ -86,7 +91,10 @@ export class RegisterMixedPayment {
         occurredAt: at,
         eventIds: payments.map(() => this.eventIdGenerator.generate())
       });
-      await this.repository.save(sale);
+      await persistBusinessChange(
+        () => this.repository.save(sale), sale.domainEvents, context,
+        this.unitOfWork, this.eventStore
+      );
       return ok(toSaleDto(sale));
     } catch (error) {
       if (error instanceof DomainError) return err(error);

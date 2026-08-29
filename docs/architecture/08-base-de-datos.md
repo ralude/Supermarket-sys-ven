@@ -45,6 +45,10 @@ La configuración se ejecuta y verifica al abrir la conexión.
 
 Los cambios de un caso de uso se ejecutan dentro de una transacción. El agregado, los hechos de ledger, la auditoría, la idempotencia y el outbox que correspondan se confirman juntos.
 
+En Fase 4, los comandos de venta componen `UnitOfWork` con los escritores transversales. `CompleteSale` confirma venta, ledger, outbox y resultado idempotente en un solo commit. Las anulaciones y overrides confirman auditoria junto al cambio de venta.
+
+`business_event` y `audit_log` usan triggers que rechazan `UPDATE` y `DELETE`. `outbox_event` permite cambios de estado para entrega y `idempotency_key` conserva solo resultados completados hasta su expiracion.
+
 En la Fase 3, `SqliteUnitOfWork` ejecuta `BEGIN IMMEDIATE -> guardar -> COMMIT` y revierte ante cualquier error. Los repositorios Drizzle rechazan escrituras sin una transaccion activa. Una venta completada o anulada y un turno cerrado son inmutables; las versiones obsoletas se rechazan.
 
 La lectura relacional rehidrata agregados sin regenerar eventos de dominio históricos. Los snapshots comerciales de una venta se almacenan junto a la venta y no dependen de la configuracion vigente del catalogo.

@@ -61,7 +61,11 @@ Caso de uso
 
 No se debe publicar un evento externo antes del commit. Si el proceso falla después del commit, el relay reintenta desde el outbox.
 
-Las tablas relacionales son la fuente de verdad del estado actual. `business_event`, `outbox_event` y `audit_log` tienen finalidades distintas y no se sustituyen entre sí.
+Desde la Fase 4, `BusinessEventV1` es el sobre persistido: separa el payload del dominio y conserva version contractual, agregado, version, nodo de origen, correlacion, actor y UTC. Los value objects se convierten explicitamente a primitivas JSON.
+
+`business_event` es append-only y ordena por version del agregado. `SaleCompleted.v1` es el primer contrato seleccionado para `outbox_event`. El relay reclama con lease, confirma la transaccion y solo entonces publica; la confirmacion o el reintento se persisten en otra transaccion corta.
+
+Las tablas relacionales son la fuente de verdad del estado actual. `business_event`, `outbox_event` y `audit_log` tienen finalidades distintas y no se sustituyen entre sí. `GetSaleHistory` proyecta una vista por version desde el ledger, pero nunca rehidrata `Sale` para operacion.
 
 ## Fase 0
 

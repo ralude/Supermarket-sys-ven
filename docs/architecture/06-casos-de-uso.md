@@ -112,6 +112,8 @@ Los fallos esperados de negocio se devuelven como `Result<T, AppError>`. Los err
 
 Los comandos que pueden reintentarse después de un corte reciben una clave de idempotencia. `CompleteSale`, `IssueFiscalDocument` y cierres fiscales requieren especial cuidado para no duplicar efectos.
 
+En Fase 4, `CompleteSale` usa `IdempotencyStore`: nodo, operacion y clave identifican la solicitud; un fingerprint distinto produce `IDEMPOTENCY_KEY_CONFLICT`. El resultado completado se guarda en el mismo commit y expira a los 30 dias sin afectar ledger ni auditoria.
+
 ## Fase 0
 
 No se implementan casos de uso. Se documentan sus contratos y dependencias para que la Fase 1 no acople la aplicación a los adaptadores.

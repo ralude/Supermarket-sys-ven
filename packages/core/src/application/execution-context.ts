@@ -4,4 +4,5 @@ export type ExecutionContext = {
   originNodeId: string;
   correlationId: string;
   idempotencyKey?: string;
+  actorRoleCodes?: readonly string[];
 };

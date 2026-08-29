@@ -47,6 +47,8 @@ Nunca se registran PINs, contraseñas, tokens, claves, números completos de tar
 
 La auditoría debe ser append-only desde la aplicación. Una cadena hash opcional puede añadirse cuando exista un requisito de evidencia contra manipulación.
 
+Desde la Fase 4, `audit_log` conserva actor, roles, accion, entidad, resumen antes/despues, motivo, terminal, nodo, UTC y correlacion. Los adaptadores redactan claves sensibles antes de serializar y triggers SQLite impiden mutar o borrar evidencia. La cadena hash sigue diferida hasta que exista un requisito formal.
+
 ## Fase 0
 
 Se define la separación y el contrato de campos. El logging técnico se compone con el transporte antes de la UI operativa; `audit_log` se implementa en la Fase 4 después de disponer de persistencia.

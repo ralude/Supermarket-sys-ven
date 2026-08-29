@@ -3,14 +3,15 @@ import { Money, Quantity, TaxRate } from '@supermarket/shared';
 import { ProductSnapshot } from '../../domain/catalog/index.js';
 import { Sale } from '../../domain/sales/index.js';
 import type { ExecutionContext } from '../execution-context.js';
-import type { AuthorizationService, SaleRepository } from '../ports/index.js';
+import type { AuditEntry, AuthorizationService, SaleRepository } from '../ports/index.js';
 import { ApplyDiscountToSale } from './apply-discount-to-sale.js';
 
 const context: ExecutionContext = {
   actorId: 'user-001',
   terminalId: 'terminal-001',
   originNodeId: 'node-001',
-  correlationId: 'correlation-001'
+  correlationId: 'correlation-001',
+  actorRoleCodes: ['MANAGER']
 };
 
 class FakeSaleRepository implements SaleRepository {
@@ -54,6 +55,7 @@ class FakeSaleRepository implements SaleRepository {
 describe('ApplyDiscountToSale', () => {
   it('requires authorization and applies the configured line limit', async () => {
     const repository = new FakeSaleRepository();
+    const auditEntries: AuditEntry[] = [];
     const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
     const useCase = new ApplyDiscountToSale(
       repository,
@@ -66,7 +68,10 @@ describe('ApplyDiscountToSale', () => {
           authorizationCalls.push(args);
           return true;
         }
-      }
+      },
+      undefined,
+      undefined,
+      { append: async (entries) => { auditEntries.push(...entries); } }
     );
 
     const result = await useCase.execute(
@@ -78,5 +83,8 @@ describe('ApplyDiscountToSale', () => {
     expect(repository.stored.discountTotal.minorUnits).toBe(100);
     expect(repository.stored.taxTotal.minorUnits).toBe(144);
     expect(authorizationCalls).toEqual([[context, 'sale.apply_discount']]);
+    expect(auditEntries).toMatchObject([{
+      action: 'SALE_DISCOUNT_OVERRIDE_APPLIED', actorRoleCodes: ['MANAGER'], reason: 'Promotion'
+    }]);
   });
 });

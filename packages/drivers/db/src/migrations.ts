@@ -12,6 +12,10 @@ import type Database from 'better-sqlite3';
 import { InfrastructureError } from '@supermarket/shared';
 import { openDatabase, type DatabaseHandle } from './connection.js';
 import { initialBusinessSchemaSql } from './migrations/0001-initial-business-schema.js';
+import { businessEventLedgerSql } from './migrations/0002-business-event-ledger.js';
+import { outboxSql } from './migrations/0003-outbox.js';
+import { auditLogSql } from './migrations/0004-audit-log.js';
+import { idempotencySql } from './migrations/0005-idempotency.js';
 
 export type Migration = {
   readonly version: number;
@@ -23,6 +27,22 @@ export const migrations: readonly Migration[] = [{
   version: 1,
   name: 'initial_business_schema',
   sql: initialBusinessSchemaSql
+}, {
+  version: 2,
+  name: 'business_event_ledger',
+  sql: businessEventLedgerSql
+}, {
+  version: 3,
+  name: 'outbox',
+  sql: outboxSql
+}, {
+  version: 4,
+  name: 'audit_log',
+  sql: auditLogSql
+}, {
+  version: 5,
+  name: 'idempotency',
+  sql: idempotencySql
 }];
 
 const checksum = (migration: Migration): string => createHash('sha256')

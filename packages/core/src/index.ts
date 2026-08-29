@@ -5,18 +5,28 @@ export * from './domain/identity/index.js';
 export * from './domain/inventory/index.js';
 export * from './domain/sales/index.js';
 export * as application from './application/index.js';
+export { toBusinessEvents } from './application/events/index.js';
+export type { BusinessEventV1, DomainEventLike, JsonValue } from './application/events/index.js';
 export type { ExecutionContext } from './application/execution-context.js';
 export type {
   AuthorizationService,
+  AuditEntry,
+  AuditWriter,
+  BusinessEventStore,
   CashRegisterRepository,
   CategoryRepository,
   Clock,
+  EventPublisher,
   DiscountPolicy,
   DiscountPolicyProvider,
   ExchangeRateRepository,
   FinancialTransactionTaxPolicy,
   FinancialTransactionTaxPolicyProvider,
   IdGenerator,
+  IdempotencyRecord,
+  IdempotencyStore,
+  OutboxEvent,
+  OutboxStore,
   PaymentMethodRepository,
   ProductSnapshotProvider,
   ProductRepository,

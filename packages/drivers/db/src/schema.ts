@@ -1,5 +1,66 @@
 import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+export const businessEvents = sqliteTable('business_event', {
+  eventId: text('event_id').primaryKey(),
+  eventType: text('event_type').notNull(),
+  contractVersion: integer('contract_version').notNull(),
+  aggregateId: text('aggregate_id').notNull(),
+  aggregateType: text('aggregate_type').notNull(),
+  aggregateVersion: integer('aggregate_version').notNull(),
+  originNodeId: text('origin_node_id').notNull(),
+  correlationId: text('correlation_id').notNull(),
+  actorId: text('actor_id').notNull(),
+  occurredAt: integer('occurred_at').notNull(),
+  payload: text('payload').notNull()
+});
+
+export const outboxEvents = sqliteTable('outbox_event', {
+  eventId: text('event_id').primaryKey(),
+  eventType: text('event_type').notNull(),
+  contractVersion: integer('contract_version').notNull(),
+  aggregateId: text('aggregate_id').notNull(),
+  aggregateType: text('aggregate_type').notNull(),
+  aggregateVersion: integer('aggregate_version').notNull(),
+  originNodeId: text('origin_node_id').notNull(),
+  correlationId: text('correlation_id').notNull(),
+  actorId: text('actor_id').notNull(),
+  occurredAt: integer('occurred_at').notNull(),
+  payload: text('payload').notNull(),
+  status: text('status').notNull(),
+  attempts: integer('attempts').notNull(),
+  nextAttemptAt: integer('next_attempt_at').notNull(),
+  leaseUntil: integer('lease_until'),
+  lastError: text('last_error'),
+  publishedAt: integer('published_at'),
+  createdAt: integer('created_at').notNull()
+});
+
+export const auditLogs = sqliteTable('audit_log', {
+  auditId: text('audit_id').primaryKey(),
+  actorId: text('actor_id').notNull(),
+  actorRoleCodes: text('actor_role_codes').notNull(),
+  action: text('action').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  beforeState: text('before_state'),
+  afterState: text('after_state'),
+  reason: text('reason').notNull(),
+  terminalId: text('terminal_id').notNull(),
+  originNodeId: text('origin_node_id').notNull(),
+  occurredAt: integer('occurred_at').notNull(),
+  correlationId: text('correlation_id').notNull()
+});
+
+export const idempotencyKeys = sqliteTable('idempotency_key', {
+  scope: text('scope').notNull(),
+  key: text('key').notNull(),
+  requestFingerprint: text('request_fingerprint').notNull(),
+  status: text('status').notNull(),
+  result: text('result').notNull(),
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at').notNull()
+}, (table) => [primaryKey({ columns: [table.scope, table.key] })]);
+
 export const categories = sqliteTable('categories', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
