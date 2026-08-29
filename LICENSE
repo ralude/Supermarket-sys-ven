@@ -1,0 +1,118 @@
+LICENCIA SOURCE-AVAILABLE CON PARTICIPACIÓN POR FACTURACIÓN
+Versión 1.0 — 29 de agosto de 2026
+
+Copyright (c) 2026 [NOMBRE LEGAL DEL TITULAR]
+
+IMPORTANTE: esta licencia es un texto contractual personalizado y no es una
+licencia aprobada por la Open Source Initiative (OSI). El término “source-
+available” describe la disponibilidad del código fuente, pero esta licencia
+no debe anunciarse como “Open Source” en sentido técnico mientras conserve una
+regalía obligatoria por uso comercial. Debe ser revisada por asesoría legal
+antes de distribuir el software.
+
+1. DEFINICIONES
+
+“Software” significa este repositorio y sus modificaciones originales, salvo
+los componentes de terceros que estén sujetos a sus propias licencias.
+
+“Titular” significa la persona o entidad que figure como titular actual de los
+derechos de autor del Software.
+
+“Licenciatario” significa la persona o entidad que instala, ejecuta, modifica,
+distribuye o pone el Software a disposición de terceros.
+
+“Instancia” significa una instalación, despliegue o copia operativa del
+Software, incluyendo sus terminales y nodos coordinadores.
+
+“Ingresos Brutos Computables” significa el importe total de las ventas
+completadas y registradas o procesadas mediante el Software durante un mes
+calendario, agregando todas las Instancias controladas por el mismo
+Licenciatario, menos reembolsos y contracargos efectivamente reconocidos y
+menos los impuestos trasladados al cliente. Los importes en otras monedas se
+convierten a dólares estadounidenses usando la tasa oficial aplicable en la
+fecha de cada operación o, cuando no exista una tasa aplicable, una tasa
+documentada y razonable acordada por escrito entre las partes.
+
+2. CONCESIÓN DE DERECHOS
+
+Sujeto al cumplimiento de esta licencia, el Titular concede al Licenciatario
+una licencia no exclusiva, mundial y revocable para:
+
+  a) usar y ejecutar el Software;
+  b) estudiar y modificar el código fuente;
+  c) copiar y distribuir el Software original o modificado; y
+  d) operar el Software para actividades personales, educativas, sin fines de
+     lucro o comerciales.
+
+El Licenciatario debe conservar este texto, los avisos de copyright y la
+atribución del Titular al distribuir el Software o una modificación.
+
+3. PARTICIPACIÓN POR USO COMERCIAL
+
+Si los Ingresos Brutos Computables de un mes calendario superan USD 5.000
+(cinco mil dólares estadounidenses), el Licenciatario debe pagar al Titular
+una participación equivalente al 5% de los Ingresos Brutos Computables de ese
+mes. La obligación se calcula sobre el total del mes que supera el umbral, no
+únicamente sobre el excedente.
+
+No se genera participación cuando los Ingresos Brutos Computables sean iguales
+o inferiores a USD 5.000 durante el mes.
+
+Dentro de los quince (15) días calendario siguientes al cierre de cada mes en
+el que se active esta obligación, el Licenciatario debe entregar al Titular un
+resumen razonable de cálculo y pagar el importe correspondiente mediante el
+método de pago que el Titular comunique por escrito. El Licenciatario debe
+conservar durante cinco (5) años los registros necesarios para verificar el
+cálculo y permitir una revisión razonable, con aviso previo y sin acceder a
+datos personales no necesarios.
+
+El Licenciatario no puede dividir artificialmente una operación, instalación,
+entidad controlada o cuenta para evitar el umbral. Las obligaciones de pago
+devengadas antes de la terminación de esta licencia sobreviven a ella.
+
+4. MODIFICACIONES Y REDISTRIBUCIÓN
+
+El Licenciatario puede crear y distribuir modificaciones, siempre que:
+
+  a) indique de forma visible que realizó cambios;
+  b) conserve este texto y los avisos de copyright; y
+  c) no represente una modificación como una publicación oficial del Titular.
+
+La distribución de una modificación no elimina ni limita la participación por
+uso comercial de quien la opere. El Licenciatario debe transmitir esta
+condición a los receptores de una copia operativa.
+
+5. COMPONENTES DE TERCEROS Y MARCAS
+
+Los componentes de terceros conservan sus propias licencias y condiciones.
+Esta licencia no concede derechos sobre marcas, nombres comerciales, logos,
+dominios ni otros signos distintivos del Titular.
+
+6. TERMINACIÓN
+
+La licencia termina automáticamente si el Licenciatario incumple una
+condición material y no corrige el incumplimiento dentro de treinta (30) días
+desde la notificación escrita. Al terminar, el Licenciatario debe cesar el uso
+y la distribución, salvo las copias archivadas únicamente para cumplimiento
+legal, respaldo o auditoría. Las cláusulas de atribución, pagos devengados,
+confidencialidad de registros y limitaciones de responsabilidad sobreviven en
+lo que corresponda.
+
+7. AUSENCIA DE GARANTÍAS Y RESPONSABILIDAD
+
+EL SOFTWARE SE ENTREGA “TAL CUAL”, SIN GARANTÍAS EXPRESAS NI IMPLÍCITAS, EN LA
+MÁXIMA MEDIDA PERMITIDA POR LA LEY APLICABLE. EL TITULAR NO GARANTIZA QUE EL
+SOFTWARE SEA ININTERRUMPIDO, LIBRE DE ERRORES, ADECUADO PARA UNA REGULACIÓN
+FISCAL PARTICULAR O SUFICIENTE PARA LAS NECESIDADES DEL LICENCIATARIO.
+
+EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY, EL TITULAR NO RESPONDERÁ POR DAÑOS
+INDIRECTOS, INCIDENTALES, ESPECIALES, PUNITIVOS, PÉRDIDA DE DATOS O PÉRDIDA DE
+BENEFICIOS DERIVADOS DEL SOFTWARE. NADA EN ESTA LICENCIA EXCLUYE UNA
+RESPONSABILIDAD QUE NO PUEDA EXCLUIRSE LEGALMENTE.
+
+8. LEY APLICABLE Y CONTACTO
+
+La ley aplicable, jurisdicción, identidad legal completa del Titular y datos
+de pago deben completarse por escrito antes de la primera distribución
+comercial. Las notificaciones de licencia deben dirigirse al contacto que el
+Titular publique junto con la versión distribuida del Software.

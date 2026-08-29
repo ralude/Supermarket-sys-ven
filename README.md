@@ -10,6 +10,7 @@ Las fases 0 de arquitectura, 1 de infraestructura y 2 de codigo de negocio estan
 
 La documentación arquitectónica está organizada por responsabilidad en [`docs/architecture/README.md`](./docs/architecture/README.md).
 El alcance del MVP, piloto, producción y plataforma empresarial se separa en [`docs/producto/alcance-entregas.md`](./docs/producto/alcance-entregas.md).
+La licencia source-available y su regla de participación por facturación están en [`LICENSE`](./LICENSE) y [`docs/producto/licencia.md`](./docs/producto/licencia.md). No se presenta como licencia Open Source aprobada por OSI.
 
 ## Estructura del monorepo
 
