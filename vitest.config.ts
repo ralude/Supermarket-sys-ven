@@ -7,7 +7,8 @@ export default defineConfig({
       'packages/core/vitest.config.ts',
       'apps/desktop/vitest.config.ts',
       'apps/server/vitest.config.ts',
-      'packages/drivers/db/vitest.config.ts'
+      'packages/drivers/db/vitest.config.ts',
+      'packages/drivers/fiscal/vitest.config.ts'
     ]
   }
 });

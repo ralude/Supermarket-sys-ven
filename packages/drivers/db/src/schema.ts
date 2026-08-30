@@ -267,3 +267,96 @@ export const stockMovements = sqliteTable('stock_movements', {
   referenceId: text('reference_id').notNull(),
   occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull()
 });
+
+export const fiscalDocuments = sqliteTable('fiscal_documents', {
+  id: text('id').primaryKey(),
+  referenceId: text('reference_id').notNull(),
+  documentType: text('document_type').notNull(),
+  currencyCode: text('currency_code').notNull(),
+  totalMinorUnits: integer('total_minor_units').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  requestFingerprint: text('request_fingerprint').notNull(),
+  terminalId: text('terminal_id').notNull(),
+  originNodeId: text('origin_node_id').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  status: text('status').notNull(),
+  version: integer('version').notNull(),
+  attempts: integer('attempts').notNull(),
+  fiscalNumber: text('fiscal_number'),
+  lastErrorCode: text('last_error_code'),
+  lastCertainty: text('last_certainty'),
+  lastFailureRetryable: integer('last_failure_retryable', { mode: 'boolean' }).notNull()
+});
+
+export const fiscalDocumentLines = sqliteTable('fiscal_document_lines', {
+  documentId: text('document_id').notNull().references(() => fiscalDocuments.id),
+  sequence: integer('sequence').notNull(),
+  lineId: text('line_id').notNull(),
+  description: text('description').notNull(),
+  quantityScaled: integer('quantity_scaled').notNull(),
+  quantityScale: integer('quantity_scale').notNull(),
+  unitPriceMinorUnits: integer('unit_price_minor_units').notNull(),
+  taxRateBasisPoints: integer('tax_rate_basis_points').notNull(),
+  totalMinorUnits: integer('total_minor_units').notNull()
+}, (table) => [primaryKey({ columns: [table.documentId, table.sequence] })]);
+
+export const fiscalDocumentPayments = sqliteTable('fiscal_document_payments', {
+  documentId: text('document_id').notNull().references(() => fiscalDocuments.id),
+  sequence: integer('sequence').notNull(),
+  methodCode: text('method_code').notNull(),
+  amountMinorUnits: integer('amount_minor_units').notNull()
+}, (table) => [primaryKey({ columns: [table.documentId, table.sequence] })]);
+
+export const fiscalDocumentTransitions = sqliteTable('fiscal_document_transitions', {
+  eventId: text('event_id').primaryKey(),
+  documentId: text('document_id').notNull().references(() => fiscalDocuments.id),
+  aggregateVersion: integer('aggregate_version').notNull(),
+  fromStatus: text('from_status'),
+  toStatus: text('to_status').notNull(),
+  actorId: text('actor_id').notNull(),
+  occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
+  errorCode: text('error_code'),
+  certainty: text('certainty')
+});
+
+export const fiscalDays = sqliteTable('fiscal_days', {
+  id: text('id').primaryKey(),
+  businessDate: text('business_date').notNull(),
+  terminalId: text('terminal_id').notNull(),
+  originNodeId: text('origin_node_id').notNull(),
+  openedBy: text('opened_by').notNull(),
+  openedAt: integer('opened_at', { mode: 'timestamp_ms' }).notNull(),
+  state: text('state').notNull(),
+  version: integer('version').notNull()
+});
+
+export const fiscalReports = sqliteTable('fiscal_reports', {
+  id: text('id').primaryKey(),
+  dayId: text('day_id').notNull().references(() => fiscalDays.id),
+  originNodeId: text('origin_node_id').notNull(),
+  reportType: text('report_type').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  requestFingerprint: text('request_fingerprint').notNull(),
+  status: text('status').notNull(),
+  attempts: integer('attempts').notNull(),
+  reportNumber: text('report_number'),
+  lastErrorCode: text('last_error_code'),
+  lastCertainty: text('last_certainty'),
+  retryable: integer('retryable', { mode: 'boolean' }).notNull(),
+  requestedBy: text('requested_by').notNull(),
+  requestedAt: integer('requested_at', { mode: 'timestamp_ms' }).notNull()
+});
+
+export const fiscalReportTransitions = sqliteTable('fiscal_report_transitions', {
+  eventId: text('event_id').primaryKey(),
+  dayId: text('day_id').notNull().references(() => fiscalDays.id),
+  reportId: text('report_id').notNull().references(() => fiscalReports.id),
+  aggregateVersion: integer('aggregate_version').notNull(),
+  fromStatus: text('from_status'),
+  toStatus: text('to_status').notNull(),
+  actorId: text('actor_id').notNull(),
+  occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
+  errorCode: text('error_code'),
+  certainty: text('certainty')
+});

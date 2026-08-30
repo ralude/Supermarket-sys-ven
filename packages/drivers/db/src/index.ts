@@ -7,6 +7,8 @@ export { DrizzleBusinessEventStore } from './business-event-store.js';
 export { DrizzleOutboxStore } from './outbox-store.js';
 export { DrizzleAuditWriter } from './audit-writer.js';
 export { DrizzleIdempotencyStore } from './idempotency-store.js';
+export { DrizzleFiscalDocumentRepository } from './fiscal-document-repository.js';
+export { DrizzleFiscalDayRepository } from './fiscal-day-repository.js';
 export {
   DrizzleCashRegisterRepository,
   DrizzleCategoryRepository,

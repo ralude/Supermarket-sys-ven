@@ -22,3 +22,17 @@ export type { AuditEntry, AuditWriter } from './audit-writer.js';
 export type { EventPublisher } from './event-publisher.js';
 export type { OutboxEvent, OutboxStore } from './outbox-store.js';
 export type { IdempotencyRecord, IdempotencyStore } from './idempotency-store.js';
+export type { FiscalDocumentRepository } from './fiscal-document-repository.js';
+export type { FiscalDayRepository } from './fiscal-day-repository.js';
+export type {
+  FiscalDocumentLinePayload,
+  FiscalDocumentPaymentPayload,
+  FiscalDocumentPayload,
+  FiscalDocumentPrintConfirmation,
+  FiscalPrinterErrorCode,
+  FiscalPrinterFailure,
+  FiscalPrinterPort,
+  FiscalPrinterResult,
+  FiscalPrinterStatus,
+  FiscalReportPrintConfirmation
+} from './fiscal-printer-port.js';

@@ -40,7 +40,8 @@ describe('database migrations', () => {
       expect.objectContaining({ version: 5, name: 'idempotency' }),
       expect.objectContaining({ version: 6, name: 'cash_operational_integrity' }),
       expect.objectContaining({ version: 7, name: 'sale_shift_payments' }),
-      expect.objectContaining({ version: 8, name: 'inventory' })
+      expect.objectContaining({ version: 8, name: 'inventory' }),
+      expect.objectContaining({ version: 9, name: 'fiscal' })
     ]);
 
     const tables = handle.sqlite.prepare(
@@ -51,6 +52,13 @@ describe('database migrations', () => {
       'audit_log',
       'cash_movements',
       'exchange_rates',
+      'fiscal_document_lines',
+      'fiscal_document_payments',
+      'fiscal_document_transitions',
+      'fiscal_documents',
+      'fiscal_days',
+      'fiscal_report_transitions',
+      'fiscal_reports',
       'idempotency_key',
       'outbox_event',
       'product_barcodes',

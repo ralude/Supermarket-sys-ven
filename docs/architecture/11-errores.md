@@ -17,7 +17,7 @@ Todos los errores públicos tienen código estable, mensaje seguro y detalles op
 |---|---|
 | Dominio | `SALE_INVALID_STATE`, `SHIFT_INVALID_STATE`, `CASH_WITHDRAWAL_INSUFFICIENT_FUNDS`, `USER_ROLE_NOT_ASSIGNABLE`, `STOCK_INSUFFICIENT`, `STOCK_QUANTITY_SCALE_MISMATCH` |
 | Aplicación | `RESOURCE_NOT_FOUND`, `SHIFT_NOT_FOUND`, `CASH_REGISTER_NOT_FOUND`, `SALE_HISTORY_NOT_FOUND`, `IDEMPOTENCY_KEY_CONFLICT`, `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT` |
-| Infraestructura | `DATABASE_BUSY`, `DATABASE_CONSTRAINT_VIOLATION`, `DATABASE_TRANSACTION_REQUIRED`, `DATABASE_CONCURRENCY_CONFLICT`, `DATABASE_MIGRATION_FAILED`, `DATABASE_MIGRATION_MISMATCH`, `FISCAL_PRINTER_OFFLINE`, `NETWORK_UNAVAILABLE` |
+| Infraestructura | `DATABASE_BUSY`, `DATABASE_CONSTRAINT_VIOLATION`, `DATABASE_TRANSACTION_REQUIRED`, `DATABASE_CONCURRENCY_CONFLICT`, `DATABASE_MIGRATION_FAILED`, `DATABASE_MIGRATION_MISMATCH`, `FISCAL_PRINTER_NAK`, `FISCAL_PRINTER_PAPER_END`, `FISCAL_PRINTER_MEMORY_FULL`, `FISCAL_PRINTER_BUSY`, `FISCAL_PRINTER_TIMEOUT`, `FISCAL_PRINTER_CRC_ERROR`, `FISCAL_PRINTER_PORT_CLOSED`, `NETWORK_UNAVAILABLE` |
 
 ## Fronteras
 
@@ -29,6 +29,7 @@ La UI traduce `code` a un mensaje en español. El código es el contrato; el tex
 
 - Reintentar solo errores transitorios y con límite.
 - No reintentar una operación fiscal si puede duplicar un documento sin reconciliación.
+- Un error fiscal `UNKNOWN` exige reconciliacion; `NOT_SENT` y `REJECTED` conservan politicas distintas y explicitas.
 - `SQLITE_BUSY` puede reintentarse con backoff corto.
 - La pérdida de red se maneja en el cliente con reconexión e idempotencia.
 

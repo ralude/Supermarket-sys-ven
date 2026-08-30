@@ -13,15 +13,15 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 4 | Ledger, outbox y auditoria | ~~Completada~~ |
 | 5 | Caja operativa | ~~Completada~~ |
 | 6 | Inventario operativo | ~~Completada~~ |
-| 7 | Driver fiscal fake | Pendiente |
+| 7 | Driver fiscal fake | ~~Completada~~ |
 | 8 | Integracion serial | Pendiente |
 | 9 | UI | Pendiente |
 | 10 | Sincronizacion | Pendiente |
 | 11 | Seguridad | Pendiente |
 | 12 | Optimizacion | Pendiente |
 
-**Fase actual:** Fase 7 - Driver fiscal fake
-**Sub-fase actual:** 7.01 - Puerto FiscalPrinter
+**Fase actual:** Fase 8 - Integracion serial
+**Sub-fase actual:** 8.01 - Adaptador SerialPort
 
 ## Fases
 
@@ -32,7 +32,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 - [~~Fase 4 - Ledger, outbox y auditoria~~](./fase-04-event-store/README.md)
 - [~~Fase 5 - Caja~~](./fase-05-caja/README.md)
 - [~~Fase 6 - Inventario~~](./fase-06-inventario/README.md)
-- [Fase 7 - Driver fiscal fake](./fase-07-driver-fiscal-fake/README.md)
+- [~~Fase 7 - Driver fiscal fake~~](./fase-07-driver-fiscal-fake/README.md)
 - [Fase 8 - Integracion serial](./fase-08-integracion-serial/README.md)
 - [Fase 9 - UI](./fase-09-ui/README.md)
 - [Fase 10 - Sincronizacion](./fase-10-sincronizacion/README.md)
@@ -63,6 +63,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 - La sub-fase 2.06 implementa permisos de codigo estable, roles configurables y usuarios sin credenciales; autenticacion, sesiones, JWT y cifrado permanecen en la Fase 11.
 - La sub-fase 2.07 implementa `StockItem` con movimientos append-only, cantidades escaladas y lotes opcionales; persistencia, FEFO, kardex e integracion con ventas permanecen en la Fase 6.
 - La Fase 6 persiste inventario como movimientos append-only, recibe compras mediante un contrato minimo, descuenta ventas con FEFO e idempotencia y deriva el kardex sin almacenar saldos mutables.
+- La Fase 7 implementa el puerto fiscal, un fake determinista, estados persistentes recuperables, emision, reportes X/Z y un contrato ejecutable reutilizable; no instala ni usa SerialPort.
 - La Fase 1 se completó con Electron, React, Fastify, SQLite, Drizzle y ESLint instalados y verificados mediante smoke tests.
 - ADR-0008 establece terminales POS autonomas con Fastify y SQLite local; el nodo coordinador sincroniza eventos y datos de referencia.
 - ADR-0009 establece tablas relacionales como fuente de verdad, ledger append-only para historia y outbox para entrega; no se usa event sourcing completo en el MVP.

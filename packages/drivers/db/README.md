@@ -20,6 +20,8 @@ La Fase 5 completa apertura, movimientos manuales, consumo idempotente de `SaleC
 
 La Fase 6 agrega `stock_items`, lotes y movimientos append-only. No persiste un saldo mutable: el repositorio rehidrata `StockItem` y el agregado deriva existencias desde su historial.
 
+La Fase 7 agrega documentos fiscales, lineas, pagos, transiciones, jornadas y reportes. Los estados emitidos y las jornadas cerradas son inmutables por restricciones de base de datos; la integracion de recuperacion se prueba cerrando y reabriendo SQLite antes de reconciliar con el dispositivo fake.
+
 ## Limites actuales
 
 La Fase 4 agrega ledger append-only, outbox reintentable, auditoria redactada e idempotencia durable. `SaleCompleted.v1` es el primer evento de integracion; el relay actual usa el puerto `EventPublisher` y se prueba con un fake, sin adelantar transporte de red.

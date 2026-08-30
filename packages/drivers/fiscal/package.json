@@ -4,10 +4,21 @@
   "private": true,
   "type": "module",
   "description": "Drivers de impresora fiscal. Fake y proveedores reales aislados.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/fiscal-printer-contract.ts",
+    "./testing/fixtures": "./src/testing/fiscal-contract-fixtures.ts"
+  },
   "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@supermarket/core": "workspace:*"
+  },
   "devDependencies": {
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.7"
   }
 }
