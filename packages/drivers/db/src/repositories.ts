@@ -1,5 +1,6 @@
 import {
   Barcode,
+  Batch,
   CashMovement,
   CashRegister,
   Category,
@@ -13,6 +14,8 @@ import {
   Sale,
   SaleItem,
   Shift,
+  StockItem,
+  StockMovement,
   UnitOfMeasure,
   type CashRegisterRepository,
   type CategoryRepository,
@@ -22,6 +25,7 @@ import {
   type ProductRepository,
   type SaleRepository,
   type ShiftRepository,
+  type StockItemRepository,
   type UnitOfMeasureRepository
 } from '@supermarket/core';
 import { InfrastructureError, Money, Percentage, Quantity, TaxRate } from '@supermarket/shared';
@@ -42,6 +46,9 @@ import {
   sales,
   shiftClosingBalances,
   shifts,
+  stockBatches,
+  stockItems,
+  stockMovements,
   unitsOfMeasure
 } from './schema.js';
 import { mapDatabaseError, requireTransaction } from './unit-of-work.js';
@@ -308,6 +315,7 @@ export class DrizzleSaleRepository implements SaleRepository {
 
     this.handle.db.insert(sales).values({
       id: sale.id,
+      shiftId: sale.shiftId,
       currencyCode: sale.currencyCode,
       terminalId: sale.terminalId,
       originNodeId: sale.originNodeId,
@@ -442,6 +450,7 @@ export class DrizzleSaleRepository implements SaleRepository {
         }));
       return Sale.restore({
         id: row.id,
+        shiftId: row.shiftId,
         currencyCode: row.currencyCode,
         terminalId: row.terminalId,
         originNodeId: row.originNodeId,
@@ -502,8 +511,11 @@ export class DrizzleShiftRepository implements ShiftRepository {
         'A closed shift cannot be overwritten.'
       );
     }
-    if (existing && shift.version < existing.version) {
+    if (existing && shift.version !== existing.version + 1) {
       throw new InfrastructureError('DATABASE_CONCURRENCY_CONFLICT', 'Shift version is stale.');
+    }
+    if (!existing && shift.version !== 1) {
+      throw new InfrastructureError('DATABASE_CONCURRENCY_CONFLICT', 'New shift version must be one.');
     }
     this.handle.db.insert(shifts).values({
       id: shift.id,
@@ -525,9 +537,11 @@ export class DrizzleShiftRepository implements ShiftRepository {
         closedBy: shift.closedBy
       }
     }).run();
-    this.handle.db.delete(cashMovements).where(eq(cashMovements.shiftId, shift.id)).run();
-    if (shift.movements.length > 0) {
-      this.handle.db.insert(cashMovements).values(shift.movements.map((movement) => ({
+    const persistedMovementIds = new Set(this.handle.db.select({ id: cashMovements.id })
+      .from(cashMovements).where(eq(cashMovements.shiftId, shift.id)).all().map(({ id }) => id));
+    const newMovements = shift.movements.filter((movement) => !persistedMovementIds.has(movement.id));
+    if (newMovements.length > 0) {
+      this.handle.db.insert(cashMovements).values(newMovements.map((movement) => ({
         id: movement.id,
         shiftId: shift.id,
         type: movement.type,
@@ -538,11 +552,11 @@ export class DrizzleShiftRepository implements ShiftRepository {
         currencyCode: movement.amount.currency,
         reason: movement.reason,
         registeredBy: movement.registeredBy,
-        registeredAt: movement.registeredAt.getTime()
+        registeredAt: movement.registeredAt.getTime(),
+        sourceId: movement.reference?.sourceId ?? null,
+        sourceEventId: movement.reference?.sourceEventId ?? null
       }))).run();
     }
-    this.handle.db.delete(shiftClosingBalances)
-      .where(eq(shiftClosingBalances.shiftId, shift.id)).run();
     if (shift.closingBalances && shift.closingBalances.length > 0) {
       this.handle.db.insert(shiftClosingBalances).values(shift.closingBalances.map((balance) => ({
         shiftId: shift.id,
@@ -591,7 +605,10 @@ export class DrizzleShiftRepository implements ShiftRepository {
         amount: Money.fromMinorUnits(movement.amountMinorUnits, movement.currencyCode),
         reason: movement.reason,
         registeredBy: movement.registeredBy,
-        registeredAt: new Date(movement.registeredAt)
+        registeredAt: new Date(movement.registeredAt),
+        ...(movement.sourceId === null || movement.sourceEventId === null
+          ? {}
+          : { reference: { sourceId: movement.sourceId, sourceEventId: movement.sourceEventId } })
       })),
       status: row.status as Parameters<typeof Shift.restore>[0]['status'],
       version: row.version,
@@ -603,6 +620,113 @@ export class DrizzleShiftRepository implements ShiftRepository {
       })),
       closedAt: row.closedAt === null ? null : new Date(row.closedAt),
       closedBy: row.closedBy
+    });
+  }
+}
+
+export class DrizzleStockItemRepository implements StockItemRepository {
+  constructor(private readonly handle: DatabaseHandle) {}
+
+  async save(item: StockItem): Promise<void> {
+    requireTransaction(this.handle.sqlite);
+    const existing = this.handle.db.select().from(stockItems)
+      .where(eq(stockItems.id, item.id)).get();
+    if (existing && (
+      existing.productId !== item.productId ||
+      existing.unitCode !== item.unitCode ||
+      existing.quantityScale !== item.quantityScale ||
+      existing.tracksBatches !== item.tracksBatches
+    )) {
+      throw new InfrastructureError(
+        'STOCK_ITEM_CONFIGURATION_MISMATCH',
+        'Persisted stock item configuration cannot be changed.'
+      );
+    }
+    if (!existing) {
+      this.handle.db.insert(stockItems).values({
+        id: item.id,
+        productId: item.productId,
+        unitCode: item.unitCode,
+        quantityScale: item.quantityScale,
+        tracksBatches: item.tracksBatches
+      }).run();
+    }
+
+    const batchIds = new Set(this.handle.db.select({ id: stockBatches.id })
+      .from(stockBatches).where(eq(stockBatches.stockItemId, item.id)).all()
+      .map(({ id }) => id));
+    const newBatches = item.batches.filter((batch) => !batchIds.has(batch.id));
+    if (newBatches.length > 0) {
+      this.handle.db.insert(stockBatches).values(newBatches.map((batch) => ({
+        id: batch.id,
+        stockItemId: item.id,
+        lotNumber: batch.lotNumber,
+        expiresAt: batch.expiresAt
+      }))).run();
+    }
+
+    const movementIds = new Set(this.handle.db.select({ id: stockMovements.id })
+      .from(stockMovements).where(eq(stockMovements.stockItemId, item.id)).all()
+      .map(({ id }) => id));
+    const newMovements = item.movements.filter((movement) => !movementIds.has(movement.id));
+    if (newMovements.length > 0) {
+      this.handle.db.insert(stockMovements).values(newMovements.map((movement) => ({
+        id: movement.id,
+        stockItemId: item.id,
+        eventId: movement.eventId,
+        aggregateVersion: item.movements.findIndex(({ id }) => id === movement.id) + 1,
+        type: movement.type,
+        direction: movement.direction,
+        quantityScaled: movement.quantity.scaledValue,
+        quantityScale: movement.quantity.scale,
+        batchId: movement.batchId,
+        actorId: movement.actorId,
+        reason: movement.reason,
+        referenceId: movement.referenceId,
+        occurredAt: movement.occurredAt
+      }))).run();
+    }
+  }
+
+  findById(id: string): Promise<StockItem | null> {
+    return read(() => this.restore(this.handle.db.select().from(stockItems)
+      .where(eq(stockItems.id, id)).get()));
+  }
+
+  findByProductId(productId: string): Promise<StockItem | null> {
+    return read(() => this.restore(this.handle.db.select().from(stockItems)
+      .where(eq(stockItems.productId, productId)).get()));
+  }
+
+  private restore(row: typeof stockItems.$inferSelect | undefined): StockItem | null {
+    if (!row) return null;
+    const batchRows = this.handle.db.select().from(stockBatches)
+      .where(eq(stockBatches.stockItemId, row.id)).all();
+    const movementRows = this.handle.db.select().from(stockMovements)
+      .where(eq(stockMovements.stockItemId, row.id))
+      .orderBy(stockMovements.aggregateVersion).all();
+    return StockItem.restore({
+      id: row.id,
+      productId: row.productId,
+      unitCode: row.unitCode,
+      quantityScale: row.quantityScale,
+      tracksBatches: row.tracksBatches,
+      batches: batchRows.map((batch) => Batch.create({
+        id: batch.id,
+        lotNumber: batch.lotNumber,
+        ...(batch.expiresAt === null ? {} : { expiresAt: batch.expiresAt })
+      })),
+      movements: movementRows.map((movement) => StockMovement.create({
+        id: movement.id,
+        type: movement.type as Parameters<typeof StockMovement.create>[0]['type'],
+        quantity: Quantity.fromScaled(movement.quantityScaled, movement.quantityScale),
+        ...(movement.batchId === null ? {} : { batchId: movement.batchId }),
+        actorId: movement.actorId,
+        reason: movement.reason,
+        referenceId: movement.referenceId,
+        occurredAt: movement.occurredAt,
+        eventId: movement.eventId
+      }))
     });
   }
 }

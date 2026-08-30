@@ -20,7 +20,7 @@ class FakeSaleRepository implements SaleRepository {
 
   constructor() {
     this.stored = Sale.start({
-      id: 'sale-001', currencyCode: 'USD', terminalId: 'terminal-001', originNodeId: 'node-001',
+      id: 'sale-001', shiftId: 'shift-001', currencyCode: 'USD', terminalId: 'terminal-001', originNodeId: 'node-001',
       startedBy: 'user-001', startedAt: new Date('2026-08-15T10:00:00.000Z'), eventId: 'event-001'
     });
     this.stored.addItem({

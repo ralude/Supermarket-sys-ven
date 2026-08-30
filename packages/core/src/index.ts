@@ -32,6 +32,7 @@ export type {
   ProductRepository,
   SaleRepository,
   ShiftRepository,
+  StockItemRepository,
   UnitOfWork,
   UnitOfMeasureRepository
 } from './application/ports/index.js';

@@ -4,6 +4,7 @@ import type { SaleDto } from './dtos.js';
 export function toSaleDto(sale: Sale): SaleDto {
   return {
     id: sale.id,
+    shiftId: sale.shiftId,
     currencyCode: sale.currencyCode,
     terminalId: sale.terminalId,
     originNodeId: sale.originNodeId,

@@ -15,6 +15,7 @@ export type SaleStatus = (typeof SALE_STATUSES)[number];
 
 export type StartSaleProps = {
   id: string;
+  shiftId: string;
   currencyCode: string;
   terminalId: string;
   originNodeId: string;
@@ -51,6 +52,7 @@ export type RegisterPaymentsProps = {
 
 export type RestoredSaleProps = {
   id: string;
+  shiftId: string;
   currencyCode: string;
   terminalId: string;
   originNodeId: string;
@@ -81,6 +83,7 @@ export class Sale {
 
   private constructor(
     readonly id: string,
+    readonly shiftId: string,
     readonly currencyCode: string,
     readonly terminalId: string,
     readonly originNodeId: string,
@@ -93,6 +96,10 @@ export class Sale {
   }
 
   static start(props: StartSaleProps): Sale {
+    const shiftId = props.shiftId.trim();
+    if (shiftId.length === 0) {
+      throw new DomainError('SALE_SHIFT_REQUIRED', 'Sale shift ID is required.');
+    }
     const zero = Money.zero(props.currencyCode);
     const event: SaleDomainEvent = {
       type: 'SaleStarted',
@@ -102,6 +109,7 @@ export class Sale {
       aggregateVersion: 1,
       occurredAt: new Date(props.startedAt),
       payload: {
+        shiftId,
         currencyCode: zero.currency,
         terminalId: props.terminalId,
         originNodeId: props.originNodeId
@@ -109,6 +117,7 @@ export class Sale {
     };
     return new Sale(
       props.id,
+      shiftId,
       zero.currency,
       props.terminalId,
       props.originNodeId,
@@ -122,6 +131,7 @@ export class Sale {
   static restore(props: RestoredSaleProps): Sale {
     const sale = Sale.start({
       id: props.id,
+      shiftId: props.shiftId,
       currencyCode: props.currencyCode,
       terminalId: props.terminalId,
       originNodeId: props.originNodeId,
@@ -355,7 +365,24 @@ export class Sale {
       type: 'SaleCompleted',
       eventId: props.eventId,
       occurredAt: props.completedAt,
-      payload: { total: this.total, paidTotal: this.paidTotal }
+      payload: {
+        shiftId: this.shiftId,
+        terminalId: this.terminalId,
+        total: this.total,
+        paidTotal: this.paidTotal,
+        payments: this.currentPayments.map((payment) => ({
+          paymentId: payment.id,
+          methodCode: payment.method.code,
+          currencyCode: payment.amount.currency,
+          amountMinorUnits: payment.amount.minorUnits
+        })),
+        items: this.currentItems.map((item) => ({
+          itemId: item.id,
+          productId: item.snapshot.productId,
+          quantityScaled: item.quantity.scaledValue,
+          quantityScale: item.quantity.scale
+        }))
+      }
     });
   }
 

@@ -3,7 +3,16 @@ import { Money } from '@supermarket/shared';
 import { CashRegister, Shift } from '../../domain/cash/index.js';
 import { PaymentMethod } from '../../domain/currency/index.js';
 import type { ExecutionContext } from '../execution-context.js';
-import type { AuthorizationService, PaymentMethodRepository, ShiftRepository } from '../ports/index.js';
+import type {
+  AuditEntry,
+  AuditWriter,
+  AuthorizationService,
+  BusinessEventStore,
+  OutboxStore,
+  PaymentMethodRepository,
+  ShiftRepository,
+  UnitOfWork
+} from '../ports/index.js';
 import { CloseShift } from './close-shift.js';
 
 const context: ExecutionContext = {
@@ -42,14 +51,28 @@ class FakePaymentMethodRepository implements PaymentMethodRepository {
 
 function useCase(
   repository: ShiftRepository,
-  authorization: AuthorizationService = { authorize: async () => true }
+  authorization: AuthorizationService = { authorize: async () => true },
+  evidence: { transactions: number; ledger: string[]; outbox: string[]; audit: AuditEntry[] } = {
+    transactions: 0, ledger: [], outbox: [], audit: []
+  }
 ): CloseShift {
   return new CloseShift(
     repository,
     new FakePaymentMethodRepository(),
     authorization,
     { generate: () => 'event-close' },
-    { now: () => new Date('2026-08-16T18:00:00.000Z') }
+    { now: () => new Date('2026-08-16T18:00:00.000Z') },
+    { execute: async (work) => { evidence.transactions += 1; return work(); } } satisfies UnitOfWork,
+    {
+      append: async (events) => { evidence.ledger.push(...events.map((event) => event.eventType)); },
+      findByAggregate: async () => []
+    } satisfies BusinessEventStore,
+    {
+      enqueue: async (events) => { evidence.outbox.push(...events.map((event) => event.eventType)); },
+      claimAvailable: async () => [], markPublished: async () => undefined, markFailed: async () => undefined
+    } satisfies OutboxStore,
+    { append: async (entries) => { evidence.audit.push(...entries); } } satisfies AuditWriter,
+    { generate: () => 'audit-close' }
   );
 }
 
@@ -57,12 +80,13 @@ describe('CloseShift', () => {
   it('closes with expected, declared and difference snapshots', async () => {
     const repository = new FakeShiftRepository(shift());
     const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
+    const evidence = { transactions: 0, ledger: [] as string[], outbox: [] as string[], audit: [] as AuditEntry[] };
     const result = await useCase(repository, {
       authorize: async (...args) => {
         authorizationCalls.push(args);
         return true;
       }
-    }).execute({
+    }, evidence).execute({
       shiftId: 'shift-001',
       declaredBalances: [{
         paymentMethodCode: 'CASH_USD', currencyCode: 'USD', amountMinorUnits: 9_900
@@ -77,7 +101,16 @@ describe('CloseShift', () => {
       expectedMinorUnits: 10_000, declaredMinorUnits: 9_900, differenceMinorUnits: -100
     }]);
     expect(repository.stored?.domainEvents.at(-1)?.type).toBe('ShiftClosed');
-    expect(authorizationCalls).toEqual([[context, 'cash.shift.close']]);
+    expect(authorizationCalls).toEqual([
+      [context, 'cash.shift.close'],
+      [context, 'cash.shift.close.difference']
+    ]);
+    expect(evidence).toMatchObject({
+      transactions: 1,
+      ledger: ['ShiftClosed'],
+      outbox: ['ShiftClosed'],
+      audit: [{ action: 'SHIFT_CLOSED', entityId: 'shift-001' }]
+    });
   });
 
   it('rejects duplicate declared balance keys without saving', async () => {
@@ -143,5 +176,19 @@ describe('CloseShift', () => {
     expect(foreign.ok).toBe(false);
     if (!foreign.ok) expect(foreign.error.code).toBe('SHIFT_OWNERSHIP_MISMATCH');
     expect(foreignRepository.saves).toBe(0);
+
+    const differenceRepository = new FakeShiftRepository(shift());
+    const difference = await useCase(differenceRepository, {
+      authorize: async (_context, permission) => permission !== 'cash.shift.close.difference'
+    }).execute({
+      shiftId: 'shift-001',
+      declaredBalances: [{
+        paymentMethodCode: 'CASH_USD', currencyCode: 'USD', amountMinorUnits: 9_900
+      }]
+    }, context);
+    expect(difference.ok).toBe(false);
+    if (!difference.ok) expect(difference.error.code).toBe('FORBIDDEN');
+    expect(differenceRepository.stored?.status).toBe('OPEN');
+    expect(differenceRepository.saves).toBe(0);
   });
 });

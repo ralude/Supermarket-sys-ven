@@ -7,9 +7,10 @@ import {
   PaymentMethod,
   Product,
   Shift,
+  StockItem,
   UnitOfMeasure
 } from '@supermarket/core';
-import { Money, TaxRate } from '@supermarket/shared';
+import { Money, Quantity, TaxRate } from '@supermarket/shared';
 import { openDatabase } from './connection.js';
 import { applyMigrations } from './migrations.js';
 import {
@@ -19,6 +20,7 @@ import {
   DrizzlePaymentMethodRepository,
   DrizzleProductRepository,
   DrizzleShiftRepository,
+  DrizzleStockItemRepository,
   DrizzleUnitOfMeasureRepository
 } from './repositories.js';
 import { SqliteUnitOfWork } from './unit-of-work.js';
@@ -117,6 +119,44 @@ describe('Drizzle repositories', () => {
     const repository = new DrizzleCategoryRepository(handle);
     await expect(repository.save(Category.create({ id: 'category-001', name: 'Food' })))
       .rejects.toMatchObject({ code: 'DATABASE_TRANSACTION_REQUIRED' });
+    handle.close();
+  });
+
+  it('persists append-only stock movements and rehydrates the derived balance', async () => {
+    const handle = openDatabase(':memory:');
+    applyMigrations(handle.sqlite);
+    const unitOfWork = new SqliteUnitOfWork(handle.sqlite);
+    const repository = new DrizzleStockItemRepository(handle);
+    const item = StockItem.create({
+      id: 'stock-001', productId: 'product-001', unitCode: 'UNIT',
+      quantityScale: 0, tracksBatches: true
+    });
+    item.registerBatch({ id: 'batch-001', lotNumber: 'LOT-001' });
+    item.registerMovement({
+      id: 'movement-001', eventId: 'event-001', type: 'PURCHASE_RECEIPT',
+      quantity: Quantity.fromScaled(5, 0), batchId: 'batch-001', actorId: 'user-001',
+      reason: 'Purchase', referenceId: 'receipt-001', occurredAt: date('2026-08-29T10:00:00Z')
+    });
+
+    await unitOfWork.execute(() => repository.save(item));
+    item.registerMovement({
+      id: 'movement-002', eventId: 'event-002', type: 'WASTE',
+      quantity: Quantity.fromScaled(2, 0), batchId: 'batch-001', actorId: 'user-002',
+      reason: 'Damaged', referenceId: 'waste-001', occurredAt: date('2026-08-29T09:00:00Z')
+    });
+    await unitOfWork.execute(() => repository.save(item));
+
+    const restored = await repository.findByProductId('product-001');
+    expect(restored?.balance.scaledValue).toBe(3);
+    expect(restored?.movements.map((movement) => movement.id))
+      .toEqual(['movement-001', 'movement-002']);
+    expect(restored?.domainEvents).toEqual([]);
+    expect(() => handle.sqlite.prepare(
+      "update stock_movements set reason = 'changed' where id = 'movement-001'"
+    ).run()).toThrowError('stock movements are append-only');
+    expect(() => handle.sqlite.prepare(
+      "delete from stock_movements where id = 'movement-001'"
+    ).run()).toThrowError('stock movements are append-only');
     handle.close();
   });
 });

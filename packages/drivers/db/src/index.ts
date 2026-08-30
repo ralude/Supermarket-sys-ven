@@ -15,5 +15,6 @@ export {
   DrizzleProductRepository,
   DrizzleSaleRepository,
   DrizzleShiftRepository,
+  DrizzleStockItemRepository,
   DrizzleUnitOfMeasureRepository
 } from './repositories.js';

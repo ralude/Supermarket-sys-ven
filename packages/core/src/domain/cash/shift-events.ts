@@ -1,5 +1,5 @@
 import type { Money } from '@supermarket/shared';
-import type { CashMovementType } from './cash-movement.js';
+import type { CashMovementReference, CashMovementType } from './cash-movement.js';
 
 export type ShiftEventBase = {
   eventId: string;
@@ -29,6 +29,7 @@ export type CashMovementRegisteredEvent = ShiftEventBase & {
     amount: Money;
     reason: string;
     registeredBy: string;
+    reference: CashMovementReference | null;
   };
 };
 

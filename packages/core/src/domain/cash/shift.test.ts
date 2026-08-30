@@ -9,6 +9,9 @@ const usdCash = PaymentMethod.create({
 const vesCash = PaymentMethod.create({
   code: 'CASH_VES', name: 'Cash VES', kind: 'CASH', currencyCode: 'VES'
 });
+const usdCard = PaymentMethod.create({
+  code: 'CARD_USD', name: 'Card USD', kind: 'CARD', currencyCode: 'USD'
+});
 
 function cashRegister(): CashRegister {
   return CashRegister.create({
@@ -82,5 +85,29 @@ describe('Shift', () => {
       registeredBy: 'user-001', terminalId: 'terminal-001', originNodeId: 'node-001',
       occurredAt: new Date('2026-08-16T07:59:59.000Z'), eventId: 'event-003'
     })).toThrowError('Shift operation cannot occur before opening.');
+  });
+
+  it('registers a sale payment once and rejects a conflicting redelivery', () => {
+    const shift = Shift.open({
+      id: 'shift-001', cashRegister: cashRegister(), openingFunds: [],
+      openedBy: 'user-001', openedAt: new Date('2026-08-16T08:00:00.000Z'), eventId: 'event-001'
+    });
+    const input = {
+      id: 'payment-001', type: 'SALE_PAYMENT' as const, method: usdCard,
+      amount: Money.fromMinorUnits(2_500, 'USD'), reason: 'Sale payment',
+      registeredBy: 'user-002', terminalId: 'terminal-001', originNodeId: 'node-001',
+      occurredAt: new Date('2026-08-16T09:00:00.000Z'), eventId: 'event-002',
+      reference: { sourceId: 'sale-001', sourceEventId: 'sale-event-001' }
+    };
+    shift.registerMovement(input);
+    shift.registerMovement(input);
+
+    expect(shift.balanceFor('CARD_USD', 'USD').minorUnits).toBe(2_500);
+    expect(shift.movements).toHaveLength(1);
+    expect(shift.domainEvents).toHaveLength(2);
+    expect(() => shift.registerMovement({
+      ...input,
+      amount: Money.fromMinorUnits(2_501, 'USD')
+    })).toThrowError('Sale payment identifier conflicts with another movement.');
   });
 });

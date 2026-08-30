@@ -12,15 +12,19 @@ La base `:memory:` se admite para pruebas; SQLite no puede usar WAL en memoria, 
 
 ## Repositorios y transacciones
 
-Los adaptadores Drizzle implementan los puertos publicos de configuracion, tasas, productos, ventas y turnos. Toda escritura debe ejecutarse mediante `SqliteUnitOfWork`; los repositorios rechazan escrituras fuera de `BEGIN IMMEDIATE -> guardar -> COMMIT` y traducen fallas SQLite a `InfrastructureError` estable.
+Los adaptadores Drizzle implementan los puertos publicos de configuracion, tasas, productos, ventas, turnos e inventario. Toda escritura debe ejecutarse mediante `SqliteUnitOfWork`; los repositorios rechazan escrituras fuera de `BEGIN IMMEDIATE -> guardar -> COMMIT` y traducen fallas SQLite a `InfrastructureError` estable.
 
 Las consultas rehidratan agregados sin regenerar eventos de dominio. Los estados finales de ventas y turnos son inmutables y los snapshots comerciales permanecen asociados a la venta.
+
+La Fase 5 completa apertura, movimientos manuales, consumo idempotente de `SaleCompleted.v1`, arqueo y cierre. Los movimientos y balances son append-only o inmutables, y cada cambio sensible confirma estado relacional, ledger, outbox y auditoria en una transaccion.
+
+La Fase 6 agrega `stock_items`, lotes y movimientos append-only. No persiste un saldo mutable: el repositorio rehidrata `StockItem` y el agregado deriva existencias desde su historial.
 
 ## Limites actuales
 
 La Fase 4 agrega ledger append-only, outbox reintentable, auditoria redactada e idempotencia durable. `SaleCompleted.v1` es el primer evento de integracion; el relay actual usa el puerto `EventPublisher` y se prueba con un fake, sin adelantar transporte de red.
 
-`GetSaleHistory` lee `business_event` por version y no reemplaza la fuente de verdad relacional. La persistencia de identidad y el inventario operativo se incorporan en las fases definidas por el cronograma.
+`GetSaleHistory` lee `business_event` por version y no reemplaza la fuente de verdad relacional. La persistencia de identidad se incorpora en la fase definida por el cronograma.
 
 Solo el proceso Fastify/servidor debe abrir el archivo SQLite. El renderer y Electron no acceden directamente a la base.
 

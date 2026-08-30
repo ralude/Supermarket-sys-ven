@@ -10,7 +10,7 @@ const context: ExecutionContext = {
 };
 
 class FakeSaleRepository implements SaleRepository {
-  stored = Sale.start({ id: 'sale-001', currencyCode: 'USD', terminalId: 'terminal-001', originNodeId: 'node-001', startedBy: 'user-001', startedAt: new Date('2026-08-15T10:00:00.000Z'), eventId: 'event-001' });
+  stored = Sale.start({ id: 'sale-001', shiftId: 'shift-001', currencyCode: 'USD', terminalId: 'terminal-001', originNodeId: 'node-001', startedBy: 'user-001', startedAt: new Date('2026-08-15T10:00:00.000Z'), eventId: 'event-001' });
   async save(sale: Sale): Promise<void> { this.stored = sale; }
   async findById(): Promise<Sale | null> { return this.stored; }
 }

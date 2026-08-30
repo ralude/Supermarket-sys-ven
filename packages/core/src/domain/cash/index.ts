@@ -3,6 +3,7 @@ export {
   CashMovement,
   CASH_MOVEMENT_TYPES,
   type CashMovementProps,
+  type CashMovementReference,
   type CashMovementType
 } from './cash-movement.js';
 export {

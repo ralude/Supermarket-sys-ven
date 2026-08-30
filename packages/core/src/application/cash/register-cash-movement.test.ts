@@ -3,7 +3,10 @@ import { Money } from '@supermarket/shared';
 import { CashRegister, Shift } from '../../domain/cash/index.js';
 import { PaymentMethod } from '../../domain/currency/index.js';
 import type { ExecutionContext } from '../execution-context.js';
-import type { AuthorizationService, PaymentMethodRepository, ShiftRepository } from '../ports/index.js';
+import type {
+  AuditEntry, AuditWriter, AuthorizationService, BusinessEventStore, OutboxStore,
+  PaymentMethodRepository, ShiftRepository, UnitOfWork
+} from '../ports/index.js';
 import { RegisterCashMovement } from './register-cash-movement.js';
 
 const context: ExecutionContext = {
@@ -44,7 +47,10 @@ class FakePaymentMethodRepository implements PaymentMethodRepository {
 
 function useCase(
   repository: ShiftRepository,
-  authorization: AuthorizationService = { authorize: async () => true }
+  authorization: AuthorizationService = { authorize: async () => true },
+  evidence: { transactions: number; ledger: string[]; outbox: string[]; audit: AuditEntry[] } = {
+    transactions: 0, ledger: [], outbox: [], audit: []
+  }
 ): RegisterCashMovement {
   let movementSequence = 1;
   let eventSequence = 1;
@@ -54,7 +60,18 @@ function useCase(
     authorization,
     { generate: () => `movement-${++movementSequence}` },
     { generate: () => `event-${++eventSequence}` },
-    { now: () => new Date('2026-08-16T09:00:00.000Z') }
+    { now: () => new Date('2026-08-16T09:00:00.000Z') },
+    { execute: async (work) => { evidence.transactions += 1; return work(); } } satisfies UnitOfWork,
+    {
+      append: async (events) => { evidence.ledger.push(...events.map((event) => event.eventType)); },
+      findByAggregate: async () => []
+    } satisfies BusinessEventStore,
+    {
+      enqueue: async (events) => { evidence.outbox.push(...events.map((event) => event.eventType)); },
+      claimAvailable: async () => [], markPublished: async () => undefined, markFailed: async () => undefined
+    } satisfies OutboxStore,
+    { append: async (entries) => { evidence.audit.push(...entries); } } satisfies AuditWriter,
+    { generate: () => 'audit-001' }
   );
 }
 
@@ -62,12 +79,13 @@ describe('RegisterCashMovement', () => {
   it('registers an income and updates the matching balance', async () => {
     const repository = new FakeShiftRepository(openShift());
     const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
+    const evidence = { transactions: 0, ledger: [] as string[], outbox: [] as string[], audit: [] as AuditEntry[] };
     const result = await useCase(repository, {
       authorize: async (...args) => {
         authorizationCalls.push(args);
         return true;
       }
-    }).execute({
+    }, evidence).execute({
       shiftId: 'shift-001',
       type: 'INCOME',
       paymentMethodCode: 'CASH_USD',
@@ -82,6 +100,12 @@ describe('RegisterCashMovement', () => {
     expect(repository.stored?.movements.at(-1)?.registeredBy).toBe('user-001');
     expect(repository.stored?.domainEvents.at(-1)?.type).toBe('CashMovementRegistered');
     expect(authorizationCalls).toEqual([[context, 'cash.movement.income']]);
+    expect(evidence).toMatchObject({
+      transactions: 1,
+      ledger: ['CashMovementRegistered'],
+      outbox: ['CashMovementRegistered'],
+      audit: [{ action: 'CASH_INCOME_REGISTERED', reason: 'Additional change' }]
+    });
   });
 
   it('registers a withdrawal and rejects one above the available balance', async () => {

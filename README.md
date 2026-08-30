@@ -6,7 +6,7 @@ El sistema está diseñado para operar standalone o en LAN mediante terminales a
 
 ## Estado actual
 
-Las fases 0 a 4 estan completadas. La siguiente sub-fase es 5.01, apertura operativa de caja; el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
+Las fases 0 a 6 estan completadas. La siguiente sub-fase es 7.01, puerto `FiscalPrinter` del driver fiscal fake; el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
 
 La documentación arquitectónica está organizada por responsabilidad en [`docs/architecture/README.md`](./docs/architecture/README.md).
 El alcance del MVP, piloto, producción y plataforma empresarial se separa en [`docs/producto/alcance-entregas.md`](./docs/producto/alcance-entregas.md).

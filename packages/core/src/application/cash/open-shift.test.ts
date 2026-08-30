@@ -3,10 +3,15 @@ import { CashRegister, Shift } from '../../domain/cash/index.js';
 import { PaymentMethod } from '../../domain/currency/index.js';
 import type { ExecutionContext } from '../execution-context.js';
 import type {
+  AuditEntry,
+  AuditWriter,
   AuthorizationService,
+  BusinessEventStore,
   CashRegisterRepository,
+  OutboxStore,
   PaymentMethodRepository,
-  ShiftRepository
+  ShiftRepository,
+  UnitOfWork
 } from '../ports/index.js';
 import { OpenShift } from './open-shift.js';
 
@@ -70,8 +75,31 @@ function register(overrides: { terminalId?: string; isActive?: boolean } = {}): 
 function createUseCase(
   cashRegisterRepository: CashRegisterRepository,
   shiftRepository: ShiftRepository,
-  authorization: AuthorizationService = { authorize: async () => true }
+  authorization: AuthorizationService = { authorize: async () => true },
+  observability: {
+    transactionRuns: number[];
+    ledger: Parameters<BusinessEventStore['append']>[0][];
+    outbox: Parameters<OutboxStore['enqueue']>[0][];
+    audit: AuditEntry[];
+  } = { transactionRuns: [], ledger: [], outbox: [], audit: [] }
 ): OpenShift {
+  const unitOfWork: UnitOfWork = {
+    execute: async (work) => {
+      observability.transactionRuns.push(1);
+      return work();
+    }
+  };
+  const eventStore: BusinessEventStore = {
+    append: async (events) => { observability.ledger.push(events); },
+    findByAggregate: async () => []
+  };
+  const outboxStore: OutboxStore = {
+    enqueue: async (events) => { observability.outbox.push(events); },
+    claimAvailable: async () => [], markPublished: async () => undefined, markFailed: async () => undefined
+  };
+  const auditWriter: AuditWriter = {
+    append: async (entries) => { observability.audit.push(...entries); }
+  };
   return new OpenShift(
     cashRegisterRepository,
     shiftRepository,
@@ -80,7 +108,12 @@ function createUseCase(
     { generate: () => 'shift-001' },
     { generate: () => 'movement-001' },
     { generate: () => 'event-001' },
-    { now: () => new Date('2026-08-16T08:00:00.000Z') }
+    { now: () => new Date('2026-08-16T08:00:00.000Z') },
+    unitOfWork,
+    eventStore,
+    outboxStore,
+    auditWriter,
+    { generate: () => 'audit-001' }
   );
 }
 
@@ -88,6 +121,9 @@ describe('OpenShift', () => {
   it('opens one shift for the execution terminal with its opening float', async () => {
     const repository = new FakeShiftRepository();
     const authorizationCalls: Parameters<AuthorizationService['authorize']>[] = [];
+    const observability: Parameters<typeof createUseCase>[3] = {
+      transactionRuns: [], ledger: [], outbox: [], audit: []
+    };
     const useCase = createUseCase(
       new FakeCashRegisterRepository(register()),
       repository,
@@ -96,7 +132,8 @@ describe('OpenShift', () => {
           authorizationCalls.push(args);
           return true;
         }
-      }
+      },
+      observability
     );
 
     const result = await useCase.execute({
@@ -120,6 +157,13 @@ describe('OpenShift', () => {
     expect(repository.stored?.domainEvents.map((event) => event.type)).toEqual(['ShiftOpened']);
     expect(repository.saves).toBe(1);
     expect(authorizationCalls).toEqual([[context, 'cash.shift.open']]);
+    expect(observability.transactionRuns).toEqual([1]);
+    expect(observability.ledger[0]?.map((event) => event.eventType)).toEqual(['ShiftOpened']);
+    expect(observability.outbox[0]?.map((event) => event.eventType)).toEqual(['ShiftOpened']);
+    expect(observability.audit).toMatchObject([{
+      auditId: 'audit-001', action: 'SHIFT_OPENED', entityType: 'Shift', entityId: 'shift-001',
+      actorId: 'user-001', terminalId: 'terminal-001', originNodeId: 'node-001'
+    }]);
   });
 
   it('rejects a second open shift for the same cash register', async () => {

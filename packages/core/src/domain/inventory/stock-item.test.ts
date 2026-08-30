@@ -27,6 +27,7 @@ function movement(
     reason: 'Operational movement',
     referenceId: 'reference-001',
     occurredAt: timestamp,
+    eventId: `event-${type}-${scaledValue}`,
     ...overrides
   };
 }

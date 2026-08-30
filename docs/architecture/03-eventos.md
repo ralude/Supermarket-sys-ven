@@ -37,17 +37,18 @@ Conserva hechos seleccionados de forma append-only para explicar el historial y 
 | `cash` | `ShiftOpened`, `ShiftClosed`, `CashMovementRegistered` |
 | `sales` | `SaleStarted`, `SaleItemAdded`, `SaleItemRemoved`, `DiscountApplied`, `PaymentRegistered`, `SaleCompleted`, `SaleVoided` |
 | `fiscal` | `FiscalDocumentIssued`, `FiscalDocumentFailed`, `FiscalXReportIssued`, `FiscalZReportIssued` |
-| `inventory` | `StockAdjusted`, `StockDepleted`, `BatchExpiringSoon` |
+| `inventory` | `StockMovementRegistered` |
 
 En `cash`, `ShiftOpened` conserva el fondo inicial, `CashMovementRegistered`
-explica cada ingreso o retiro manual y `ShiftClosed` congela saldo esperado,
-conteo declarado y diferencia por moneda y método. La integración de pagos de
-venta con el turno queda para la Fase 5.
+explica cada ingreso, retiro manual o pago derivado de una venta y `ShiftClosed`
+congela saldo esperado, conteo declarado y diferencia por moneda y método.
+Desde la Fase 6, `SaleCompleted.v1` incluye turno, terminal y snapshots primitivos
+de sus pagos e items. Caja e inventario lo consumen de forma idempotente sin leer
+tablas de ventas.
 
-En Fase 2, `inventory` conserva sus movimientos como historia inmutable dentro
-de `StockItem`, pero no publica eventos de integración. `StockAdjusted`,
-`StockDepleted` y `BatchExpiringSoon` se concretan con los flujos operativos,
-persistencia y políticas de la Fase 6.
+Desde la Fase 6, `StockMovementRegistered` explica en el ledger cada recepcion,
+salida de venta, merma o ajuste persistido en `StockItem`. Todavia no es un evento
+de integracion: la publicacion para consolidacion entre nodos se define en la Fase 10.
 
 ## Flujo de publicación
 

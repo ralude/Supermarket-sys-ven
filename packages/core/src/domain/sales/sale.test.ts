@@ -21,6 +21,7 @@ const snapshot = ProductSnapshot.create({
 function startSale(): Sale {
   return Sale.start({
     id: 'sale-001',
+    shiftId: 'shift-001',
     currencyCode: 'USD',
     terminalId: 'terminal-001',
     originNodeId: 'node-001',
@@ -93,6 +94,17 @@ describe('Sale', () => {
       'PaymentRegistered',
       'SaleCompleted'
     ]);
+    expect(sale.domainEvents.at(-1)?.payload).toMatchObject({
+      shiftId: 'shift-001',
+      terminalId: 'terminal-001',
+      payments: [{
+        paymentId: 'payment-001', methodCode: 'CASH_USD',
+        currencyCode: 'USD', amountMinorUnits: 1044
+      }],
+      items: [{
+        itemId: 'item-001', productId: 'product-001', quantityScaled: 1, quantityScale: 0
+      }]
+    });
   });
 
   it('rejects quantities with a different scale and voids only drafts', () => {

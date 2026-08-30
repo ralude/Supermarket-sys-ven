@@ -16,6 +16,9 @@ import { businessEventLedgerSql } from './migrations/0002-business-event-ledger.
 import { outboxSql } from './migrations/0003-outbox.js';
 import { auditLogSql } from './migrations/0004-audit-log.js';
 import { idempotencySql } from './migrations/0005-idempotency.js';
+import { cashOperationalIntegritySql } from './migrations/0006-cash-operational-integrity.js';
+import { saleShiftPaymentsSql } from './migrations/0007-sale-shift-payments.js';
+import { inventorySql } from './migrations/0008-inventory.js';
 
 export type Migration = {
   readonly version: number;
@@ -43,6 +46,18 @@ export const migrations: readonly Migration[] = [{
   version: 5,
   name: 'idempotency',
   sql: idempotencySql
+}, {
+  version: 6,
+  name: 'cash_operational_integrity',
+  sql: cashOperationalIntegritySql
+}, {
+  version: 7,
+  name: 'sale_shift_payments',
+  sql: saleShiftPaymentsSql
+}, {
+  version: 8,
+  name: 'inventory',
+  sql: inventorySql
 }];
 
 const checksum = (migration: Migration): string => createHash('sha256')

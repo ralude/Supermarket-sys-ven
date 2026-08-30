@@ -7,3 +7,5 @@ export {
   type StockMovementType
 } from './stock-movement.js';
 export { StockItem, type StockItemProps } from './stock-item.js';
+export type { RestoredStockItemProps } from './stock-item.js';
+export type { StockMovementRegisteredEvent } from './stock-events.js';

@@ -20,6 +20,7 @@ export type StockMovementProps = {
   reason: string;
   referenceId: string;
   occurredAt: Date;
+  eventId: string;
 };
 
 const MOVEMENT_DIRECTIONS: Record<StockMovementType, StockMovementDirection> = {
@@ -42,7 +43,8 @@ export class StockMovement {
     readonly actorId: string,
     readonly reason: string,
     readonly referenceId: string,
-    occurredAt: Date
+    occurredAt: Date,
+    readonly eventId: string
   ) {
     this.occurrenceTimestamp = new Date(occurredAt);
   }
@@ -81,6 +83,11 @@ export class StockMovement {
       'STOCK_MOVEMENT_REFERENCE_REQUIRED',
       'Stock movement reference is required.'
     );
+    const eventId = StockMovement.requireText(
+      props.eventId,
+      'STOCK_MOVEMENT_EVENT_ID_REQUIRED',
+      'Stock movement event ID is required.'
+    );
     if (Number.isNaN(props.occurredAt.getTime())) {
       throw new DomainError(
         'STOCK_MOVEMENT_TIMESTAMP_INVALID',
@@ -96,12 +103,22 @@ export class StockMovement {
       actorId,
       reason,
       referenceId,
-      props.occurredAt
+      props.occurredAt,
+      eventId
     );
   }
 
   get occurredAt(): Date {
     return new Date(this.occurrenceTimestamp);
+  }
+
+  matches(props: StockMovementProps): boolean {
+    return this.type === props.type && this.quantity.scaledValue === props.quantity.scaledValue &&
+      this.quantity.scale === props.quantity.scale && this.batchId === (props.batchId?.trim() ?? null) &&
+      this.actorId === props.actorId.trim() && this.reason === props.reason.trim() &&
+      this.referenceId === props.referenceId.trim() &&
+      this.occurrenceTimestamp.getTime() === props.occurredAt.getTime() &&
+      this.eventId === props.eventId.trim();
   }
 
   private static requireText(value: string, code: string, message: string): string {

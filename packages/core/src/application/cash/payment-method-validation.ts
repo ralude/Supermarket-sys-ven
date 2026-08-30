@@ -2,7 +2,7 @@ import { ApplicationError, err, ok, type Result } from '@supermarket/shared';
 import type { PaymentMethod } from '../../domain/currency/index.js';
 import type { PaymentMethodRepository } from '../ports/index.js';
 
-export async function resolveCashPaymentMethod(
+export async function resolvePaymentMethod(
   repository: PaymentMethodRepository,
   code: string,
   currencyCode: string
@@ -14,9 +14,6 @@ export async function resolveCashPaymentMethod(
   if (!method.isActive) {
     return err(new ApplicationError('PAYMENT_METHOD_INACTIVE', 'Payment method is inactive.'));
   }
-  if (method.kind !== 'CASH') {
-    return err(new ApplicationError('CASH_PAYMENT_METHOD_REQUIRED', 'Cash operations require a cash method.'));
-  }
   if (method.currencyCode !== currencyCode) {
     return err(new ApplicationError(
       'PAYMENT_METHOD_CURRENCY_MISMATCH',
@@ -24,4 +21,17 @@ export async function resolveCashPaymentMethod(
     ));
   }
   return ok(method);
+}
+
+export async function resolveCashPaymentMethod(
+  repository: PaymentMethodRepository,
+  code: string,
+  currencyCode: string
+): Promise<Result<PaymentMethod, ApplicationError>> {
+  const result = await resolvePaymentMethod(repository, code, currencyCode);
+  if (!result.ok || result.value.kind === 'CASH') return result;
+  return err(new ApplicationError(
+    'CASH_PAYMENT_METHOD_REQUIRED',
+    'Cash operations require a cash method.'
+  ));
 }

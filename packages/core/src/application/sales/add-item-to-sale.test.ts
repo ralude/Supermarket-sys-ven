@@ -15,7 +15,7 @@ const context: ExecutionContext = {
 
 function sale(): Sale {
   return Sale.start({
-    id: 'sale-001',
+    id: 'sale-001', shiftId: 'shift-001',
     currencyCode: 'USD',
     terminalId: 'terminal-001',
     originNodeId: 'node-001',

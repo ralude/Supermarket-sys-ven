@@ -11,7 +11,7 @@ type SaleEventBase = {
 
 export type SaleStartedEvent = SaleEventBase & {
   type: 'SaleStarted';
-  payload: { currencyCode: string; terminalId: string; originNodeId: string };
+  payload: { shiftId: string; currencyCode: string; terminalId: string; originNodeId: string };
 };
 
 export type SaleItemAddedEvent = SaleEventBase & {
@@ -36,7 +36,24 @@ export type PaymentRegisteredEvent = SaleEventBase & {
 
 export type SaleCompletedEvent = SaleEventBase & {
   type: 'SaleCompleted';
-  payload: { total: Money; paidTotal: Money };
+  payload: {
+    shiftId: string;
+    terminalId: string;
+    total: Money;
+    paidTotal: Money;
+    payments: Array<{
+      paymentId: string;
+      methodCode: string;
+      currencyCode: string;
+      amountMinorUnits: number;
+    }>;
+    items: Array<{
+      itemId: string;
+      productId: string;
+      quantityScaled: number;
+      quantityScale: number;
+    }>;
+  };
 };
 
 export type SaleVoidedEvent = SaleEventBase & {

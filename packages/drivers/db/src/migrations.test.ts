@@ -37,7 +37,10 @@ describe('database migrations', () => {
       expect.objectContaining({ version: 2, name: 'business_event_ledger' }),
       expect.objectContaining({ version: 3, name: 'outbox' }),
       expect.objectContaining({ version: 4, name: 'audit_log' }),
-      expect.objectContaining({ version: 5, name: 'idempotency' })
+      expect.objectContaining({ version: 5, name: 'idempotency' }),
+      expect.objectContaining({ version: 6, name: 'cash_operational_integrity' }),
+      expect.objectContaining({ version: 7, name: 'sale_shift_payments' }),
+      expect.objectContaining({ version: 8, name: 'inventory' })
     ]);
 
     const tables = handle.sqlite.prepare(
@@ -59,8 +62,18 @@ describe('database migrations', () => {
       'sales',
       'schema_migrations',
       'shift_closing_balances',
-      'shifts'
+      'shifts',
+      'stock_batches',
+      'stock_items',
+      'stock_movements'
     ]));
+    expect(handle.sqlite.prepare("pragma table_info('sales')").all())
+      .toEqual(expect.arrayContaining([expect.objectContaining({ name: 'shift_id', notnull: 1 })]));
+    expect(handle.sqlite.prepare("pragma table_info('cash_movements')").all())
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'source_id' }),
+        expect.objectContaining({ name: 'source_event_id' })
+      ]));
   });
 
   it('advances an existing database and rolls back a failed migration', () => {

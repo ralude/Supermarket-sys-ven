@@ -25,6 +25,7 @@ export type SalePaymentDto = {
 
 export type SaleDto = {
   id: string;
+  shiftId: string;
   currencyCode: string;
   terminalId: string;
   originNodeId: string;
@@ -47,6 +48,7 @@ export type SaleDto = {
 
 export type StartSaleInput = {
   currencyCode: string;
+  shiftId: string;
 };
 
 export type AddItemToSaleInput = {

@@ -135,6 +135,7 @@ export const productPriceHistory = sqliteTable('product_price_history', {
 
 export const sales = sqliteTable('sales', {
   id: text('id').primaryKey(),
+  shiftId: text('shift_id').notNull(),
   currencyCode: text('currency_code').notNull(),
   terminalId: text('terminal_id').notNull(),
   originNodeId: text('origin_node_id').notNull(),
@@ -222,7 +223,9 @@ export const cashMovements = sqliteTable('cash_movements', {
   currencyCode: text('currency_code').notNull(),
   reason: text('reason').notNull(),
   registeredBy: text('registered_by').notNull(),
-  registeredAt: integer('registered_at').notNull()
+  registeredAt: integer('registered_at').notNull(),
+  sourceId: text('source_id'),
+  sourceEventId: text('source_event_id')
 });
 
 export const shiftClosingBalances = sqliteTable('shift_closing_balances', {
@@ -233,3 +236,34 @@ export const shiftClosingBalances = sqliteTable('shift_closing_balances', {
   declaredMinorUnits: integer('declared_minor_units').notNull(),
   differenceMinorUnits: integer('difference_minor_units').notNull()
 }, (table) => [primaryKey({ columns: [table.shiftId, table.paymentMethodCode, table.currencyCode] })]);
+
+export const stockItems = sqliteTable('stock_items', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull().unique(),
+  unitCode: text('unit_code').notNull(),
+  quantityScale: integer('quantity_scale').notNull(),
+  tracksBatches: integer('tracks_batches', { mode: 'boolean' }).notNull()
+});
+
+export const stockBatches = sqliteTable('stock_batches', {
+  id: text('id').primaryKey(),
+  stockItemId: text('stock_item_id').notNull().references(() => stockItems.id),
+  lotNumber: text('lot_number').notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' })
+});
+
+export const stockMovements = sqliteTable('stock_movements', {
+  id: text('id').primaryKey(),
+  stockItemId: text('stock_item_id').notNull().references(() => stockItems.id),
+  eventId: text('event_id').notNull().unique(),
+  aggregateVersion: integer('aggregate_version').notNull(),
+  type: text('type').notNull(),
+  direction: text('direction').notNull(),
+  quantityScaled: integer('quantity_scaled').notNull(),
+  quantityScale: integer('quantity_scale').notNull(),
+  batchId: text('batch_id').references(() => stockBatches.id),
+  actorId: text('actor_id').notNull(),
+  reason: text('reason').notNull(),
+  referenceId: text('reference_id').notNull(),
+  occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull()
+});

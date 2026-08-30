@@ -15,7 +15,7 @@ const instant = (minute: number): Date => new Date(`2026-08-29T10:${String(minut
 
 const paidDraftSale = (): Sale => {
   const sale = Sale.start({
-    id: 'sale-001', currencyCode: 'USD', terminalId: 'terminal-001',
+    id: 'sale-001', shiftId: 'shift-001', currencyCode: 'USD', terminalId: 'terminal-001',
     originNodeId: 'node-001', startedBy: 'user-001', startedAt: instant(0), eventId: 'event-001'
   });
   sale.addItem({
@@ -56,7 +56,9 @@ describe('DrizzleSaleRepository integration', () => {
     await unitOfWork.execute(() => repository.save(sale));
 
     const restored = await repository.findById(sale.id);
-    expect(restored).toMatchObject({ id: sale.id, status: 'DRAFT', version: 4 });
+    expect(restored).toMatchObject({
+      id: sale.id, shiftId: 'shift-001', status: 'DRAFT', version: 4
+    });
     expect(restored?.items[0]?.snapshot).toMatchObject({
       productId: 'product-001', description: 'Rice 1kg', unitCode: 'UNIT'
     });

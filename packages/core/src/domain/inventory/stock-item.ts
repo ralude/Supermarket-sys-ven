@@ -1,6 +1,7 @@
 import { DomainError, Quantity } from '@supermarket/shared';
 import { Batch, type BatchProps } from './batch.js';
 import { StockMovement, type StockMovementProps } from './stock-movement.js';
+import type { StockMovementRegisteredEvent } from './stock-events.js';
 
 export type StockItemProps = {
   id: string;
@@ -10,11 +11,17 @@ export type StockItemProps = {
   tracksBatches: boolean;
 };
 
+export type RestoredStockItemProps = StockItemProps & {
+  batches: Batch[];
+  movements: StockMovement[];
+};
+
 const UNIT_CODE_PATTERN = /^[A-Z][A-Z0-9_-]*$/;
 
 export class StockItem {
   private readonly currentBatches: Batch[] = [];
   private readonly currentMovements: StockMovement[] = [];
+  private readonly events: StockMovementRegisteredEvent[] = [];
 
   private constructor(
     readonly id: string,
@@ -44,12 +51,38 @@ export class StockItem {
     return new StockItem(id, productId, unitCode, props.quantityScale, props.tracksBatches);
   }
 
+  static restore(props: RestoredStockItemProps): StockItem {
+    const item = StockItem.create(props);
+    for (const batch of props.batches) item.registerBatch({
+      id: batch.id,
+      lotNumber: batch.lotNumber,
+      ...(batch.expiresAt === null ? {} : { expiresAt: batch.expiresAt })
+    });
+    for (const movement of props.movements) item.registerMovement({
+      id: movement.id,
+      type: movement.type,
+      quantity: movement.quantity,
+      ...(movement.batchId === null ? {} : { batchId: movement.batchId }),
+      actorId: movement.actorId,
+      reason: movement.reason,
+      referenceId: movement.referenceId,
+      occurredAt: movement.occurredAt,
+      eventId: movement.eventId
+    });
+    item.events.length = 0;
+    return item;
+  }
+
   get batches(): readonly Batch[] {
     return [...this.currentBatches];
   }
 
   get movements(): readonly StockMovement[] {
     return [...this.currentMovements];
+  }
+
+  get domainEvents(): readonly StockMovementRegisteredEvent[] {
+    return [...this.events];
   }
 
   get balance(): Quantity {
@@ -75,8 +108,19 @@ export class StockItem {
   }
 
   registerMovement(props: StockMovementProps): StockMovement {
-    if (this.currentMovements.some((movement) => movement.id === props.id.trim())) {
+    const existing = this.currentMovements.find((movement) => movement.id === props.id.trim());
+    if (existing?.type === 'SALE_ISSUE' && props.type === 'SALE_ISSUE') {
+      if (existing.matches(props)) return existing;
+      throw new DomainError('STOCK_SALE_ISSUE_CONFLICT', 'Sale stock issue conflicts with another movement.');
+    }
+    if (existing) {
       throw new DomainError('STOCK_MOVEMENT_DUPLICATE', 'Stock movement already exists.');
+    }
+    if (this.currentMovements.some((movement) => movement.eventId === props.eventId.trim())) {
+      throw new DomainError(
+        'STOCK_MOVEMENT_EVENT_DUPLICATE',
+        'Stock movement event already exists.'
+      );
     }
     const movement = StockMovement.create(props);
     if (movement.quantity.scale !== this.quantityScale) {
@@ -98,7 +142,48 @@ export class StockItem {
       }
     }
     this.currentMovements.push(movement);
+    this.events.push({
+      type: 'StockMovementRegistered',
+      eventId: movement.eventId,
+      aggregateId: this.id,
+      aggregateType: 'StockItem',
+      aggregateVersion: this.currentMovements.length,
+      occurredAt: movement.occurredAt,
+      payload: {
+        productId: this.productId,
+        movementId: movement.id,
+        movementType: movement.type,
+        quantity: movement.quantity,
+        batchId: movement.batchId,
+        actorId: movement.actorId,
+        reason: movement.reason,
+        referenceId: movement.referenceId
+      }
+    });
     return movement;
+  }
+
+  allocateForIssue(quantity: Quantity): Array<{ batchId: string | null; quantity: Quantity }> {
+    if (quantity.scale !== this.quantityScale) {
+      throw new DomainError('STOCK_QUANTITY_SCALE_MISMATCH', 'Stock issue scale must match the item scale.');
+    }
+    if (!this.tracksBatches) return [{ batchId: null, quantity }];
+    let remaining = quantity.scaledValue;
+    const allocations: Array<{ batchId: string | null; quantity: Quantity }> = [];
+    const batches = [...this.currentBatches].sort((left, right) =>
+      (left.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER) -
+        (right.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER) ||
+      left.lotNumber.localeCompare(right.lotNumber)
+    );
+    for (const batch of batches) {
+      const available = this.balanceForBatch(batch.id).scaledValue;
+      if (available <= 0) continue;
+      const used = Math.min(available, remaining);
+      allocations.push({ batchId: batch.id, quantity: Quantity.fromScaled(used, this.quantityScale) });
+      remaining -= used;
+      if (remaining === 0) return allocations;
+    }
+    throw new DomainError('STOCK_INSUFFICIENT', 'Stock movement exceeds the available balance.');
   }
 
   balanceForBatch(batchId: string): Quantity {

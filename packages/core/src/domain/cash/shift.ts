@@ -1,6 +1,10 @@
 import { DomainError, Money } from '@supermarket/shared';
 import type { PaymentMethod } from '../currency/index.js';
-import { CashMovement, type CashMovementType } from './cash-movement.js';
+import {
+  CashMovement,
+  type CashMovementReference,
+  type CashMovementType
+} from './cash-movement.js';
 import type { CashRegister } from './cash-register.js';
 import type { ShiftDomainEvent } from './shift-events.js';
 
@@ -45,6 +49,7 @@ export type RegisterMovementProps = {
   originNodeId: string;
   occurredAt: Date;
   eventId: string;
+  reference?: CashMovementReference;
 };
 
 export type CloseShiftProps = {
@@ -210,12 +215,20 @@ export class Shift {
   }
 
   registerMovement(props: RegisterMovementProps): CashMovement {
-    this.assertOpen();
     this.assertOwnership(props.terminalId, props.originNodeId);
-    this.assertOccurredDuringShift(props.occurredAt);
-    if (this.currentMovements.some((movement) => movement.id === props.id)) {
+    const existing = this.currentMovements.find((movement) => movement.id === props.id);
+    if (existing?.type === 'SALE_PAYMENT' && props.type === 'SALE_PAYMENT') {
+      if (existing.matches({ ...props, registeredAt: props.occurredAt })) return existing;
+      throw new DomainError(
+        'CASH_SALE_PAYMENT_CONFLICT',
+        'Sale payment identifier conflicts with another movement.'
+      );
+    }
+    if (existing) {
       throw new DomainError('CASH_MOVEMENT_DUPLICATE', 'Cash movement already exists.');
     }
+    this.assertOpen();
+    this.assertOccurredDuringShift(props.occurredAt);
     const movement = CashMovement.create({
       id: props.id,
       type: props.type,
@@ -223,7 +236,8 @@ export class Shift {
       amount: props.amount,
       reason: props.reason,
       registeredBy: props.registeredBy,
-      registeredAt: props.occurredAt
+      registeredAt: props.occurredAt,
+      ...(props.reference ? { reference: props.reference } : {})
     });
     if (movement.type === 'WITHDRAWAL') {
       const available = this.balanceFor(movement.method.code, movement.amount.currency);
@@ -245,7 +259,8 @@ export class Shift {
         paymentMethodCode: movement.method.code,
         amount: movement.amount,
         reason: movement.reason,
-        registeredBy: movement.registeredBy
+        registeredBy: movement.registeredBy,
+        reference: movement.reference
       }
     });
     return movement;
@@ -263,9 +278,6 @@ export class Shift {
           'SHIFT_CLOSING_BALANCE_NEGATIVE',
           'Declared closing balance cannot be negative.'
         );
-      }
-      if (balance.method.kind !== 'CASH') {
-        throw new DomainError('CASH_PAYMENT_METHOD_REQUIRED', 'Cash balances require a cash payment method.');
       }
       if (balance.method.currencyCode !== balance.amount.currency) {
         throw new DomainError(
