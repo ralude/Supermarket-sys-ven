@@ -1,8 +1,8 @@
 import type {
-  FiscalDeliveryCertainty,
   FiscalDocumentContent,
   FiscalDocumentLine,
-  FiscalDocumentPayment
+  FiscalDocumentPayment,
+  FiscalOperationEvidence
 } from '../../domain/fiscal/index.js';
 
 export type FiscalDocumentLinePayload = FiscalDocumentLine;
@@ -19,7 +19,7 @@ export type FiscalPrinterErrorCode =
 
 export type FiscalPrinterFailure = {
   readonly code: FiscalPrinterErrorCode;
-  readonly certainty: FiscalDeliveryCertainty;
+  readonly evidence: FiscalOperationEvidence;
   readonly retryable: boolean;
   readonly message: string;
 };
@@ -40,11 +40,13 @@ export type FiscalPrinterStatus = {
 export type FiscalDocumentPrintConfirmation = {
   readonly fiscalNumber: string;
   readonly confirmedAt: Date;
+  readonly evidence: FiscalOperationEvidence;
 };
 
 export type FiscalReportPrintConfirmation = {
   readonly reportNumber: string;
   readonly confirmedAt: Date;
+  readonly evidence: FiscalOperationEvidence;
 };
 
 export interface FiscalPrinterPort {

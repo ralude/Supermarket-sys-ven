@@ -17,7 +17,13 @@ La piramide de pruebas prioriza reglas de dominio rapidas y deterministas, y agr
 - Fase 3: integration tests con SQLite real y transacciones reales.
 - Fase 4: pruebas de append-only, outbox, idempotencia y proyeccion de historial sin rehidratar el estado operativo.
 - Fases 5 y 6: flujos integrados auditados de caja e inventario.
-- Fases 7 y 8: contract tests, simulacion y reconciliacion del driver fiscal.
+- Fase 7: contract tests semanticos y simulacion determinista del puerto fiscal
+  fake.
+- Fase 8: suites contractuales del puerto sobre simuladores/fakes controlados y
+  sin controles exclusivos del fake fiscal, vectores dorados de bytes por
+  protocolo, SerialPortMock/fake de transporte, reconciliacion por evidencia y
+  una suite hardware-in-the-loop separada por modelo y firmware. El
+  consentimiento de X/Z simulados nunca habilita X/Z en hardware.
 - Fase 9: E2E de venta, caja, catalogo e inventario.
 - Fase 10: deduplicacion, ownership por agregado, reconexion y discrepancias de inventario.
 
@@ -30,3 +36,22 @@ La piramide de pruebas prioriza reglas de dominio rapidas y deterministas, y agr
 - Reiniciar el equipo durante el cierre Z.
 
 Cada escenario debe definir estado inicial, fallo inyectado, estado esperado recuperable y evidencia de que no se duplicaron efectos.
+
+## Matriz minima de la Fase 8
+
+- El parser recibe cada trama en todos sus cortes posibles, varias tramas en un
+  chunk, ruido, truncamiento, overflow, checksum invalido y respuesta tardia.
+- El transporte cubre puerto ocupado, backpressure, timeout por etapa,
+  desconexion, reconexion con epoch nuevo y cierre mientras hay trabajo.
+- Factura, nota, X y Z fallan antes, durante y despues de la escritura y de la
+  respuesta; solo evidencia autoritativa permite retry.
+- El barrido de arranque recupera documentos y reportes o mantiene el
+  dispositivo bloqueado sin reproducir tramas.
+- Cada uno de los dos manifiestos se valida con su hardware fiscal y la misma
+  aplicación empaquetada en Windows limpio; también con simulador oficial
+  cuando el fabricante disponga de uno.
+- La prueba HIL verifica contenido/totales del documento, impresion incompleta,
+  presupuesto de cierres Z y coexistencia con el DCTD.
+- Los resultados registran por perfil proveedor, modelo, firmware, protocolo o
+  SDK, interfaz, runtime y version de SerialPort cuando aplique; una combinacion
+  no probada queda fuera de la matriz soportada.

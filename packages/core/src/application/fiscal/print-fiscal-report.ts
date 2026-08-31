@@ -136,6 +136,7 @@ export class PrintFiscalReport {
         day.markReportIssued({
           reportId: report.id,
           reportNumber: printed.value.reportNumber,
+          evidence: printed.value.evidence,
           actorId: context.actorId,
           occurredAt: printed.value.confirmedAt,
           eventId: this.eventIdGenerator.generate()
@@ -151,9 +152,7 @@ export class PrintFiscalReport {
       }
       const action = printed.ok
         ? `FISCAL_${this.type}_REPORT_ISSUED`
-        : printed.error.retryable
-          ? 'FISCAL_REPORT_ERROR_RECORDED'
-          : 'FISCAL_REPORT_FAILED';
+        : 'FISCAL_REPORT_ERROR_RECORDED';
       await this.persist(day, cursor, context, reason, action);
       if (!printed.ok) return err(new ApplicationError(printed.error.code, printed.error.message));
       return ok(this.toDto(day, report.id));
@@ -208,7 +207,8 @@ export class PrintFiscalReport {
       status: report.status,
       attempts: report.attempts,
       reportNumber: report.reportNumber,
-      lastErrorCode: report.lastErrorCode
+      lastErrorCode: report.lastErrorCode,
+      lastEvidence: report.lastEvidence
     };
   }
 }

@@ -14,14 +14,14 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 5 | Caja operativa | ~~Completada~~ |
 | 6 | Inventario operativo | ~~Completada~~ |
 | 7 | Driver fiscal fake | ~~Completada~~ |
-| 8 | Integracion serial | Pendiente |
+| 8 | Integracion serial | En curso |
 | 9 | UI | Pendiente |
 | 10 | Sincronizacion | Pendiente |
 | 11 | Seguridad | Pendiente |
 | 12 | Optimizacion | Pendiente |
 
 **Fase actual:** Fase 8 - Integracion serial
-**Sub-fase actual:** 8.01 - Adaptador SerialPort
+**Sub-fase actual:** 8.00 - Gate de evidencia, contrato y proveedor
 
 ## Fases
 
@@ -63,7 +63,16 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 - La sub-fase 2.06 implementa permisos de codigo estable, roles configurables y usuarios sin credenciales; autenticacion, sesiones, JWT y cifrado permanecen en la Fase 11.
 - La sub-fase 2.07 implementa `StockItem` con movimientos append-only, cantidades escaladas y lotes opcionales; persistencia, FEFO, kardex e integracion con ventas permanecen en la Fase 6.
 - La Fase 6 persiste inventario como movimientos append-only, recibe compras mediante un contrato minimo, descuenta ventas con FEFO e idempotencia y deriva el kardex sin almacenar saldos mutables.
-- La Fase 7 implementa el puerto fiscal, un fake determinista, estados persistentes recuperables, emision, reportes X/Z y un contrato ejecutable reutilizable; no instala ni usa SerialPort.
+- La Fase 7 implementó el puerto fiscal, un fake determinista, estados
+  persistentes recuperables, emision y reportes X/Z. El gate 8.00 ya separó sus
+  controles privados de las suites semánticas exclusivas de simulador y aisló
+  X/Z detrás de consentimiento simulado explícito. No instala ni usa SerialPort.
+- La Fase 8 comienza por 8.00 para cerrar las deudas de recuperacion de la Fase 7 y habilitar un primer perfil con evidencia primaria. El transporte serial y la recuperacion neutral se estabilizan con ese perfil; luego un gate, adaptador y HIL independientes califican el segundo, reutilizando SerialPort solo si su via oficial es compatible. La fase solo termina con dos combinaciones exactas soportadas, inicialmente candidatas PNP y The Factory HKA/ACLAS. ADR-0010 limita la genericidad al contrato semantico y, cuando aplica, al transporte serial; cada protocolo o SDK, modelo y firmware requiere evidencia y calificacion propias.
+- El corte interno de 8.00 del 2026-08-31 separa retry de terminalidad,
+  persiste evidencia fiscal en cuatro ejes y añade las migraciones 0010/0011
+  con recuperación determinista e integridad fail-closed. Esto no cierra el
+  gate: siguen pendientes fabricante, protocolo, registro, runtime y equipo.
+- La planificacion regulatoria de Fase 8 reconoce que SNAT/2026/00084 derogo la SNAT/2024/000121 el 2026-08-12. La autorizacion por modelo y el registro del desarrollador ante el fabricante de SNAT/2018/0141 se verifican nuevamente antes del piloto.
 - La Fase 1 se completó con Electron, React, Fastify, SQLite, Drizzle y ESLint instalados y verificados mediante smoke tests.
 - ADR-0008 establece terminales POS autonomas con Fastify y SQLite local; el nodo coordinador sincroniza eventos y datos de referencia.
 - ADR-0009 establece tablas relacionales como fuente de verdad, ledger append-only para historia y outbox para entrega; no se usa event sourcing completo en el MVP.

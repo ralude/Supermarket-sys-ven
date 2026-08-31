@@ -1,8 +1,8 @@
 import {
   FiscalDocument,
-  type FiscalDeliveryCertainty,
   type FiscalDocumentRepository,
   type FiscalDocumentState,
+  type FiscalDocumentTransition,
   type FiscalDocumentType
 } from '@supermarket/core';
 import { InfrastructureError } from '@supermarket/shared';
@@ -14,10 +14,14 @@ import {
   fiscalDocuments,
   fiscalDocumentTransitions
 } from './schema.js';
+import {
+  fiscalOperationEvidenceValues,
+  restoreFiscalOperationEvidence
+} from './fiscal-operation-evidence.js';
 import { mapDatabaseError, requireTransaction } from './unit-of-work.js';
 
 const activeStates: FiscalDocumentState[] = ['PENDING', 'PRINTING', 'ERROR', 'RETRYING'];
-const recoverableStates: FiscalDocumentState[] = ['PRINTING', 'ERROR', 'RETRYING'];
+const recoverableStates: FiscalDocumentState[] = ['PENDING', 'PRINTING', 'ERROR', 'RETRYING'];
 
 export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository {
   constructor(private readonly handle: DatabaseHandle) {}
@@ -27,6 +31,11 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
     try {
       const existing = this.handle.db.select().from(fiscalDocuments)
         .where(eq(fiscalDocuments.id, document.id)).get();
+      const transitions = this.newTransitions(
+        document.transitions,
+        existing?.version ?? 0,
+        document.version
+      );
       if (!existing) {
         this.handle.db.insert(fiscalDocuments).values(this.documentValues(document)).run();
         this.handle.db.insert(fiscalDocumentLines).values(document.content.lines.map((line, sequence) => ({
@@ -56,34 +65,39 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
             'Fiscal document version is stale.'
           );
         }
+        const evidence = fiscalOperationEvidenceValues(document.lastEvidence);
         this.handle.db.update(fiscalDocuments).set({
           status: document.status,
           version: document.version,
           attempts: document.attempts,
           fiscalNumber: document.fiscalNumber,
           lastErrorCode: document.lastErrorCode,
-          lastCertainty: document.lastCertainty,
+          lastDispatchState: evidence.dispatchState,
+          lastCommandEffect: evidence.commandEffect,
+          lastFiscalCommit: evidence.fiscalCommit,
+          lastPrintDelivery: evidence.printDelivery,
           lastFailureRetryable: document.lastFailureRetryable
         }).where(eq(fiscalDocuments.id, document.id)).run();
       }
 
-      const persisted = new Set(this.handle.db.select({ eventId: fiscalDocumentTransitions.eventId })
-        .from(fiscalDocumentTransitions)
-        .where(eq(fiscalDocumentTransitions.documentId, document.id)).all()
-        .map(({ eventId }) => eventId));
-      const transitions = document.transitions.filter(({ eventId }) => !persisted.has(eventId));
       if (transitions.length > 0) {
-        this.handle.db.insert(fiscalDocumentTransitions).values(transitions.map((transition) => ({
-          eventId: transition.eventId,
-          documentId: document.id,
-          aggregateVersion: transition.version,
-          fromStatus: transition.from,
-          toStatus: transition.to,
-          actorId: transition.actorId,
-          occurredAt: transition.occurredAt,
-          errorCode: transition.errorCode,
-          certainty: transition.certainty
-        }))).run();
+        this.handle.db.insert(fiscalDocumentTransitions).values(transitions.map((transition) => {
+          const evidence = fiscalOperationEvidenceValues(transition.evidence);
+          return {
+            eventId: transition.eventId,
+            documentId: document.id,
+            aggregateVersion: transition.version,
+            fromStatus: transition.from,
+            toStatus: transition.to,
+            actorId: transition.actorId,
+            occurredAt: transition.occurredAt,
+            errorCode: transition.errorCode,
+            dispatchState: evidence.dispatchState,
+            commandEffect: evidence.commandEffect,
+            fiscalCommit: evidence.fiscalCommit,
+            printDelivery: evidence.printDelivery
+          };
+        })).run();
       }
     } catch (error) {
       throw mapDatabaseError(error);
@@ -104,13 +118,34 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
 
   findActive(): Promise<FiscalDocument | null> {
     return this.read(() => this.restore(this.handle.db.select().from(fiscalDocuments)
-      .where(inArray(fiscalDocuments.status, activeStates)).get()));
+      .where(inArray(fiscalDocuments.status, activeStates))
+      .orderBy(fiscalDocuments.createdAt, fiscalDocuments.id).get()));
   }
 
   findRecoverable(): Promise<FiscalDocument[]> {
     return this.read(() => this.handle.db.select().from(fiscalDocuments)
-      .where(inArray(fiscalDocuments.status, recoverableStates)).all()
+      .where(inArray(fiscalDocuments.status, recoverableStates))
+      .orderBy(fiscalDocuments.createdAt, fiscalDocuments.id).all()
       .map((row) => this.restore(row) as FiscalDocument));
+  }
+
+  private newTransitions(
+    transitions: readonly FiscalDocumentTransition[],
+    persistedVersion: number,
+    aggregateVersion: number
+  ): FiscalDocumentTransition[] {
+    const pending = transitions
+      .filter(({ version }) => version > persistedVersion)
+      .sort((left, right) => left.version - right.version);
+    const expectedCount = aggregateVersion - persistedVersion;
+    if (expectedCount < 0 || pending.length !== expectedCount ||
+      pending.some(({ version }, index) => version !== persistedVersion + index + 1)) {
+      throw new InfrastructureError(
+        'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID',
+        'Fiscal document transition sequence is incomplete.'
+      );
+    }
+    return pending;
   }
 
   private restore(row: typeof fiscalDocuments.$inferSelect | undefined): FiscalDocument | null {
@@ -156,7 +191,12 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
       attempts: row.attempts,
       fiscalNumber: row.fiscalNumber,
       lastErrorCode: row.lastErrorCode,
-      lastCertainty: row.lastCertainty as FiscalDeliveryCertainty | null,
+      lastEvidence: restoreFiscalOperationEvidence({
+        dispatchState: row.lastDispatchState,
+        commandEffect: row.lastCommandEffect,
+        fiscalCommit: row.lastFiscalCommit,
+        printDelivery: row.lastPrintDelivery
+      }),
       lastFailureRetryable: row.lastFailureRetryable,
       transitions: transitions.map((transition) => ({
         eventId: transition.eventId,
@@ -166,12 +206,18 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
         actorId: transition.actorId,
         occurredAt: transition.occurredAt,
         errorCode: transition.errorCode,
-        certainty: transition.certainty as FiscalDeliveryCertainty | null
+        evidence: restoreFiscalOperationEvidence({
+          dispatchState: transition.dispatchState,
+          commandEffect: transition.commandEffect,
+          fiscalCommit: transition.fiscalCommit,
+          printDelivery: transition.printDelivery
+        })
       }))
     });
   }
 
   private documentValues(document: FiscalDocument): typeof fiscalDocuments.$inferInsert {
+    const evidence = fiscalOperationEvidenceValues(document.lastEvidence);
     return {
       id: document.id,
       referenceId: document.content.referenceId,
@@ -189,7 +235,10 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
       attempts: document.attempts,
       fiscalNumber: document.fiscalNumber,
       lastErrorCode: document.lastErrorCode,
-      lastCertainty: document.lastCertainty,
+      lastDispatchState: evidence.dispatchState,
+      lastCommandEffect: evidence.commandEffect,
+      lastFiscalCommit: evidence.fiscalCommit,
+      lastPrintDelivery: evidence.printDelivery,
       lastFailureRetryable: document.lastFailureRetryable
     };
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FiscalDay } from '../../domain/fiscal/index.js';
+import { FiscalDay } from '../../domain/fiscal/index.js';
 import type { ExecutionContext } from '../execution-context.js';
 import type {
   AuditEntry, BusinessEventStore, FiscalDayRepository, FiscalPrinterPort,
@@ -12,6 +12,18 @@ const context: ExecutionContext = {
   actorId: 'user-001', terminalId: 'terminal-001', originNodeId: 'node-001',
   correlationId: 'correlation-001', idempotencyKey: 'report-request-001'
 };
+const committedEvidence = {
+  dispatchState: 'RESULT_RECEIVED', commandEffect: 'APPLIED',
+  fiscalCommit: 'COMMITTED', printDelivery: 'COMPLETE'
+} as const;
+const notStartedEvidence = {
+  dispatchState: 'NOT_STARTED', commandEffect: 'NOT_APPLIED',
+  fiscalCommit: 'NOT_COMMITTED', printDelivery: 'INCOMPLETE'
+} as const;
+const rejectedEvidence = {
+  dispatchState: 'RESULT_RECEIVED', commandEffect: 'REJECTED',
+  fiscalCommit: 'NOT_COMMITTED', printDelivery: 'INCOMPLETE'
+} as const;
 
 class Repository implements FiscalDayRepository {
   stored: FiscalDay | null = null;
@@ -25,19 +37,26 @@ class Repository implements FiscalDayRepository {
     return this.stored?.originNodeId === originNodeId &&
       this.stored.reports.some((report) => report.idempotencyKey === key) ? this.stored : null;
   }
+  async findRecoverable(): Promise<FiscalDay[]> {
+    return this.stored?.reports.some(({ status }) =>
+      ['PENDING', 'PRINTING', 'ERROR', 'RETRYING'].includes(status)) ? [this.stored] : [];
+  }
 }
 
 const setup = (response: 'ACK' | 'PAPER_END' | 'MEMORY_FULL' = 'ACK') => {
   const repository = new Repository();
   const evidence = { active: false, ledger: [] as string[], outbox: [] as string[], audit: [] as AuditEntry[] };
-  const confirmation = { reportNumber: 'R-000001', confirmedAt: new Date('2026-08-30T20:00:00.000Z') };
+  const confirmation = {
+    reportNumber: 'R-000001', confirmedAt: new Date('2026-08-30T20:00:00.000Z'),
+    evidence: committedEvidence
+  };
   const result = response === 'ACK' ? { ok: true as const, value: confirmation } : {
     ok: false as const,
     error: response === 'PAPER_END' ? {
-      code: 'FISCAL_PRINTER_PAPER_END' as const, certainty: 'NOT_SENT' as const,
+      code: 'FISCAL_PRINTER_PAPER_END' as const, evidence: notStartedEvidence,
       retryable: true, message: 'No paper.'
     } : {
-      code: 'FISCAL_PRINTER_MEMORY_FULL' as const, certainty: 'REJECTED' as const,
+      code: 'FISCAL_PRINTER_MEMORY_FULL' as const, evidence: rejectedEvidence,
       retryable: false, message: 'Memory full.'
     }
   };
@@ -74,6 +93,23 @@ const setup = (response: 'ACK' | 'PAPER_END' | 'MEMORY_FULL' = 'ACK') => {
 };
 
 describe('fiscal reports', () => {
+  it('keeps a PENDING report visible to startup recovery', async () => {
+    const repository = new Repository();
+    const day = FiscalDay.open({
+      id: 'day-001', businessDate: '2026-08-30', terminalId: 'terminal-001',
+      originNodeId: 'node-001', openedBy: 'user-001',
+      openedAt: new Date('2026-08-30T08:00:00.000Z'), eventId: 'event-001'
+    });
+    day.requestReport({
+      id: 'report-001', type: 'X', idempotencyKey: 'report-key',
+      requestFingerprint: 'fingerprint', actorId: 'user-001',
+      occurredAt: new Date('2026-08-30T09:00:00.000Z'), eventId: 'event-002'
+    });
+    repository.stored = day;
+
+    expect(await repository.findRecoverable()).toEqual([day]);
+  });
+
   it('issues X without closing the fiscal day', async () => {
     const { repository, evidence, common } = setup();
     const result = await new PrintXReport(...common).execute({
@@ -81,7 +117,9 @@ describe('fiscal reports', () => {
     }, context);
     expect(result.ok).toBe(true);
     expect(repository.stored?.state).toBe('DAY_OPEN');
-    expect(repository.stored?.reports[0]).toMatchObject({ type: 'X', status: 'ISSUED' });
+    expect(repository.stored?.reports[0]).toMatchObject({
+      type: 'X', status: 'ISSUED', lastEvidence: committedEvidence
+    });
     expect(evidence.outbox).toEqual(['FiscalXReportIssued']);
   });
 
@@ -97,13 +135,17 @@ describe('fiscal reports', () => {
 
   it.each([
     ['PAPER_END', 'ERROR'],
-    ['MEMORY_FULL', 'FAILED']
+    ['MEMORY_FULL', 'ERROR']
   ] as const)('persists %s as %s', async (response, expectedStatus) => {
-    const { repository, common } = setup(response);
+    const { repository, evidence, common } = setup(response);
     const result = await new PrintXReport(...common).execute({
       dayId: 'day-001', businessDate: '2026-08-30', reason: 'Control report'
     }, context);
     expect(result.ok).toBe(false);
     expect(repository.stored?.reports[0]?.status).toBe(expectedStatus);
+    expect(await repository.findRecoverable()).toEqual([repository.stored]);
+    expect(evidence.audit).toMatchObject([{ action: 'FISCAL_REPORT_ERROR_RECORDED' }]);
+    expect(evidence.ledger).toContain('FiscalReportErrorRecorded');
+    expect(evidence.ledger).not.toContain('FiscalReportFailed');
   });
 });

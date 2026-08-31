@@ -1,5 +1,13 @@
 import { DomainError } from '@supermarket/shared';
-import type { FiscalDeliveryCertainty, FiscalDocumentContent } from './fiscal-types.js';
+import {
+  cloneFiscalOperationEvidence,
+  isFiscalOperationCommitted,
+  isFiscalOperationEvidenceCoherent,
+  isFiscalOperationRetrySafe,
+  isFiscalOperationTerminalFailureSafe,
+  type FiscalDocumentContent,
+  type FiscalOperationEvidence
+} from './fiscal-types.js';
 
 export const FISCAL_DOCUMENT_STATES = [
   'PENDING', 'PRINTING', 'ISSUED', 'ERROR', 'RETRYING', 'FAILED'
@@ -14,7 +22,7 @@ export type FiscalDocumentTransition = {
   readonly actorId: string;
   readonly occurredAt: Date;
   readonly errorCode: string | null;
-  readonly certainty: FiscalDeliveryCertainty | null;
+  readonly evidence: FiscalOperationEvidence | null;
 };
 
 type FiscalEventType =
@@ -53,7 +61,7 @@ export type RestoreFiscalDocumentProps = Omit<CreateFiscalDocumentProps, 'eventI
   readonly attempts: number;
   readonly fiscalNumber: string | null;
   readonly lastErrorCode: string | null;
-  readonly lastCertainty: FiscalDeliveryCertainty | null;
+  readonly lastEvidence: FiscalOperationEvidence | null;
   readonly lastFailureRetryable: boolean;
   readonly transitions: readonly FiscalDocumentTransition[];
 };
@@ -70,7 +78,7 @@ export class FiscalDocument {
   private currentAttempts = 0;
   private currentFiscalNumber: string | null = null;
   private currentLastErrorCode: string | null = null;
-  private currentLastCertainty: FiscalDeliveryCertainty | null = null;
+  private currentLastEvidence: FiscalOperationEvidence | null = null;
   private currentLastFailureRetryable = false;
   private readonly currentTransitions: FiscalDocumentTransition[] = [];
   private readonly events: FiscalDocumentDomainEvent[] = [];
@@ -102,7 +110,7 @@ export class FiscalDocument {
     );
     document.addTransition({
       eventId: props.eventId, version: 1, from: null, to: 'PENDING', actorId: props.createdBy,
-      occurredAt: props.createdAt, errorCode: null, certainty: null
+      occurredAt: props.createdAt, errorCode: null, evidence: null
     }, 'FiscalDocumentPending', {
       referenceId: document.content.referenceId,
       type: document.content.type
@@ -117,12 +125,17 @@ export class FiscalDocument {
     document.currentAttempts = props.attempts;
     document.currentFiscalNumber = props.fiscalNumber;
     document.currentLastErrorCode = props.lastErrorCode;
-    document.currentLastCertainty = props.lastCertainty;
+    document.currentLastEvidence = props.lastEvidence === null
+      ? null
+      : cloneFiscalOperationEvidence(props.lastEvidence);
     document.currentLastFailureRetryable = props.lastFailureRetryable;
     document.currentTransitions.length = 0;
     document.currentTransitions.push(...props.transitions.map((transition) => ({
       ...transition,
-      occurredAt: FiscalDocument.validDate(transition.occurredAt)
+      occurredAt: FiscalDocument.validDate(transition.occurredAt),
+      evidence: transition.evidence === null
+        ? null
+        : cloneFiscalOperationEvidence(transition.evidence)
     })));
     document.events.length = 0;
     return document;
@@ -134,11 +147,19 @@ export class FiscalDocument {
   get attempts(): number { return this.currentAttempts; }
   get fiscalNumber(): string | null { return this.currentFiscalNumber; }
   get lastErrorCode(): string | null { return this.currentLastErrorCode; }
-  get lastCertainty(): FiscalDeliveryCertainty | null { return this.currentLastCertainty; }
+  get lastEvidence(): FiscalOperationEvidence | null {
+    return this.currentLastEvidence === null
+      ? null
+      : cloneFiscalOperationEvidence(this.currentLastEvidence);
+  }
   get lastFailureRetryable(): boolean { return this.currentLastFailureRetryable; }
   get transitions(): readonly FiscalDocumentTransition[] {
     return this.currentTransitions.map((transition) => ({
-      ...transition, occurredAt: new Date(transition.occurredAt)
+      ...transition,
+      occurredAt: new Date(transition.occurredAt),
+      evidence: transition.evidence === null
+        ? null
+        : cloneFiscalOperationEvidence(transition.evidence)
     }));
   }
   get domainEvents(): readonly FiscalDocumentDomainEvent[] { return [...this.events]; }
@@ -149,6 +170,9 @@ export class FiscalDocument {
       throw new DomainError('FISCAL_DOCUMENT_INVALID_STATE', 'Fiscal document cannot start printing.');
     }
     this.currentAttempts += 1;
+    this.currentLastErrorCode = null;
+    this.currentLastEvidence = null;
+    this.currentLastFailureRetryable = false;
     this.transition('PRINTING', props, 'FiscalDocumentPrintingStarted', {
       attempt: this.currentAttempts
     });
@@ -159,26 +183,30 @@ export class FiscalDocument {
     actorId: string;
     occurredAt: Date;
     eventId: string;
+    evidence: FiscalOperationEvidence;
   }): void {
     this.assertMutable();
-    if (this.currentStatus !== 'PRINTING' && this.currentStatus !== 'ERROR') {
+    if (this.currentStatus !== 'PRINTING' && this.currentStatus !== 'ERROR' &&
+      this.currentStatus !== 'RETRYING') {
       throw new DomainError('FISCAL_DOCUMENT_INVALID_STATE', 'Fiscal document cannot be marked issued.');
     }
+    FiscalDocument.assertCommittedEvidence(props.evidence);
     this.currentFiscalNumber = FiscalDocument.requireText(
       props.fiscalNumber, 'FISCAL_NUMBER_REQUIRED', 'Fiscal document number is required.'
     );
     this.currentLastErrorCode = null;
-    this.currentLastCertainty = null;
+    this.currentLastEvidence = cloneFiscalOperationEvidence(props.evidence);
     this.currentLastFailureRetryable = false;
     this.transition('ISSUED', props, 'FiscalDocumentIssued', {
       fiscalNumber: this.currentFiscalNumber,
-      referenceId: this.content.referenceId
+      referenceId: this.content.referenceId,
+      evidence: this.currentLastEvidence
     });
   }
 
   recordError(props: {
     code: string;
-    certainty: FiscalDeliveryCertainty;
+    evidence: FiscalOperationEvidence;
     retryable: boolean;
     actorId: string;
     occurredAt: Date;
@@ -188,27 +216,28 @@ export class FiscalDocument {
     if (this.currentStatus !== 'PRINTING') {
       throw new DomainError('FISCAL_DOCUMENT_INVALID_STATE', 'Fiscal document is not printing.');
     }
+    FiscalDocument.assertFailureEvidence(props.evidence);
     this.currentLastErrorCode = FiscalDocument.requireText(
       props.code, 'FISCAL_ERROR_CODE_REQUIRED', 'Fiscal error code is required.'
     );
-    this.currentLastCertainty = props.certainty;
+    this.currentLastEvidence = cloneFiscalOperationEvidence(props.evidence);
     this.currentLastFailureRetryable = props.retryable;
     this.transition('ERROR', props, 'FiscalDocumentErrorRecorded', {
       errorCode: props.code,
-      certainty: props.certainty,
+      evidence: this.currentLastEvidence,
       retryable: props.retryable
     });
   }
 
   beginRetry(props: {
-    confirmedNotIssued: boolean;
     actorId: string;
     occurredAt: Date;
     eventId: string;
   }): void {
     this.assertMutable();
     if (this.currentStatus !== 'ERROR' || !this.currentLastFailureRetryable ||
-      !props.confirmedNotIssued) {
+      this.currentLastEvidence === null ||
+      !isFiscalOperationRetrySafe(this.currentLastEvidence)) {
       throw new DomainError(
         'FISCAL_RETRY_RECONCILIATION_REQUIRED',
         'Fiscal document cannot retry without confirmed device state.'
@@ -223,6 +252,13 @@ export class FiscalDocument {
     this.assertMutable();
     if (this.currentStatus !== 'ERROR' && this.currentStatus !== 'RETRYING') {
       throw new DomainError('FISCAL_DOCUMENT_INVALID_STATE', 'Fiscal document cannot be marked failed.');
+    }
+    if (this.currentLastEvidence === null ||
+      !isFiscalOperationTerminalFailureSafe(this.currentLastEvidence)) {
+      throw new DomainError(
+        'FISCAL_TERMINAL_FAILURE_EVIDENCE_REQUIRED',
+        'Terminal failure requires authoritative no-commit evidence.'
+      );
     }
     this.transition('FAILED', props, 'FiscalDocumentFailed', {
       errorCode: this.currentLastErrorCode
@@ -248,7 +284,9 @@ export class FiscalDocument {
       ),
       occurredAt: FiscalDocument.validDate(props.occurredAt),
       errorCode: this.currentLastErrorCode,
-      certainty: this.currentLastCertainty
+      evidence: this.currentLastEvidence === null
+        ? null
+        : cloneFiscalOperationEvidence(this.currentLastEvidence)
     }, eventType, payload);
   }
 
@@ -261,7 +299,12 @@ export class FiscalDocument {
       transition.eventId, 'FISCAL_EVENT_ID_REQUIRED', 'Fiscal event ID is required.'
     );
     this.currentTransitions.push({
-      ...transition, eventId, occurredAt: new Date(transition.occurredAt)
+      ...transition,
+      eventId,
+      occurredAt: new Date(transition.occurredAt),
+      evidence: transition.evidence === null
+        ? null
+        : cloneFiscalOperationEvidence(transition.evidence)
     });
     this.events.push({
       type,
@@ -352,5 +395,23 @@ export class FiscalDocument {
       throw new DomainError('FISCAL_TIMESTAMP_INVALID', 'Fiscal timestamp is invalid.');
     }
     return new Date(value);
+  }
+
+  private static assertCommittedEvidence(evidence: FiscalOperationEvidence): void {
+    if (!isFiscalOperationCommitted(evidence)) {
+      throw new DomainError(
+        'FISCAL_COMMIT_EVIDENCE_REQUIRED',
+        'Issued fiscal documents require positive fiscal commit evidence.'
+      );
+    }
+  }
+
+  private static assertFailureEvidence(evidence: FiscalOperationEvidence): void {
+    if (!isFiscalOperationEvidenceCoherent(evidence) || evidence.printDelivery === 'COMPLETE') {
+      throw new DomainError(
+        'FISCAL_FAILURE_EVIDENCE_INVALID',
+        'Fiscal failure evidence is inconsistent.'
+      );
+    }
   }
 }

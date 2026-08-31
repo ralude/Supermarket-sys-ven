@@ -2,9 +2,11 @@ import type {
   FiscalDocumentPayload,
   FiscalDocumentPrintConfirmation,
   FiscalPrinterFailure,
+  FiscalOperationEvidence,
   FiscalPrinterPort,
   FiscalPrinterResult,
   FiscalPrinterStatus,
+  FiscalPrintDelivery,
   FiscalReportPrintConfirmation
 } from '@supermarket/core';
 
@@ -26,33 +28,68 @@ export type FiscalFakeCommand =
   | { readonly name: 'X_REPORT' }
   | { readonly name: 'Z_REPORT' };
 
+const completeEvidence: FiscalOperationEvidence = {
+  dispatchState: 'RESULT_RECEIVED',
+  commandEffect: 'APPLIED',
+  fiscalCommit: 'COMMITTED',
+  printDelivery: 'COMPLETE'
+};
+
 const failures: Record<Exclude<FiscalFakeResponse, 'ACK'>, FiscalPrinterFailure> = {
   NAK: {
-    code: 'FISCAL_PRINTER_NAK', certainty: 'REJECTED', retryable: false,
+    code: 'FISCAL_PRINTER_NAK', retryable: false,
+    evidence: {
+      dispatchState: 'RESULT_RECEIVED', commandEffect: 'REJECTED',
+      fiscalCommit: 'NOT_COMMITTED', printDelivery: 'INCOMPLETE'
+    },
     message: 'Fiscal printer rejected the command.'
   },
   PAPER_END: {
-    code: 'FISCAL_PRINTER_PAPER_END', certainty: 'NOT_SENT', retryable: true,
+    code: 'FISCAL_PRINTER_PAPER_END', retryable: true,
+    evidence: {
+      dispatchState: 'RESULT_RECEIVED', commandEffect: 'NOT_APPLIED',
+      fiscalCommit: 'NOT_COMMITTED', printDelivery: 'INCOMPLETE'
+    },
     message: 'Fiscal printer has no paper.'
   },
   MEMORY_FULL: {
-    code: 'FISCAL_PRINTER_MEMORY_FULL', certainty: 'REJECTED', retryable: false,
+    code: 'FISCAL_PRINTER_MEMORY_FULL', retryable: false,
+    evidence: {
+      dispatchState: 'RESULT_RECEIVED', commandEffect: 'REJECTED',
+      fiscalCommit: 'NOT_COMMITTED', printDelivery: 'INCOMPLETE'
+    },
     message: 'Fiscal printer memory is full.'
   },
   BUSY: {
-    code: 'FISCAL_PRINTER_BUSY', certainty: 'NOT_SENT', retryable: true,
+    code: 'FISCAL_PRINTER_BUSY', retryable: true,
+    evidence: {
+      dispatchState: 'RESULT_RECEIVED', commandEffect: 'NOT_APPLIED',
+      fiscalCommit: 'NOT_COMMITTED', printDelivery: 'INCOMPLETE'
+    },
     message: 'Fiscal printer is busy.'
   },
   TIMEOUT: {
-    code: 'FISCAL_PRINTER_TIMEOUT', certainty: 'UNKNOWN', retryable: true,
+    code: 'FISCAL_PRINTER_TIMEOUT', retryable: true,
+    evidence: {
+      dispatchState: 'STARTED', commandEffect: 'UNKNOWN',
+      fiscalCommit: 'NOT_COMMITTED', printDelivery: 'UNKNOWN'
+    },
     message: 'Fiscal printer response timed out.'
   },
   CRC_ERROR: {
-    code: 'FISCAL_PRINTER_CRC_ERROR', certainty: 'UNKNOWN', retryable: true,
+    code: 'FISCAL_PRINTER_CRC_ERROR', retryable: true,
+    evidence: {
+      dispatchState: 'STARTED', commandEffect: 'UNKNOWN',
+      fiscalCommit: 'NOT_COMMITTED', printDelivery: 'UNKNOWN'
+    },
     message: 'Fiscal printer response failed CRC validation.'
   },
   PORT_CLOSED: {
-    code: 'FISCAL_PRINTER_PORT_CLOSED', certainty: 'NOT_SENT', retryable: true,
+    code: 'FISCAL_PRINTER_PORT_CLOSED', retryable: true,
+    evidence: {
+      dispatchState: 'NOT_STARTED', commandEffect: 'NOT_APPLIED',
+      fiscalCommit: 'NOT_COMMITTED', printDelivery: 'INCOMPLETE'
+    },
     message: 'Fiscal printer port is closed.'
   }
 };
@@ -64,6 +101,7 @@ type FiscalPrinterFakeOptions = {
 export class FiscalPrinterFake implements FiscalPrinterPort {
   private readonly recordedCommands: FiscalFakeCommand[] = [];
   private readonly responses: FiscalFakeResponse[] = [];
+  private readonly printDeliveries: FiscalPrintDelivery[] = [];
   private readonly now: () => Date;
   private isOpen = true;
   private documentSequence = 0;
@@ -82,6 +120,10 @@ export class FiscalPrinterFake implements FiscalPrinterPort {
 
   queueResponses(...responses: FiscalFakeResponse[]): void {
     this.responses.push(...responses);
+  }
+
+  queuePrintDeliveries(...deliveries: FiscalPrintDelivery[]): void {
+    this.printDeliveries.push(...deliveries);
   }
 
   closePort(): void {
@@ -121,21 +163,23 @@ export class FiscalPrinterFake implements FiscalPrinterPort {
 
   async printXReport(): Promise<FiscalPrinterResult<FiscalReportPrintConfirmation>> {
     const response = this.execute({ name: 'X_REPORT' });
-    if (!response.ok) return response;
+    if (!response.ok) return this.reportFailure(response);
     this.xReportSequence += 1;
     return { ok: true, value: {
       reportNumber: `X-${String(this.xReportSequence).padStart(6, '0')}`,
-      confirmedAt: this.now()
+      confirmedAt: this.now(),
+      evidence: this.successEvidence()
     } };
   }
 
   async printZReport(): Promise<FiscalPrinterResult<FiscalReportPrintConfirmation>> {
     const response = this.execute({ name: 'Z_REPORT' });
-    if (!response.ok) return response;
+    if (!response.ok) return this.reportFailure(response);
     this.zReportSequence += 1;
     return { ok: true, value: {
       reportNumber: `Z-${String(this.zReportSequence).padStart(6, '0')}`,
-      confirmedAt: this.now()
+      confirmedAt: this.now(),
+      evidence: this.successEvidence()
     } };
   }
 
@@ -152,17 +196,75 @@ export class FiscalPrinterFake implements FiscalPrinterPort {
       { name: 'CLOSE', referenceId: document.referenceId }
     ];
     const fiscalNumber = `${prefix}-${String(this.documentSequence + 1).padStart(6, '0')}`;
-    for (const command of commands) {
+    for (const [index, command] of commands.entries()) {
       const response = this.execute(command);
       if (!response.ok) {
-        if (command.name === 'CLOSE' && response.error.certainty === 'UNKNOWN') {
+        const ambiguousClose = command.name === 'CLOSE' && (
+          response.error.code === 'FISCAL_PRINTER_TIMEOUT' ||
+          response.error.code === 'FISCAL_PRINTER_CRC_ERROR'
+        );
+        if (ambiguousClose) {
           this.confirmDocument(document.referenceId, fiscalNumber);
+          return {
+            ok: false,
+            error: {
+              ...response.error,
+              evidence: {
+                dispatchState: response.error.code === 'FISCAL_PRINTER_CRC_ERROR'
+                  ? 'RESULT_RECEIVED'
+                  : 'STARTED',
+                commandEffect: 'APPLIED',
+                fiscalCommit: 'COMMITTED',
+                printDelivery: 'UNKNOWN'
+              }
+            }
+          };
+        }
+        if (index > 0) {
+          return {
+            ok: false,
+            error: {
+              ...response.error,
+              evidence: {
+                dispatchState: response.error.evidence.dispatchState === 'RESULT_RECEIVED'
+                  ? 'RESULT_RECEIVED'
+                  : 'STARTED',
+                commandEffect: 'UNKNOWN',
+                fiscalCommit: 'NOT_COMMITTED',
+                printDelivery: 'UNKNOWN'
+              }
+            }
+          };
         }
         return response;
       }
     }
     this.confirmDocument(document.referenceId, fiscalNumber);
-    return { ok: true, value: { fiscalNumber, confirmedAt: this.now() } };
+    return {
+      ok: true,
+      value: { fiscalNumber, confirmedAt: this.now(), evidence: this.successEvidence() }
+    };
+  }
+
+  private reportFailure(
+    response: { ok: false; error: FiscalPrinterFailure }
+  ): { ok: false; error: FiscalPrinterFailure } {
+    if (response.error.code !== 'FISCAL_PRINTER_TIMEOUT' &&
+      response.error.code !== 'FISCAL_PRINTER_CRC_ERROR') return response;
+    return {
+      ok: false,
+      error: {
+        ...response.error,
+        evidence: {
+          dispatchState: response.error.code === 'FISCAL_PRINTER_CRC_ERROR'
+            ? 'RESULT_RECEIVED'
+            : 'STARTED',
+          commandEffect: 'UNKNOWN',
+          fiscalCommit: 'UNKNOWN',
+          printDelivery: 'UNKNOWN'
+        }
+      }
+    };
   }
 
   private execute(command: FiscalFakeCommand): FiscalPrinterResult<true> {
@@ -172,7 +274,15 @@ export class FiscalPrinterFake implements FiscalPrinterPort {
   }
 
   private failure(response: Exclude<FiscalFakeResponse, 'ACK'>): { ok: false; error: FiscalPrinterFailure } {
-    return { ok: false, error: failures[response] };
+    const failure = failures[response];
+    return { ok: false, error: { ...failure, evidence: { ...failure.evidence } } };
+  }
+
+  private successEvidence(): FiscalOperationEvidence {
+    return {
+      ...completeEvidence,
+      printDelivery: this.printDeliveries.shift() ?? 'COMPLETE'
+    };
   }
 
   private confirmDocument(referenceId: string, fiscalNumber: string): void {

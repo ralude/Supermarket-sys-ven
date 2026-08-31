@@ -53,6 +53,13 @@ En la Fase 3, `SqliteUnitOfWork` ejecuta `BEGIN IMMEDIATE -> guardar -> COMMIT` 
 
 La lectura relacional rehidrata agregados sin regenerar eventos de dominio históricos. Los snapshots comerciales de una venta se almacenan junto a la venta y no dependen de la configuracion vigente del catalogo.
 
+En fiscal, las transiciones nuevas se persisten por versión del agregado y las
+restricciones rechazan IDs de evento reutilizados, secuencias incompletas y una
+transición de reporte asociada a otra jornada. Líneas y pagos se cargan antes de
+la primera transición dentro de la creación transaccional y quedan sellados
+después. La evidencia de operación se almacena como un snapshot de cuatro
+columnas todas nulas o todas presentes y semánticamente coherentes.
+
 No se permite una transacción abierta durante una llamada de hardware o red. La impresión debe usar un estado persistido y un mecanismo de reconciliación.
 
 ## Migraciones y respaldo

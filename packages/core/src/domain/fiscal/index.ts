@@ -1,5 +1,11 @@
 export { FiscalDocument, FISCAL_DOCUMENT_STATES } from './fiscal-document.js';
 export { FiscalDay } from './fiscal-day.js';
+export {
+  isFiscalOperationCommitted,
+  isFiscalOperationEvidenceCoherent,
+  isFiscalOperationRetrySafe,
+  isFiscalOperationTerminalFailureSafe
+} from './fiscal-types.js';
 export type {
   FiscalDayDomainEvent,
   FiscalDayState,
@@ -18,9 +24,13 @@ export type {
   RestoreFiscalDocumentProps
 } from './fiscal-document.js';
 export type {
-  FiscalDeliveryCertainty,
+  FiscalCommandEffect,
+  FiscalCommit,
+  FiscalDispatchState,
   FiscalDocumentContent,
   FiscalDocumentLine,
   FiscalDocumentPayment,
-  FiscalDocumentType
+  FiscalDocumentType,
+  FiscalOperationEvidence,
+  FiscalPrintDelivery
 } from './fiscal-types.js';

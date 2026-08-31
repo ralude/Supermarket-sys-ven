@@ -128,6 +128,7 @@ export class IssueFiscalDocument {
       if (printed.ok) {
         document.markIssued({
           fiscalNumber: printed.value.fiscalNumber,
+          evidence: printed.value.evidence,
           actorId: context.actorId,
           occurredAt: printed.value.confirmedAt,
           eventId: this.eventIdGenerator.generate()
@@ -139,19 +140,10 @@ export class IssueFiscalDocument {
           occurredAt: this.clock.now(),
           eventId: this.eventIdGenerator.generate()
         });
-        if (!printed.error.retryable) {
-          document.markFailed({
-            actorId: context.actorId,
-            occurredAt: this.clock.now(),
-            eventId: this.eventIdGenerator.generate()
-          });
-        }
       }
       const action = printed.ok
         ? 'FISCAL_DOCUMENT_ISSUED'
-        : !printed.error.retryable
-          ? 'FISCAL_DOCUMENT_FAILED'
-          : 'FISCAL_DOCUMENT_ERROR_RECORDED';
+        : 'FISCAL_DOCUMENT_ERROR_RECORDED';
       await this.persist(document, eventCursor, context, reason, action);
       if (!printed.ok) {
         return err(new ApplicationError(printed.error.code, printed.error.message));

@@ -52,6 +52,7 @@ Incluye:
 - [ADR-0007: Outside-In TDD para funcionalidades](./adr/0007-outside-in-tdd.md)
 - [ADR-0008: Topología offline por nodo](./adr/0008-topologia-offline-por-nodo.md)
 - [ADR-0009: Estado relacional, ledger y outbox](./adr/0009-estado-relacional-ledger-outbox.md)
+- [ADR-0010: Transporte serial común e integraciones fiscales por proveedor](./adr/0010-transporte-serial-y-protocolos-fiscales.md)
 
 ## Alcance del producto
 
@@ -77,4 +78,7 @@ El estado de ejecución no se duplica aquí. Consulta el [cronograma maestro](..
 
 La estructura interna de `core` permite extraer `domain` y `application` a paquetes separados si el crecimiento lo justifica. Los drivers están separados por integración para aislar dependencias nativas y permitir reemplazos independientes.
 
-Las obligaciones fiscales concretas deben validarse con un proveedor fiscal certificado y asesoría tributaria vigente antes de producción. La arquitectura no sustituye la certificación ni la interpretación legal.
+Las obligaciones fiscales concretas deben validarse con fabricante o
+representante, evidencia vigente del modelo y asesoría tributaria antes de
+producción. La arquitectura no sustituye esa verificación ni la interpretación
+legal.

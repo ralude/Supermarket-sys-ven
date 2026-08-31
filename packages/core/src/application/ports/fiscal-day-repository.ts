@@ -5,4 +5,5 @@ export interface FiscalDayRepository {
   findById(id: string): Promise<FiscalDay | null>;
   findOpenByTerminal(terminalId: string): Promise<FiscalDay | null>;
   findByReportIdempotencyKey(originNodeId: string, key: string): Promise<FiscalDay | null>;
+  findRecoverable(): Promise<FiscalDay[]>;
 }

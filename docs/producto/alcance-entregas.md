@@ -11,7 +11,8 @@ Incluye:
 - catálogo, moneda, ventas, caja e inventario básico;
 - persistencia local por nodo;
 - historial append-only, outbox, auditoría e idempotencia;
-- impresora fiscal fake y pruebas de contrato;
+- impresora fiscal fake, pruebas de contrato y dos perfiles reales calificados
+  por la Fase 8, sin prometer compatibilidad fuera de su matriz;
 - UI para los flujos principales;
 - prueba de sincronización entre una terminal autónoma y un nodo coordinador.
 
@@ -27,7 +28,12 @@ Requiere:
 - política aprobada de inventario durante desconexiones;
 - backup automático y restauración ensayada;
 - recuperación después de reinicio, corte eléctrico y pérdida de LAN;
-- adaptador fiscal validado con el proveedor certificado;
+- dos perfiles fiscales validados por separado con fabricante/representante y
+  una matriz explícita de modelo, firmware, protocolo o SDK e interfaz; una
+  tienda piloto puede instalar uno de los perfiles aprobados sin tener ambos
+  equipos simultáneamente;
+- evidencia vigente de autorización por modelo, registro del integrador y revisión tributaria antes de operar;
+- coexistencia ensayada con el DCTD y soporte autorizado de la topología instalada;
 - instalación, actualización y rollback ensayados;
 - matriz concreta de Windows, terminales y periféricos soportados;
 - runbooks de caja, base de datos, red y dispositivo fiscal.
@@ -44,7 +50,10 @@ Requiere:
 - rotación, retención y exportación segura de logs y auditoría;
 - diagnóstico remoto con consentimiento y redacción de datos sensibles;
 - objetivos medidos de recuperación, disponibilidad y rendimiento;
-- política de versiones compatibles y soporte.
+- política de versiones compatibles y soporte;
+- proceso repetible para agregar una tercera o posterior familia fiscal mediante
+  protocolo oficial, adaptador independiente y calificación con hardware;
+  ninguna marca se considera compatible por defecto.
 
 ## 4. Plataforma empresarial
 

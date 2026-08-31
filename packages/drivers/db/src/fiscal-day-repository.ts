@@ -2,7 +2,6 @@ import {
   FiscalDay,
   type FiscalDayRepository,
   type FiscalDayState,
-  type FiscalDeliveryCertainty,
   type FiscalReport,
   type FiscalReportState,
   type FiscalReportType
@@ -10,8 +9,16 @@ import {
 import { InfrastructureError } from '@supermarket/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DatabaseHandle } from './connection.js';
+import {
+  fiscalOperationEvidenceValues,
+  restoreFiscalOperationEvidence
+} from './fiscal-operation-evidence.js';
 import { fiscalDays, fiscalReports, fiscalReportTransitions } from './schema.js';
 import { mapDatabaseError, requireTransaction } from './unit-of-work.js';
+
+const recoverableReportStates: FiscalReportState[] = [
+  'PENDING', 'PRINTING', 'ERROR', 'RETRYING'
+];
 
 export class DrizzleFiscalDayRepository implements FiscalDayRepository {
   constructor(private readonly handle: DatabaseHandle) {}
@@ -21,6 +28,16 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
     try {
       const existing = this.handle.db.select().from(fiscalDays)
         .where(eq(fiscalDays.id, day.id)).get();
+      const persistedReports = new Map(day.reports.map((report) => [
+        report.id,
+        this.handle.db.select().from(fiscalReports)
+          .where(eq(fiscalReports.id, report.id)).get()
+      ]));
+      for (const report of day.reports) {
+        const row = persistedReports.get(report.id);
+        if (row) this.assertPersistedReportIdentity(row, day, report);
+      }
+      const transitions = this.newTransitions(day, existing?.version ?? 1);
       if (!existing) {
         this.handle.db.insert(fiscalDays).values({
           id: day.id,
@@ -52,42 +69,46 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
       }
 
       for (const report of day.reports) {
-        const row = this.handle.db.select().from(fiscalReports)
-          .where(eq(fiscalReports.id, report.id)).get();
+        const row = persistedReports.get(report.id);
         if (!row) {
           this.handle.db.insert(fiscalReports).values(this.reportValues(day, report)).run();
         } else if (row.status !== 'ISSUED') {
+          const evidence = fiscalOperationEvidenceValues(report.lastEvidence);
           this.handle.db.update(fiscalReports).set({
             status: report.status,
             attempts: report.attempts,
             reportNumber: report.reportNumber,
             lastErrorCode: report.lastErrorCode,
-            lastCertainty: report.lastCertainty,
+            lastDispatchState: evidence.dispatchState,
+            lastCommandEffect: evidence.commandEffect,
+            lastFiscalCommit: evidence.fiscalCommit,
+            lastPrintDelivery: evidence.printDelivery,
             retryable: report.retryable
           }).where(eq(fiscalReports.id, report.id)).run();
         }
       }
 
-      const persisted = new Set(this.handle.db.select({ eventId: fiscalReportTransitions.eventId })
-        .from(fiscalReportTransitions).where(eq(fiscalReportTransitions.dayId, day.id)).all()
-        .map(({ eventId }) => eventId));
-      const transitions = day.reports.flatMap((report) => report.transitions.map((transition) => ({
-        reportId: report.id,
-        transition
-      }))).filter(({ transition }) => !persisted.has(transition.eventId));
       if (transitions.length > 0) {
-        this.handle.db.insert(fiscalReportTransitions).values(transitions.map(({ reportId, transition }) => ({
-          eventId: transition.eventId,
-          dayId: day.id,
-          reportId,
-          aggregateVersion: transition.version,
-          fromStatus: transition.from,
-          toStatus: transition.to,
-          actorId: transition.actorId,
-          occurredAt: transition.occurredAt,
-          errorCode: transition.errorCode,
-          certainty: transition.certainty
-        }))).run();
+        this.handle.db.insert(fiscalReportTransitions).values(
+          transitions.map(({ reportId, transition }) => {
+            const evidence = fiscalOperationEvidenceValues(transition.evidence);
+            return {
+              eventId: transition.eventId,
+              dayId: day.id,
+              reportId,
+              aggregateVersion: transition.version,
+              fromStatus: transition.from,
+              toStatus: transition.to,
+              actorId: transition.actorId,
+              occurredAt: transition.occurredAt,
+              errorCode: transition.errorCode,
+              dispatchState: evidence.dispatchState,
+              commandEffect: evidence.commandEffect,
+              fiscalCommit: evidence.fiscalCommit,
+              printDelivery: evidence.printDelivery
+            };
+          })
+        ).run();
       }
     } catch (error) {
       throw mapDatabaseError(error);
@@ -118,10 +139,27 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
     });
   }
 
+  findRecoverable(): Promise<FiscalDay[]> {
+    return this.read(() => {
+      const dayIds = [...new Set(this.handle.db.select({ dayId: fiscalReports.dayId })
+        .from(fiscalReports)
+        .where(inArray(fiscalReports.status, recoverableReportStates))
+        .all()
+        .map(({ dayId }) => dayId))];
+      if (dayIds.length === 0) return [];
+      return this.handle.db.select().from(fiscalDays)
+        .where(inArray(fiscalDays.id, dayIds))
+        .orderBy(fiscalDays.openedAt, fiscalDays.id)
+        .all()
+        .map((row) => this.restore(row) as FiscalDay);
+    });
+  }
+
   private restore(row: typeof fiscalDays.$inferSelect | undefined): FiscalDay | null {
     if (!row) return null;
     const reportRows = this.handle.db.select().from(fiscalReports)
-      .where(eq(fiscalReports.dayId, row.id)).orderBy(fiscalReports.requestedAt).all();
+      .where(eq(fiscalReports.dayId, row.id))
+      .orderBy(fiscalReports.requestedAt, fiscalReports.id).all();
     const transitionRows = this.handle.db.select().from(fiscalReportTransitions)
       .where(eq(fiscalReportTransitions.dayId, row.id))
       .orderBy(fiscalReportTransitions.aggregateVersion).all();
@@ -143,7 +181,12 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
         attempts: report.attempts,
         reportNumber: report.reportNumber,
         lastErrorCode: report.lastErrorCode,
-        lastCertainty: report.lastCertainty as FiscalDeliveryCertainty | null,
+        lastEvidence: restoreFiscalOperationEvidence({
+          dispatchState: report.lastDispatchState,
+          commandEffect: report.lastCommandEffect,
+          fiscalCommit: report.lastFiscalCommit,
+          printDelivery: report.lastPrintDelivery
+        }),
         retryable: report.retryable,
         requestedBy: report.requestedBy,
         requestedAt: report.requestedAt,
@@ -156,7 +199,12 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
             actorId: transition.actorId,
             occurredAt: transition.occurredAt,
             errorCode: transition.errorCode,
-            certainty: transition.certainty as FiscalDeliveryCertainty | null
+            evidence: restoreFiscalOperationEvidence({
+              dispatchState: transition.dispatchState,
+              commandEffect: transition.commandEffect,
+              fiscalCommit: transition.fiscalCommit,
+              printDelivery: transition.printDelivery
+            })
           }))
       }))
     });
@@ -166,6 +214,7 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
     day: FiscalDay,
     report: FiscalReport
   ): typeof fiscalReports.$inferInsert {
+    const evidence = fiscalOperationEvidenceValues(report.lastEvidence);
     return {
       id: report.id,
       dayId: day.id,
@@ -177,11 +226,52 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
       attempts: report.attempts,
       reportNumber: report.reportNumber,
       lastErrorCode: report.lastErrorCode,
-      lastCertainty: report.lastCertainty,
+      lastDispatchState: evidence.dispatchState,
+      lastCommandEffect: evidence.commandEffect,
+      lastFiscalCommit: evidence.fiscalCommit,
+      lastPrintDelivery: evidence.printDelivery,
       retryable: report.retryable,
       requestedBy: report.requestedBy,
       requestedAt: report.requestedAt
     };
+  }
+
+  private assertPersistedReportIdentity(
+    row: typeof fiscalReports.$inferSelect,
+    day: FiscalDay,
+    report: FiscalReport
+  ): void {
+    if (row.dayId !== day.id || row.originNodeId !== day.originNodeId ||
+      row.reportType !== report.type || row.idempotencyKey !== report.idempotencyKey ||
+      row.requestFingerprint !== report.requestFingerprint ||
+      row.requestedBy !== report.requestedBy ||
+      row.requestedAt.getTime() !== report.requestedAt.getTime()) {
+      throw new InfrastructureError(
+        'FISCAL_REPORT_IDENTITY_CONFLICT',
+        'Fiscal report identity cannot be changed or shared by another day.'
+      );
+    }
+  }
+
+  private newTransitions(
+    day: FiscalDay,
+    persistedVersion: number
+  ): Array<{ reportId: string; transition: FiscalReport['transitions'][number] }> {
+    const pending = day.reports.flatMap((report) => report.transitions.map((transition) => ({
+      reportId: report.id,
+      transition
+    }))).filter(({ transition }) => transition.version > persistedVersion)
+      .sort((left, right) => left.transition.version - right.transition.version);
+    const expectedCount = day.version - persistedVersion;
+    if (expectedCount < 0 || pending.length !== expectedCount ||
+      pending.some(({ transition }, index) =>
+        transition.version !== persistedVersion + index + 1)) {
+      throw new InfrastructureError(
+        'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID',
+        'Fiscal report transition sequence is incomplete.'
+      );
+    }
+    return pending;
   }
 
   private async read<T>(operation: () => T): Promise<T> {

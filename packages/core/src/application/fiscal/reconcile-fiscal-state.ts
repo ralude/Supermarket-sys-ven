@@ -60,8 +60,17 @@ export class ReconcileFiscalState {
       let cursor = document.domainEvents.length;
       if (status.value.lastDocumentReferenceId === document.content.referenceId &&
         status.value.lastDocumentNumber) {
+        const previousEvidence = document.lastEvidence;
         document.markIssued({
           fiscalNumber: status.value.lastDocumentNumber,
+          evidence: {
+            dispatchState: previousEvidence?.dispatchState === 'RESULT_RECEIVED'
+              ? 'RESULT_RECEIVED'
+              : 'STARTED',
+            commandEffect: 'APPLIED',
+            fiscalCommit: 'COMMITTED',
+            printDelivery: 'UNKNOWN'
+          },
           actorId: context.actorId,
           occurredAt: this.clock.now(),
           eventId: this.eventIdGenerator.generate()
@@ -72,33 +81,32 @@ export class ReconcileFiscalState {
 
       if (document.status === 'PRINTING') {
         document.recordError({
-          code: 'FISCAL_DOCUMENT_NOT_CONFIRMED',
-          certainty: 'NOT_SENT',
+          code: 'FISCAL_RECONCILIATION_INCONCLUSIVE',
+          evidence: {
+            dispatchState: 'STARTED',
+            commandEffect: 'UNKNOWN',
+            fiscalCommit: 'UNKNOWN',
+            printDelivery: 'UNKNOWN'
+          },
           retryable: true,
           actorId: context.actorId,
           occurredAt: this.clock.now(),
           eventId: this.eventIdGenerator.generate()
         });
-        await this.persist(document, cursor, context);
+        await this.persist(
+          document,
+          cursor,
+          context,
+          reason,
+          'FISCAL_DOCUMENT_RECONCILIATION_INCONCLUSIVE'
+        );
       }
-      if (document.status === 'ERROR') {
-        cursor = document.domainEvents.length;
-        if (!document.lastFailureRetryable) {
-          document.markFailed({
-            actorId: context.actorId,
-            occurredAt: this.clock.now(),
-            eventId: this.eventIdGenerator.generate()
-          });
-          await this.persist(document, cursor, context, reason, 'FISCAL_DOCUMENT_FAILED');
-          return err(new ApplicationError('FISCAL_DOCUMENT_FAILED', 'Fiscal document requires intervention.'));
-        }
-        document.beginRetry({
-          confirmedNotIssued: true,
-          actorId: context.actorId,
-          occurredAt: this.clock.now(),
-          eventId: this.eventIdGenerator.generate()
-        });
-        await this.persist(document, cursor, context);
+      if (document.status === 'PRINTING' || document.status === 'ERROR' ||
+        document.status === 'RETRYING') {
+        return err(new ApplicationError(
+          'FISCAL_RECONCILIATION_INCONCLUSIVE',
+          'The fiscal device did not provide positive evidence that the document was issued or not issued.'
+        ));
       }
 
       cursor = document.domainEvents.length;
@@ -115,6 +123,7 @@ export class ReconcileFiscalState {
       if (printed.ok) {
         document.markIssued({
           fiscalNumber: printed.value.fiscalNumber,
+          evidence: printed.value.evidence,
           actorId: context.actorId,
           occurredAt: printed.value.confirmedAt,
           eventId: this.eventIdGenerator.generate()
@@ -126,20 +135,13 @@ export class ReconcileFiscalState {
           occurredAt: this.clock.now(),
           eventId: this.eventIdGenerator.generate()
         });
-        if (!printed.error.retryable) {
-          document.markFailed({
-            actorId: context.actorId,
-            occurredAt: this.clock.now(),
-            eventId: this.eventIdGenerator.generate()
-          });
-        }
       }
       await this.persist(
         document,
         cursor,
         context,
         reason,
-        printed.ok ? 'FISCAL_DOCUMENT_RECONCILED' : 'FISCAL_DOCUMENT_FAILED'
+        printed.ok ? 'FISCAL_DOCUMENT_RECONCILED' : 'FISCAL_DOCUMENT_ERROR_RECORDED'
       );
       if (!printed.ok) return err(new ApplicationError(printed.error.code, printed.error.message));
       return ok(toFiscalDocumentDto(document));

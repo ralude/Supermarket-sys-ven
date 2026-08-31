@@ -1,8 +1,8 @@
 import type {
-  FiscalDeliveryCertainty,
   FiscalDocumentContent,
   FiscalDocumentState,
   FiscalDayState,
+  FiscalOperationEvidence,
   FiscalReportState,
   FiscalReportType
 } from '../../domain/fiscal/index.js';
@@ -25,7 +25,7 @@ export type FiscalDocumentDto = {
   readonly attempts: number;
   readonly fiscalNumber: string | null;
   readonly lastErrorCode: string | null;
-  readonly lastCertainty: FiscalDeliveryCertainty | null;
+  readonly lastEvidence: FiscalOperationEvidence | null;
 };
 
 export type PrintFiscalReportInput = {
@@ -43,4 +43,5 @@ export type FiscalReportDto = {
   readonly attempts: number;
   readonly reportNumber: string | null;
   readonly lastErrorCode: string | null;
+  readonly lastEvidence: FiscalOperationEvidence | null;
 };

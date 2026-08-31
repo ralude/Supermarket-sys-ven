@@ -285,7 +285,10 @@ export const fiscalDocuments = sqliteTable('fiscal_documents', {
   attempts: integer('attempts').notNull(),
   fiscalNumber: text('fiscal_number'),
   lastErrorCode: text('last_error_code'),
-  lastCertainty: text('last_certainty'),
+  lastDispatchState: text('last_dispatch_state'),
+  lastCommandEffect: text('last_command_effect'),
+  lastFiscalCommit: text('last_fiscal_commit'),
+  lastPrintDelivery: text('last_print_delivery'),
   lastFailureRetryable: integer('last_failure_retryable', { mode: 'boolean' }).notNull()
 });
 
@@ -317,7 +320,10 @@ export const fiscalDocumentTransitions = sqliteTable('fiscal_document_transition
   actorId: text('actor_id').notNull(),
   occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
   errorCode: text('error_code'),
-  certainty: text('certainty')
+  dispatchState: text('dispatch_state'),
+  commandEffect: text('command_effect'),
+  fiscalCommit: text('fiscal_commit'),
+  printDelivery: text('print_delivery')
 });
 
 export const fiscalDays = sqliteTable('fiscal_days', {
@@ -342,7 +348,10 @@ export const fiscalReports = sqliteTable('fiscal_reports', {
   attempts: integer('attempts').notNull(),
   reportNumber: text('report_number'),
   lastErrorCode: text('last_error_code'),
-  lastCertainty: text('last_certainty'),
+  lastDispatchState: text('last_dispatch_state'),
+  lastCommandEffect: text('last_command_effect'),
+  lastFiscalCommit: text('last_fiscal_commit'),
+  lastPrintDelivery: text('last_print_delivery'),
   retryable: integer('retryable', { mode: 'boolean' }).notNull(),
   requestedBy: text('requested_by').notNull(),
   requestedAt: integer('requested_at', { mode: 'timestamp_ms' }).notNull()
@@ -358,5 +367,8 @@ export const fiscalReportTransitions = sqliteTable('fiscal_report_transitions', 
   actorId: text('actor_id').notNull(),
   occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
   errorCode: text('error_code'),
-  certainty: text('certainty')
+  dispatchState: text('dispatch_state'),
+  commandEffect: text('command_effect'),
+  fiscalCommit: text('fiscal_commit'),
+  printDelivery: text('print_delivery')
 });

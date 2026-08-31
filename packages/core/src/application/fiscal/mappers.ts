@@ -9,5 +9,5 @@ export const toFiscalDocumentDto = (document: FiscalDocument): FiscalDocumentDto
   attempts: document.attempts,
   fiscalNumber: document.fiscalNumber,
   lastErrorCode: document.lastErrorCode,
-  lastCertainty: document.lastCertainty
+  lastEvidence: document.lastEvidence
 });

@@ -6,7 +6,7 @@ El sistema está diseñado para operar standalone o en LAN mediante terminales a
 
 ## Estado actual
 
-Las fases 0 a 7 estan completadas. La siguiente sub-fase es 8.01, adaptador `SerialPort`; el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
+Las fases 0 a 7 estan completadas. La Fase 8 esta en curso y comienza por la sub-fase 8.00, gate de evidencia, contrato y proveedor, antes de agregar `SerialPort` al workspace de produccion; el detalle del avance esta en [`docs/cronograma/README.md`](./docs/cronograma/README.md).
 
 La documentación arquitectónica está organizada por responsabilidad en [`docs/architecture/README.md`](./docs/architecture/README.md).
 El alcance del MVP, piloto, producción y plataforma empresarial se separa en [`docs/producto/alcance-entregas.md`](./docs/producto/alcance-entregas.md).

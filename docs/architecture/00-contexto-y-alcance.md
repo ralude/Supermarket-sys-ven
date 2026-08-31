@@ -40,7 +40,7 @@ El diseño parte de nodos operativos autónomos:
 
 ## Decisiones pendientes para fases posteriores
 
-- proveedor fiscal certificado y protocolo exacto;
+- fabricante/representante, modelo autorizado, protocolo y firmware exactos;
 - política definitiva de inventario offline para el piloto;
 - proveedor oficial de tasa de cambio y frecuencia de actualización;
 - política de retención y exportación de datos;

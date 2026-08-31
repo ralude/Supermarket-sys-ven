@@ -1,5 +1,12 @@
 import { DomainError } from '@supermarket/shared';
-import type { FiscalDeliveryCertainty } from './fiscal-types.js';
+import {
+  cloneFiscalOperationEvidence,
+  isFiscalOperationCommitted,
+  isFiscalOperationEvidenceCoherent,
+  isFiscalOperationRetrySafe,
+  isFiscalOperationTerminalFailureSafe,
+  type FiscalOperationEvidence
+} from './fiscal-types.js';
 
 export type FiscalDayState = 'DAY_OPEN' | 'Z_PENDING' | 'DAY_CLOSED';
 export type FiscalReportType = 'X' | 'Z';
@@ -13,7 +20,7 @@ export type FiscalReportTransition = {
   readonly actorId: string;
   readonly occurredAt: Date;
   readonly errorCode: string | null;
-  readonly certainty: FiscalDeliveryCertainty | null;
+  readonly evidence: FiscalOperationEvidence | null;
 };
 
 export type FiscalReport = {
@@ -25,7 +32,7 @@ export type FiscalReport = {
   readonly attempts: number;
   readonly reportNumber: string | null;
   readonly lastErrorCode: string | null;
-  readonly lastCertainty: FiscalDeliveryCertainty | null;
+  readonly lastEvidence: FiscalOperationEvidence | null;
   readonly retryable: boolean;
   readonly requestedBy: string;
   readonly requestedAt: Date;
@@ -75,10 +82,16 @@ export type RestoreFiscalDayProps = Omit<OpenFiscalDayProps, 'eventId'> & {
 
 const cloneReport = (report: FiscalReport): FiscalReport => ({
   ...report,
+  lastEvidence: report.lastEvidence === null
+    ? null
+    : cloneFiscalOperationEvidence(report.lastEvidence),
   requestedAt: new Date(report.requestedAt),
   transitions: report.transitions.map((transition) => ({
     ...transition,
-    occurredAt: new Date(transition.occurredAt)
+    occurredAt: new Date(transition.occurredAt),
+    evidence: transition.evidence === null
+      ? null
+      : cloneFiscalOperationEvidence(transition.evidence)
   }))
 });
 
@@ -162,7 +175,7 @@ export class FiscalDay {
       attempts: 0,
       reportNumber: null,
       lastErrorCode: null,
-      lastCertainty: null,
+      lastEvidence: null,
       retryable: false,
       requestedBy: FiscalDay.text(
         props.actorId, 'FISCAL_ACTOR_REQUIRED', 'Fiscal actor is required.'
@@ -195,6 +208,9 @@ export class FiscalDay {
     const from = report.status;
     report.status = 'PRINTING';
     report.attempts += 1;
+    report.lastErrorCode = null;
+    report.lastEvidence = null;
+    report.retryable = false;
     this.transitionReport(report, from, 'PRINTING', props, null, null);
     this.event('FiscalReportPrintingStarted', props.eventId, props.occurredAt, {
       reportId: report.id,
@@ -209,33 +225,36 @@ export class FiscalDay {
     actorId: string;
     occurredAt: Date;
     eventId: string;
+    evidence: FiscalOperationEvidence;
   }): void {
     const report = this.report(props.reportId);
-    if (report.status !== 'PRINTING' && report.status !== 'ERROR') {
+    if (report.status !== 'PRINTING' && report.status !== 'ERROR' &&
+      report.status !== 'RETRYING') {
       throw new DomainError('FISCAL_REPORT_INVALID_STATE', 'Fiscal report cannot be marked issued.');
     }
+    FiscalDay.assertCommittedEvidence(props.evidence);
     const from = report.status;
     report.status = 'ISSUED';
     report.reportNumber = FiscalDay.text(
       props.reportNumber, 'FISCAL_REPORT_NUMBER_REQUIRED', 'Fiscal report number is required.'
     );
     report.lastErrorCode = null;
-    report.lastCertainty = null;
+    report.lastEvidence = cloneFiscalOperationEvidence(props.evidence);
     report.retryable = false;
     if (report.type === 'Z') this.currentState = 'DAY_CLOSED';
-    this.transitionReport(report, from, 'ISSUED', props, null, null);
+    this.transitionReport(report, from, 'ISSUED', props, null, report.lastEvidence);
     this.event(
       report.type === 'X' ? 'FiscalXReportIssued' : 'FiscalZReportIssued',
       props.eventId,
       props.occurredAt,
-      { reportId: report.id, reportNumber: report.reportNumber }
+      { reportId: report.id, reportNumber: report.reportNumber, evidence: report.lastEvidence }
     );
   }
 
   recordReportError(props: {
     reportId: string;
     code: string;
-    certainty: FiscalDeliveryCertainty;
+    evidence: FiscalOperationEvidence;
     retryable: boolean;
     actorId: string;
     occurredAt: Date;
@@ -245,33 +264,60 @@ export class FiscalDay {
     if (report.status !== 'PRINTING') {
       throw new DomainError('FISCAL_REPORT_INVALID_STATE', 'Fiscal report is not printing.');
     }
+    FiscalDay.assertFailureEvidence(props.evidence);
     const from = report.status;
-    report.status = props.retryable ? 'ERROR' : 'FAILED';
+    report.status = 'ERROR';
     report.lastErrorCode = FiscalDay.text(
       props.code, 'FISCAL_ERROR_CODE_REQUIRED', 'Fiscal error code is required.'
     );
-    report.lastCertainty = props.certainty;
+    report.lastEvidence = cloneFiscalOperationEvidence(props.evidence);
     report.retryable = props.retryable;
     this.transitionReport(
-      report, from, report.status, props, report.lastErrorCode, report.lastCertainty
+      report, from, report.status, props, report.lastErrorCode, report.lastEvidence
     );
     this.event(
-      props.retryable ? 'FiscalReportErrorRecorded' : 'FiscalReportFailed',
+      'FiscalReportErrorRecorded',
       props.eventId,
       props.occurredAt,
-      { reportId: report.id, errorCode: report.lastErrorCode, certainty: props.certainty }
+      { reportId: report.id, errorCode: report.lastErrorCode, evidence: report.lastEvidence }
     );
   }
 
-  retryReport(props: {
+  markReportFailed(props: {
     reportId: string;
-    confirmedNotIssued: boolean;
     actorId: string;
     occurredAt: Date;
     eventId: string;
   }): void {
     const report = this.report(props.reportId);
-    if (report.status !== 'ERROR' || !report.retryable || !props.confirmedNotIssued) {
+    if (report.status !== 'ERROR' || report.lastEvidence === null ||
+      !isFiscalOperationTerminalFailureSafe(report.lastEvidence)) {
+      throw new DomainError(
+        'FISCAL_TERMINAL_FAILURE_EVIDENCE_REQUIRED',
+        'Terminal failure requires authoritative no-commit evidence.'
+      );
+    }
+    report.status = 'FAILED';
+    report.retryable = false;
+    this.transitionReport(
+      report, 'ERROR', 'FAILED', props, report.lastErrorCode, report.lastEvidence
+    );
+    this.event('FiscalReportFailed', props.eventId, props.occurredAt, {
+      reportId: report.id,
+      errorCode: report.lastErrorCode,
+      evidence: report.lastEvidence
+    });
+  }
+
+  retryReport(props: {
+    reportId: string;
+    actorId: string;
+    occurredAt: Date;
+    eventId: string;
+  }): void {
+    const report = this.report(props.reportId);
+    if (report.status !== 'ERROR' || !report.retryable || report.lastEvidence === null ||
+      !isFiscalOperationRetrySafe(report.lastEvidence)) {
       throw new DomainError(
         'FISCAL_REPORT_RECONCILIATION_REQUIRED',
         'Fiscal report cannot retry without confirmed device state.'
@@ -279,7 +325,7 @@ export class FiscalDay {
     }
     report.status = 'RETRYING';
     this.transitionReport(
-      report, 'ERROR', 'RETRYING', props, report.lastErrorCode, report.lastCertainty
+      report, 'ERROR', 'RETRYING', props, report.lastErrorCode, report.lastEvidence
     );
     this.event('FiscalReportRetrying', props.eventId, props.occurredAt, {
       reportId: report.id
@@ -292,7 +338,7 @@ export class FiscalDay {
     to: FiscalReportState,
     props: { actorId: string; occurredAt: Date; eventId: string },
     errorCode: string | null,
-    certainty: FiscalDeliveryCertainty | null
+    evidence: FiscalOperationEvidence | null
   ): void {
     this.currentVersion += 1;
     const transitions = [...report.transitions, {
@@ -303,7 +349,7 @@ export class FiscalDay {
       actorId: FiscalDay.text(props.actorId, 'FISCAL_ACTOR_REQUIRED', 'Fiscal actor is required.'),
       occurredAt: FiscalDay.date(props.occurredAt),
       errorCode,
-      certainty
+      evidence: evidence === null ? null : cloneFiscalOperationEvidence(evidence)
     }];
     report.transitions = transitions;
   }
@@ -348,5 +394,23 @@ export class FiscalDay {
       throw new DomainError('FISCAL_TIMESTAMP_INVALID', 'Fiscal timestamp is invalid.');
     }
     return new Date(value);
+  }
+
+  private static assertCommittedEvidence(evidence: FiscalOperationEvidence): void {
+    if (!isFiscalOperationCommitted(evidence)) {
+      throw new DomainError(
+        'FISCAL_COMMIT_EVIDENCE_REQUIRED',
+        'Issued fiscal reports require positive fiscal commit evidence.'
+      );
+    }
+  }
+
+  private static assertFailureEvidence(evidence: FiscalOperationEvidence): void {
+    if (!isFiscalOperationEvidenceCoherent(evidence) || evidence.printDelivery === 'COMPLETE') {
+      throw new DomainError(
+        'FISCAL_FAILURE_EVIDENCE_INVALID',
+        'Fiscal report failure evidence is inconsistent.'
+      );
+    }
   }
 }

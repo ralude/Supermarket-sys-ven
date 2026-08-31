@@ -25,4 +25,13 @@ Los comandos y estados fiscales se prueban ante respuestas correctas, errores y 
 
 ## Resultado
 
-El puerto, el fake determinista, la maquina de estados, la persistencia y los casos de uso de documentos y reportes quedaron integrados. El contrato reutilizable de pruebas y sus fixtures quedan disponibles para validar el adaptador real de la Fase 8 sin usar hardware en esta fase.
+Al cerrar la Fase 7, el puerto, el fake determinista, la maquina de estados, la
+persistencia y los casos de uso de documentos y reportes quedaron integrados.
+Sus pruebas constituían una base semantica para la Fase 8, pero no un protocolo
+de bytes ni todavía un harness portable a hardware real. Ya dentro del gate
+8.00 se separó el harness observable de los controles exclusivos del fake.
+
+La [retrospectiva](./retrospectiva.md) conserva la evidencia del cierre y el
+estado de las deudas transferidas al gate 8.00: completar el contrato fiscal, la
+reconciliacion X/Z, el wiring de startup y la prueba negativa segura antes de
+agregar SerialPort como dependencia de produccion.

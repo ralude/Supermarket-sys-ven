@@ -2,6 +2,18 @@
 
 Este archivo es la fuente única de reglas operativas para cualquier agente de código, incluyendo OpenCode, Claude Code, Codex u otras herramientas. Debe leerse antes de inspeccionar para modificar código, documentación técnica o configuración.
 
+## Spec-driven development
+
+For non-trivial features:
+
+1. Read the relevant domain specifications.
+2. Never invent business rules silently.
+3. If behavior is unspecified, flag the ambiguity.
+4. Create or update acceptance criteria before implementation.
+5. Implement against the approved specification.
+6. Every business invariant must have test coverage.
+7. Do not modify an approved specification merely to make tests pass.
+
 ## 1. Misión del proyecto
 
 Construir una plataforma empresarial para supermercados en Venezuela con operación standalone y LAN, soporte multi-moneda, trazabilidad comercial, estados fiscales recuperables e integración intercambiable con hardware.
@@ -49,20 +61,21 @@ Antes de modificar algo:
 
 Mapa mínimo:
 
-| Cambio | Lectura obligatoria |
-|---|---|
-| Dependencias o estructura | `01-capas.md`, ADR-0001 |
-| Módulos | `02-modulos.md`, `05-agregados.md` |
-| Eventos/outbox | `03-eventos.md`, ADR-0005 |
-| Entidades/agregados | `04-entidades.md`, `05-agregados.md` |
-| Casos de uso/puertos | `06-casos-de-uso.md` |
-| Electron/IPC | `07-ipc.md`, ADR-0002 |
-| SQLite/Drizzle/dinero | `08-base-de-datos.md`, ADR-0003 |
-| Fiscal/hardware | `09-estados-fiscales.md`, ADR-0004 |
-| Logs/auditoría | `10-logs.md`, ADR-0006 |
-| Errores | `11-errores.md`, ADR-0006 |
-| Pruebas / TDD | ADR-0007 |
-| Fases y estado | `docs/cronograma/README.md` y README de la sub-fase |
+| Cambio                       | Lectura obligatoria                                          |
+| ---------------------------- | ------------------------------------------------------------ |
+| Dependencias o estructura    | `01-capas.md`, ADR-0001                                      |
+| Módulos                      | `02-modulos.md`, `05-agregados.md`                           |
+| Eventos/outbox               | `03-eventos.md`, ADR-0005                                    |
+| Entidades/agregados          | `04-entidades.md`, `05-agregados.md`                         |
+| Casos de uso/puertos         | `06-casos-de-uso.md`                                         |
+| Electron/IPC                 | `07-ipc.md`, ADR-0002                                        |
+| SQLite/Drizzle/dinero        | `08-base-de-datos.md`, ADR-0003                              |
+| Fiscal/hardware              | `09-estados-fiscales.md`, ADR-0004                           |
+| Logs/auditoría               | `10-logs.md`, ADR-0006                                       |
+| Errores                      | `11-errores.md`, ADR-0006                                    |
+| Semántica de fallos críticos | `docs/failure-scenarios/README.md` y escenarios relacionados |
+| Pruebas / TDD                | ADR-0007                                                     |
+| Fases y estado               | `docs/cronograma/README.md` y README de la sub-fase          |
 
 ## 4. Arquitectura obligatoria
 
@@ -132,6 +145,14 @@ Reglas estrictas:
 8. Reportar archivos modificados, fase/sub-fase, validaciones y limitaciones.
 
 No agregues dependencias, abstracciones, compatibilidad hacia atrás o funcionalidades fuera del alcance sin una necesidad concreta y documentada.
+
+Cuando una funcionalidad crítica cambie su semántica de fallo, actualiza en el
+mismo cambio los escenarios afectados de [`docs/failure-scenarios/`](./docs/failure-scenarios/README.md),
+incluidas sus garantías, retry, recuperación, observabilidad y pruebas. No
+dupliques allí el catálogo de errores ni una decisión arquitectónica: enlaza
+`docs/architecture/11-errores.md`, el ADR o la especificación que siga siendo la
+fuente normativa. Si la garantía todavía no está decidida o probada, declárala
+como brecha; no la presentes como comportamiento vigente.
 
 ## 9. Convenciones
 
