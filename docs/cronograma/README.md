@@ -69,7 +69,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
   X/Z detrás de consentimiento simulado explícito. No instala ni usa SerialPort.
 - La Fase 8 comienza por 8.00 para cerrar las deudas de recuperacion de la Fase 7 y habilitar un primer perfil con evidencia primaria. El transporte serial y la recuperacion neutral se estabilizan con ese perfil; luego un gate, adaptador y HIL independientes califican el segundo, reutilizando SerialPort solo si su via oficial es compatible. La fase solo termina con dos combinaciones exactas soportadas, inicialmente candidatas PNP y The Factory HKA/ACLAS. ADR-0010 limita la genericidad al contrato semantico y, cuando aplica, al transporte serial; cada protocolo o SDK, modelo y firmware requiere evidencia y calificacion propias.
 - El corte interno de 8.00 del 2026-08-31 separa retry de terminalidad,
-  persiste evidencia fiscal en cuatro ejes y añade las migraciones 0010/0011
+  persiste evidencia fiscal en cuatro ejes y añade las migraciones 0010–0012
   con recuperación determinista e integridad fail-closed. Esto no cierra el
   gate: siguen pendientes fabricante, protocolo, registro, runtime y equipo.
 - La planificacion regulatoria de Fase 8 reconoce que SNAT/2026/00084 derogo la SNAT/2024/000121 el 2026-08-12. La autorizacion por modelo y el registro del desarrollador ante el fabricante de SNAT/2018/0141 se verifican nuevamente antes del piloto.

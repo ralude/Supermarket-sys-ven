@@ -55,6 +55,10 @@ Un timeout nunca autoriza por sí solo una segunda emisión. `ISSUED` requiere
 evidencia positiva de compromiso fiscal y es inmutable. El estado y los cuatro
 ejes de evidencia sobreviven a la reapertura de SQLite.
 
+Un `FAILED` heredado que conserve efecto o compromiso ambiguo se reabre como
+`ERROR` durante la migración 0012, con una transición correctiva y sin I/O. Así no
+queda oculto de `findRecoverable()` por una terminalidad antigua más débil.
+
 Esta garantía está probada con el fake. Ningún perfil físico está declarado
 soportado todavía, por lo que no se afirma que una impresora real pueda aportar
 la evidencia requerida.
@@ -73,6 +77,8 @@ la evidencia requerida.
 
 - Reabrir SQLite y enumerar documentos `PENDING`, `PRINTING`, `ERROR` y
   `RETRYING` mediante `findRecoverable()`.
+- Durante el upgrade, reabrir como `ERROR` los `FAILED` ambiguos y los
+  `RETRYING` que no tengan evidencia segura; la corrección no reenvía comandos.
 - Ejecutar `ReconcileFiscalState` con motivo y actor.
 - Confirmar `ISSUED` solo con evidencia positiva; si la evidencia queda
   `UNKNOWN`, escalar a intervención y conservar el dispositivo bloqueado.
@@ -116,6 +122,9 @@ recuperación o escalamiento visible cuando la UI se implemente.
   bloquean retry/terminalidad con evidencia desconocida.
 - [`fiscal-document-repository.test.ts`](../../packages/drivers/db/src/fiscal-document-repository.test.ts):
   reapertura y recuperación de evidencia `UNKNOWN`.
+- [`migrations.test.ts`](../../packages/drivers/db/src/migrations.test.ts):
+  normalización versionada de estados legacy falsamente terminales y su
+  inclusión posterior en la consulta recuperable.
 
 ## ADRs/documentos relacionados
 
@@ -127,4 +136,3 @@ recuperación o escalamiento visible cuando la UI se implemente.
 - [ADR-0010](../architecture/adr/0010-transporte-serial-y-protocolos-fiscales.md)
 - [8.04 Retry seguro y reconciliación](../cronograma/fase-08-integracion-serial/8.04-retry-reconciliacion.md)
 - [Diseño del orquestador de arranque](../cronograma/fase-08-integracion-serial/orquestador-arranque-fiscal.md)
-

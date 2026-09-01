@@ -45,7 +45,8 @@ describe('database migrations', () => {
       expect.objectContaining({ version: 8, name: 'inventory' }),
       expect.objectContaining({ version: 9, name: 'fiscal' }),
       expect.objectContaining({ version: 10, name: 'fiscal_operation_evidence' }),
-      expect.objectContaining({ version: 11, name: 'fiscal_integrity_guards' })
+      expect.objectContaining({ version: 11, name: 'fiscal_integrity_guards' }),
+      expect.objectContaining({ version: 12, name: 'fiscal_recovery_integrity' })
     ]);
 
     const tables = handle.sqlite.prepare(
@@ -199,6 +200,127 @@ describe('database migrations', () => {
     expect((caught as InfrastructureError).code).toBe('DATABASE_MIGRATION_MISMATCH');
   });
 
+  it('aborts 0012 instead of guessing a missing legacy fiscal transition', () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite, migrations.filter(({ version }) => version <= 10));
+    handle.sqlite.exec(`
+      insert into fiscal_documents (
+        id, reference_id, document_type, currency_code, total_minor_units,
+        idempotency_key, request_fingerprint, terminal_id, origin_node_id,
+        created_by, created_at, status, version, attempts, fiscal_number,
+        last_error_code, last_certainty, last_failure_retryable
+      ) values (
+        'corrupt-document', 'corrupt-sale', 'INVOICE', 'USD', 100,
+        'corrupt-key', 'corrupt-fingerprint', 'terminal-001', 'node-001',
+        'user-001', 1, 'PENDING', 2, 0, null, null, null, 0
+      );
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty,
+        dispatch_state, command_effect, fiscal_commit, print_delivery
+      ) values (
+        'corrupt-event-2', 'corrupt-document', 2, null, 'PENDING',
+        'user-001', 2, null, null, null, null, null, null
+      );
+    `);
+
+    expect(() => applyMigrations(handle.sqlite)).toThrowError(
+      expect.objectContaining({ code: 'DATABASE_MIGRATION_FAILED' })
+    );
+    expect(handle.sqlite.prepare(
+      'select count(*) from schema_migrations where version = 12'
+    ).pluck().get()).toBe(0);
+    expect(handle.sqlite.prepare(
+      'select count(*) from schema_migrations where version = 11'
+    ).pluck().get()).toBe(1);
+    expect(handle.sqlite.prepare(`
+      select count(*) from sqlite_master
+      where type = 'trigger' and name = 'fiscal_documents_status_insert_valid'
+    `).pluck().get()).toBe(0);
+  });
+
+  it('aborts 0012 when a legacy snapshot contradicts its last transition', () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite, migrations.filter(({ version }) => version <= 10));
+    handle.sqlite.exec(`
+      insert into fiscal_documents (
+        id, reference_id, document_type, currency_code, total_minor_units,
+        idempotency_key, request_fingerprint, terminal_id, origin_node_id,
+        created_by, created_at, status, version, attempts, fiscal_number,
+        last_error_code, last_certainty, last_failure_retryable
+      ) values (
+        'mismatched-document', 'mismatched-sale', 'INVOICE', 'USD', 100,
+        'mismatched-key', 'mismatched-fingerprint', 'terminal-001', 'node-001',
+        'user-001', 1, 'PENDING', 1, 0, null, null, null, 0
+      );
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty,
+        dispatch_state, command_effect, fiscal_commit, print_delivery
+      ) values (
+        'mismatched-event', 'mismatched-document', 1, null, 'PRINTING',
+        'user-001', 2, null, null, null, null, null, null
+      );
+    `);
+
+    expect(() => applyMigrations(handle.sqlite)).toThrowError(
+      expect.objectContaining({ code: 'DATABASE_MIGRATION_FAILED' })
+    );
+    expect(handle.sqlite.prepare(
+      'select count(*) from schema_migrations where version = 12'
+    ).pluck().get()).toBe(0);
+  });
+
+  it('aborts 0012 when a legacy report transition belongs to another day', () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite, migrations.filter(({ version }) => version <= 10));
+    handle.sqlite.exec(`
+      insert into fiscal_days (
+        id, business_date, terminal_id, origin_node_id, opened_by, opened_at,
+        state, version
+      ) values
+        ('report-owner-day', '2026-08-28', 'terminal-a', 'node-001',
+          'user-001', 1, 'DAY_OPEN', 2),
+        ('transition-day', '2026-08-29', 'terminal-b', 'node-001',
+          'user-001', 2, 'DAY_OPEN', 2);
+      insert into fiscal_reports (
+        id, day_id, origin_node_id, report_type, idempotency_key,
+        request_fingerprint, status, attempts, report_number, last_error_code,
+        last_certainty, retryable, requested_by, requested_at
+      ) values (
+        'crossed-report', 'report-owner-day', 'node-001', 'X', 'crossed-key',
+        'crossed-fingerprint', 'PENDING', 0, null, null, null, 0,
+        'user-001', 3
+      );
+      insert into fiscal_report_transitions (
+        event_id, day_id, report_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty,
+        dispatch_state, command_effect, fiscal_commit, print_delivery
+      ) values (
+        'owner-event', 'report-owner-day', 'crossed-report', 2,
+        null, 'PENDING', 'user-001', 3, null, null, null, null, null, null
+      );
+      insert into fiscal_report_transitions (
+        event_id, day_id, report_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty,
+        dispatch_state, command_effect, fiscal_commit, print_delivery
+      ) values (
+        'crossed-event', 'transition-day', 'crossed-report', 2,
+        null, 'PENDING', 'user-001', 3, null, null, null, null, null, null
+      );
+    `);
+
+    expect(() => applyMigrations(handle.sqlite)).toThrowError(
+      expect.objectContaining({ code: 'DATABASE_MIGRATION_FAILED' })
+    );
+    expect(handle.sqlite.prepare(
+      'select count(*) from schema_migrations where version = 12'
+    ).pluck().get()).toBe(0);
+  });
+
   it('upgrades legacy fiscal certainty without claiming a safe retry', async () => {
     const handle = openDatabase(':memory:');
     handles.push(handle);
@@ -230,6 +352,13 @@ describe('database migrations', () => {
         event_id, document_id, aggregate_version, from_status, to_status,
         actor_id, occurred_at, error_code, certainty
       ) values (
+        'legacy-document-pending', 'legacy-document', 1, null, 'PENDING',
+        'user-001', 1, null, null
+      );
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty
+      ) values (
         'legacy-document-event', 'legacy-document', 2, 'PRINTING', 'ERROR',
         'user-001', 2, 'FISCAL_PRINTER_TIMEOUT', 'NOT_SENT'
       );
@@ -244,6 +373,26 @@ describe('database migrations', () => {
         'user-001', 3, 'ERROR', 2, 1, null,
         'FISCAL_PRINTER_TIMEOUT', 'UNKNOWN', 1
       );
+      insert into fiscal_document_lines (
+        document_id, sequence, line_id, description, quantity_scaled,
+        quantity_scale, unit_price_minor_units, tax_rate_basis_points,
+        total_minor_units
+      ) values (
+        'legacy-unknown-document', 0, 'legacy-unknown-line',
+        'Legacy unknown item', 1, 0, 100, 0, 100
+      );
+      insert into fiscal_document_payments (
+        document_id, sequence, method_code, amount_minor_units
+      ) values ('legacy-unknown-document', 0, 'CASH_USD', 100);
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty
+      ) values
+        ('legacy-unknown-document-pending', 'legacy-unknown-document', 1,
+          null, 'PENDING', 'user-001', 3, null, null),
+        ('legacy-unknown-document-error', 'legacy-unknown-document', 2,
+          'PRINTING', 'ERROR', 'user-001', 4,
+          'FISCAL_PRINTER_TIMEOUT', 'UNKNOWN');
       insert into fiscal_documents (
         id, reference_id, document_type, currency_code, total_minor_units,
         idempotency_key, request_fingerprint, terminal_id, origin_node_id,
@@ -259,15 +408,91 @@ describe('database migrations', () => {
         event_id, document_id, aggregate_version, from_status, to_status,
         actor_id, occurred_at, error_code, certainty
       ) values (
+        'legacy-issued-document-pending', 'legacy-issued-document', 1,
+        null, 'PENDING', 'user-001', 4, null, null
+      );
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty
+      ) values (
         'legacy-issued-document-event', 'legacy-issued-document', 2,
         'PRINTING', 'ISSUED', 'user-001', 5, null, 'UNKNOWN'
       );
+      insert into fiscal_documents (
+        id, reference_id, document_type, currency_code, total_minor_units,
+        idempotency_key, request_fingerprint, terminal_id, origin_node_id,
+        created_by, created_at, status, version, attempts, fiscal_number,
+        last_error_code, last_certainty, last_failure_retryable
+      ) values (
+        'legacy-failed-document', 'legacy-failed-sale', 'INVOICE', 'USD', 100,
+        'legacy-failed-key', 'legacy-failed-fingerprint', 'terminal-001', 'node-001',
+        'user-001', 6, 'FAILED', 3, 1, null,
+        'FISCAL_PRINTER_TIMEOUT', 'UNKNOWN', 0
+      );
+      insert into fiscal_document_lines (
+        document_id, sequence, line_id, description, quantity_scaled,
+        quantity_scale, unit_price_minor_units, tax_rate_basis_points,
+        total_minor_units
+      ) values (
+        'legacy-failed-document', 0, 'legacy-failed-line',
+        'Legacy failed item', 1, 0, 100, 0, 100
+      );
+      insert into fiscal_document_payments (
+        document_id, sequence, method_code, amount_minor_units
+      ) values ('legacy-failed-document', 0, 'CASH_USD', 100);
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty
+      ) values
+        ('legacy-failed-document-pending', 'legacy-failed-document', 1,
+          null, 'PENDING', 'user-001', 6, null, null),
+        ('legacy-failed-document-printing', 'legacy-failed-document', 2,
+          'PENDING', 'PRINTING', 'user-001', 7, null, null),
+        ('legacy-failed-document-failed', 'legacy-failed-document', 3,
+          'PRINTING', 'FAILED', 'user-001', 8,
+          'FISCAL_PRINTER_TIMEOUT', 'UNKNOWN');
+      insert into fiscal_documents (
+        id, reference_id, document_type, currency_code, total_minor_units,
+        idempotency_key, request_fingerprint, terminal_id, origin_node_id,
+        created_by, created_at, status, version, attempts, fiscal_number,
+        last_error_code, last_certainty, last_failure_retryable
+      ) values (
+        'legacy-retrying-document', 'legacy-retrying-sale', 'INVOICE', 'USD', 100,
+        'legacy-retrying-key', 'legacy-retrying-fingerprint', 'terminal-001', 'node-001',
+        'user-001', 9, 'RETRYING', 4, 1, null,
+        'FISCAL_PRINTER_TIMEOUT', 'NOT_SENT', 1
+      );
+      insert into fiscal_document_lines (
+        document_id, sequence, line_id, description, quantity_scaled,
+        quantity_scale, unit_price_minor_units, tax_rate_basis_points,
+        total_minor_units
+      ) values (
+        'legacy-retrying-document', 0, 'legacy-retrying-line',
+        'Legacy retrying item', 1, 0, 100, 0, 100
+      );
+      insert into fiscal_document_payments (
+        document_id, sequence, method_code, amount_minor_units
+      ) values ('legacy-retrying-document', 0, 'CASH_USD', 100);
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty
+      ) values
+        ('legacy-retrying-document-pending', 'legacy-retrying-document', 1,
+          null, 'PENDING', 'user-001', 9, null, null),
+        ('legacy-retrying-document-printing', 'legacy-retrying-document', 2,
+          'PENDING', 'PRINTING', 'user-001', 10, null, null),
+        ('legacy-retrying-document-error', 'legacy-retrying-document', 3,
+          'PRINTING', 'ERROR', 'user-001', 11,
+          'FISCAL_PRINTER_TIMEOUT', 'NOT_SENT'),
+        ('legacy-retrying-document-retrying', 'legacy-retrying-document', 4,
+          'ERROR', 'RETRYING', 'user-001', 12,
+          'FISCAL_PRINTER_TIMEOUT', 'NOT_SENT');
       insert into fiscal_days (
         id, business_date, terminal_id, origin_node_id, opened_by, opened_at,
         state, version
       ) values (
         'legacy-day', '2026-08-29', 'terminal-002', 'node-001', 'user-001', 1,
-        'DAY_OPEN', 4
+        'DAY_OPEN', 6
       );
       insert into fiscal_reports (
         id, day_id, origin_node_id, report_type, idempotency_key,
@@ -317,9 +542,45 @@ describe('database migrations', () => {
         'legacy-issued-report-event', 'legacy-day', 'legacy-issued-report', 4,
         'PRINTING', 'ISSUED', 'user-001', 4, null, 'UNKNOWN'
       );
+      insert into fiscal_reports (
+        id, day_id, origin_node_id, report_type, idempotency_key,
+        request_fingerprint, status, attempts, report_number, last_error_code,
+        last_certainty, retryable, requested_by, requested_at
+      ) values (
+        'legacy-failed-report', 'legacy-day', 'node-001', 'X',
+        'legacy-failed-report-key', 'legacy-failed-report-fingerprint',
+        'FAILED', 1, null, 'FISCAL_PRINTER_TIMEOUT', 'UNKNOWN', 0,
+        'user-001', 5
+      );
+      insert into fiscal_report_transitions (
+        event_id, day_id, report_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty
+      ) values (
+        'legacy-failed-report-event', 'legacy-day', 'legacy-failed-report', 5,
+        'PRINTING', 'FAILED', 'user-001', 5,
+        'FISCAL_PRINTER_TIMEOUT', 'UNKNOWN'
+      );
+      insert into fiscal_reports (
+        id, day_id, origin_node_id, report_type, idempotency_key,
+        request_fingerprint, status, attempts, report_number, last_error_code,
+        last_certainty, retryable, requested_by, requested_at
+      ) values (
+        'legacy-retrying-report', 'legacy-day', 'node-001', 'X',
+        'legacy-retrying-report-key', 'legacy-retrying-report-fingerprint',
+        'RETRYING', 1, null, 'FISCAL_PRINTER_TIMEOUT', 'NOT_SENT', 1,
+        'user-001', 6
+      );
+      insert into fiscal_report_transitions (
+        event_id, day_id, report_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty
+      ) values (
+        'legacy-retrying-report-event', 'legacy-day', 'legacy-retrying-report', 6,
+        'ERROR', 'RETRYING', 'user-001', 6,
+        'FISCAL_PRINTER_TIMEOUT', 'NOT_SENT'
+      );
     `);
 
-    expect(applyMigrations(handle.sqlite)).toEqual([10, 11]);
+    expect(applyMigrations(handle.sqlite)).toEqual([10, 11, 12]);
     expect(handle.sqlite.prepare(`
       select last_dispatch_state as dispatchState,
         last_command_effect as commandEffect,
@@ -381,6 +642,60 @@ describe('database migrations', () => {
       fiscalCommit: 'COMMITTED', printDelivery: 'UNKNOWN'
     });
     expect(handle.sqlite.prepare(`
+      select status, version, last_dispatch_state as dispatchState,
+        last_command_effect as commandEffect,
+        last_fiscal_commit as fiscalCommit,
+        last_print_delivery as printDelivery
+      from fiscal_documents where id = 'legacy-failed-document'
+    `).get()).toEqual({
+      status: 'ERROR', version: 4,
+      dispatchState: 'STARTED', commandEffect: 'UNKNOWN',
+      fiscalCommit: 'UNKNOWN', printDelivery: 'UNKNOWN'
+    });
+    expect(handle.sqlite.prepare(`
+      select status, version from fiscal_documents
+      where id = 'legacy-retrying-document'
+    `).get()).toEqual({ status: 'ERROR', version: 5 });
+    expect(handle.sqlite.prepare(`
+      select aggregate_version as aggregateVersion, from_status as fromStatus,
+        to_status as toStatus, actor_id as actorId
+      from fiscal_document_transitions
+      where document_id = 'legacy-failed-document'
+        and actor_id = 'system:migration-0012'
+    `).get()).toEqual({
+      aggregateVersion: 4, fromStatus: 'FAILED', toStatus: 'ERROR',
+      actorId: 'system:migration-0012'
+    });
+    expect(handle.sqlite.prepare(`
+      select status from fiscal_reports
+      where id in ('legacy-failed-report', 'legacy-retrying-report')
+      order by id
+    `).pluck().all()).toEqual(['ERROR', 'ERROR']);
+    expect(handle.sqlite.prepare(`
+      select version from fiscal_days where id = 'legacy-day'
+    `).pluck().get()).toBe(8);
+    expect(handle.sqlite.prepare(`
+      select aggregate_version as aggregateVersion, from_status as fromStatus,
+        to_status as toStatus, actor_id as actorId
+      from fiscal_report_transitions
+      where report_id = 'legacy-failed-report'
+        and actor_id = 'system:migration-0012'
+    `).get()).toEqual({
+      aggregateVersion: 7, fromStatus: 'FAILED', toStatus: 'ERROR',
+      actorId: 'system:migration-0012'
+    });
+    const correctionEventIds = handle.sqlite.prepare(`
+      select event_id from fiscal_document_transitions
+      where actor_id = 'system:migration-0012'
+      union all
+      select event_id from fiscal_report_transitions
+      where actor_id = 'system:migration-0012'
+    `).pluck().all() as string[];
+    expect(correctionEventIds).toHaveLength(4);
+    expect(correctionEventIds.every((eventId) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/.test(eventId)
+    )).toBe(true);
+    expect(handle.sqlite.prepare(`
       select dispatch_state as dispatchState, command_effect as commandEffect,
         fiscal_commit as fiscalCommit, print_delivery as printDelivery
       from fiscal_document_transitions where event_id = 'legacy-document-event'
@@ -417,6 +732,59 @@ describe('database migrations', () => {
       update fiscal_reports set last_print_delivery = null
       where id = 'legacy-report'
     `).run()).toThrowError('fiscal operation evidence is invalid');
+    expect(() => handle.sqlite.prepare(`
+      update fiscal_documents set status = 'PENDING'
+      where id = 'legacy-document'
+    `).run()).toThrowError('fiscal status evidence is invalid');
+    expect(() => handle.sqlite.prepare(`
+      update fiscal_documents set status = 'ISSUED', fiscal_number = 'INV-INVALID'
+      where id = 'legacy-document'
+    `).run()).toThrowError('fiscal status evidence is invalid');
+    expect(() => handle.sqlite.prepare(`
+      update fiscal_reports set status = 'PENDING'
+      where id = 'legacy-report'
+    `).run()).toThrowError('fiscal status evidence is invalid');
+    handle.sqlite.exec(`
+      insert into fiscal_documents (
+        id, reference_id, document_type, currency_code, total_minor_units,
+        idempotency_key, request_fingerprint, terminal_id, origin_node_id,
+        created_by, created_at, status, version, attempts, fiscal_number,
+        last_error_code, last_certainty, last_failure_retryable
+      ) values (
+        'sequence-probe', 'sequence-sale', 'INVOICE', 'USD', 100,
+        'sequence-key', 'sequence-fingerprint', 'terminal-001', 'node-001',
+        'user-001', 7, 'PENDING', 1, 0, null, null, null, 0
+      );
+      insert into fiscal_document_lines (
+        document_id, sequence, line_id, description, quantity_scaled,
+        quantity_scale, unit_price_minor_units, tax_rate_basis_points,
+        total_minor_units
+      ) values (
+        'sequence-probe', 0, 'sequence-line', 'Sequence item',
+        1, 0, 100, 0, 100
+      );
+      insert into fiscal_document_payments (
+        document_id, sequence, method_code, amount_minor_units
+      ) values ('sequence-probe', 0, 'CASH_USD', 100);
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty,
+        dispatch_state, command_effect, fiscal_commit, print_delivery
+      ) values (
+        'sequence-event-1', 'sequence-probe', 1, null, 'PENDING',
+        'user-001', 7, null, null, null, null, null, null
+      );
+    `);
+    expect(() => handle.sqlite.prepare(`
+      insert into fiscal_document_transitions (
+        event_id, document_id, aggregate_version, from_status, to_status,
+        actor_id, occurred_at, error_code, certainty,
+        dispatch_state, command_effect, fiscal_commit, print_delivery
+      ) values (
+        'sequence-event-3', 'sequence-probe', 3, 'PENDING', 'PRINTING',
+        'user-001', 8, null, null, null, null, null, null
+      )
+    `).run()).toThrowError('fiscal document transition version is not contiguous');
     handle.sqlite.prepare(`
       insert into fiscal_days (
         id, business_date, terminal_id, origin_node_id, opened_by, opened_at,
@@ -461,12 +829,26 @@ describe('database migrations', () => {
       fiscalCommit: 'UNKNOWN', printDelivery: 'UNKNOWN'
     });
 
-    const legacyDocument = await new DrizzleFiscalDocumentRepository(handle)
-      .findById('legacy-document');
+    const documentRepository = new DrizzleFiscalDocumentRepository(handle);
+    expect((await documentRepository.findRecoverable())
+      .map(({ id }) => id).filter((id) => id.startsWith('legacy-'))).toEqual([
+      'legacy-document', 'legacy-unknown-document',
+      'legacy-failed-document', 'legacy-retrying-document'
+    ]);
+    const legacyDocument = await documentRepository.findById('legacy-document');
     expect(() => legacyDocument?.beginRetry({
       actorId: 'user-001', occurredAt: new Date(6), eventId: 'blocked-document-retry'
     })).toThrowError(expect.objectContaining({ code: 'FISCAL_RETRY_RECONCILIATION_REQUIRED' }));
-    const legacyDay = await new DrizzleFiscalDayRepository(handle).findById('legacy-day');
+    const dayRepository = new DrizzleFiscalDayRepository(handle);
+    expect((await dayRepository.findRecoverable()).map(({ id }) => id))
+      .toEqual(['legacy-day']);
+    const legacyDay = await dayRepository.findById('legacy-day');
+    expect(legacyDay?.reports.filter(({ id }) =>
+      id === 'legacy-failed-report' || id === 'legacy-retrying-report'
+    ).map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: 'legacy-failed-report', status: 'ERROR' },
+      { id: 'legacy-retrying-report', status: 'ERROR' }
+    ]);
     expect(() => legacyDay?.retryReport({
       reportId: 'legacy-unknown-report', actorId: 'user-001',
       occurredAt: new Date(6), eventId: 'blocked-report-retry'

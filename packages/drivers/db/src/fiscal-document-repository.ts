@@ -15,6 +15,7 @@ import {
   fiscalDocumentTransitions
 } from './schema.js';
 import {
+  assertFiscalOperationSnapshot,
   fiscalOperationEvidenceValues,
   restoreFiscalOperationEvidence
 } from './fiscal-operation-evidence.js';
@@ -31,10 +32,12 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
     try {
       const existing = this.handle.db.select().from(fiscalDocuments)
         .where(eq(fiscalDocuments.id, document.id)).get();
+      if (existing) this.assertPersistedTransitionSequence(existing.id, existing.version);
       const transitions = this.newTransitions(
         document.transitions,
         existing?.version ?? 0,
-        document.version
+        document.version,
+        document.status
       );
       if (!existing) {
         this.handle.db.insert(fiscalDocuments).values(this.documentValues(document)).run();
@@ -132,8 +135,18 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
   private newTransitions(
     transitions: readonly FiscalDocumentTransition[],
     persistedVersion: number,
-    aggregateVersion: number
+    aggregateVersion: number,
+    aggregateState: FiscalDocumentState
   ): FiscalDocumentTransition[] {
+    const ordered = [...transitions].sort((left, right) => left.version - right.version);
+    if (ordered.length !== aggregateVersion || ordered.some(
+      ({ version }, index) => version !== index + 1
+    ) || ordered.at(-1)?.to !== aggregateState) {
+      throw new InfrastructureError(
+        'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID',
+        'Fiscal document transition history contradicts its snapshot.'
+      );
+    }
     const pending = transitions
       .filter(({ version }) => version > persistedVersion)
       .sort((left, right) => left.version - right.version);
@@ -159,6 +172,18 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
     const transitions = this.handle.db.select().from(fiscalDocumentTransitions)
       .where(eq(fiscalDocumentTransitions.documentId, row.id))
       .orderBy(fiscalDocumentTransitions.aggregateVersion).all();
+    this.assertTransitionRows(row.version, row.status as FiscalDocumentState, transitions);
+    const lastEvidence = restoreFiscalOperationEvidence({
+      dispatchState: row.lastDispatchState,
+      commandEffect: row.lastCommandEffect,
+      fiscalCommit: row.lastFiscalCommit,
+      printDelivery: row.lastPrintDelivery
+    });
+    assertFiscalOperationSnapshot({
+      state: row.status as FiscalDocumentState,
+      evidence: lastEvidence,
+      referenceNumber: row.fiscalNumber
+    });
     return FiscalDocument.restore({
       id: row.id,
       content: {
@@ -191,12 +216,7 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
       attempts: row.attempts,
       fiscalNumber: row.fiscalNumber,
       lastErrorCode: row.lastErrorCode,
-      lastEvidence: restoreFiscalOperationEvidence({
-        dispatchState: row.lastDispatchState,
-        commandEffect: row.lastCommandEffect,
-        fiscalCommit: row.lastFiscalCommit,
-        printDelivery: row.lastPrintDelivery
-      }),
+      lastEvidence,
       lastFailureRetryable: row.lastFailureRetryable,
       transitions: transitions.map((transition) => ({
         eventId: transition.eventId,
@@ -241,6 +261,37 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
       lastPrintDelivery: evidence.printDelivery,
       lastFailureRetryable: document.lastFailureRetryable
     };
+  }
+
+  private assertPersistedTransitionSequence(documentId: string, version: number): void {
+    const transitions = this.handle.db.select({
+      aggregateVersion: fiscalDocumentTransitions.aggregateVersion,
+      toStatus: fiscalDocumentTransitions.toStatus
+    }).from(fiscalDocumentTransitions)
+      .where(eq(fiscalDocumentTransitions.documentId, documentId))
+      .orderBy(fiscalDocumentTransitions.aggregateVersion).all();
+    const document = this.handle.db.select({ status: fiscalDocuments.status })
+      .from(fiscalDocuments).where(eq(fiscalDocuments.id, documentId)).get();
+    this.assertTransitionRows(
+      version,
+      document?.status as FiscalDocumentState,
+      transitions
+    );
+  }
+
+  private assertTransitionRows(
+    version: number,
+    state: FiscalDocumentState,
+    transitions: readonly { aggregateVersion: number; toStatus: string }[]
+  ): void {
+    if (transitions.length !== version || transitions.some(
+      ({ aggregateVersion }, index) => aggregateVersion !== index + 1
+    ) || transitions.at(-1)?.toStatus !== state) {
+      throw new InfrastructureError(
+        'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID',
+        'Persisted fiscal document transition sequence is incomplete.'
+      );
+    }
   }
 
   private assertPersistedIdentity(

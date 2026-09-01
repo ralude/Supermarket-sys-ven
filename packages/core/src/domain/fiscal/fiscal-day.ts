@@ -290,17 +290,24 @@ export class FiscalDay {
     eventId: string;
   }): void {
     const report = this.report(props.reportId);
-    if (report.status !== 'ERROR' || report.lastEvidence === null ||
+    if (report.status !== 'ERROR' && report.status !== 'RETRYING') {
+      throw new DomainError(
+        'FISCAL_REPORT_INVALID_STATE',
+        'Fiscal report cannot be marked failed.'
+      );
+    }
+    if (report.lastEvidence === null ||
       !isFiscalOperationTerminalFailureSafe(report.lastEvidence)) {
       throw new DomainError(
         'FISCAL_TERMINAL_FAILURE_EVIDENCE_REQUIRED',
         'Terminal failure requires authoritative no-commit evidence.'
       );
     }
+    const from = report.status;
     report.status = 'FAILED';
     report.retryable = false;
     this.transitionReport(
-      report, 'ERROR', 'FAILED', props, report.lastErrorCode, report.lastEvidence
+      report, from, 'FAILED', props, report.lastErrorCode, report.lastEvidence
     );
     this.event('FiscalReportFailed', props.eventId, props.occurredAt, {
       reportId: report.id,

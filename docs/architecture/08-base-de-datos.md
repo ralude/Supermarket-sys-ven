@@ -58,7 +58,13 @@ restricciones rechazan IDs de evento reutilizados, secuencias incompletas y una
 transición de reporte asociada a otra jornada. Líneas y pagos se cargan antes de
 la primera transición dentro de la creación transaccional y quedan sellados
 después. La evidencia de operación se almacena como un snapshot de cuatro
-columnas todas nulas o todas presentes y semánticamente coherentes.
+columnas todas nulas o todas presentes y semánticamente coherentes. Los guards
+relacionan además el snapshot con el estado fiscal destino; la rehidratación
+vuelve a comprobar tanto esa relación como la continuidad de versiones y que la
+última transición de cada operación coincida con su snapshot. Una
+migración aborta ante historia legacy corrupta que no pueda reparar sin
+adivinar, mientras que estados legacy falsamente terminales se reabren con una
+transición correctiva append-only.
 
 No se permite una transacción abierta durante una llamada de hardware o red. La impresión debe usar un estado persistido y un mecanismo de reconciliación.
 

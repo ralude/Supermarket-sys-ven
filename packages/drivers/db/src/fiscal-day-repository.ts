@@ -10,6 +10,7 @@ import { InfrastructureError } from '@supermarket/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DatabaseHandle } from './connection.js';
 import {
+  assertFiscalOperationSnapshot,
   fiscalOperationEvidenceValues,
   restoreFiscalOperationEvidence
 } from './fiscal-operation-evidence.js';
@@ -28,6 +29,7 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
     try {
       const existing = this.handle.db.select().from(fiscalDays)
         .where(eq(fiscalDays.id, day.id)).get();
+      if (existing) this.assertPersistedTransitionSequence(existing.id, existing.version);
       const persistedReports = new Map(day.reports.map((report) => [
         report.id,
         this.handle.db.select().from(fiscalReports)
@@ -163,6 +165,7 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
     const transitionRows = this.handle.db.select().from(fiscalReportTransitions)
       .where(eq(fiscalReportTransitions.dayId, row.id))
       .orderBy(fiscalReportTransitions.aggregateVersion).all();
+    this.assertTransitionRows(row.version, transitionRows, reportRows);
     return FiscalDay.restore({
       id: row.id,
       businessDate: row.businessDate,
@@ -172,41 +175,49 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
       openedAt: row.openedAt,
       state: row.state as FiscalDayState,
       version: row.version,
-      reports: reportRows.map((report): FiscalReport => ({
-        id: report.id,
-        type: report.reportType as FiscalReportType,
-        idempotencyKey: report.idempotencyKey,
-        requestFingerprint: report.requestFingerprint,
-        status: report.status as FiscalReportState,
-        attempts: report.attempts,
-        reportNumber: report.reportNumber,
-        lastErrorCode: report.lastErrorCode,
-        lastEvidence: restoreFiscalOperationEvidence({
+      reports: reportRows.map((report): FiscalReport => {
+        const lastEvidence = restoreFiscalOperationEvidence({
           dispatchState: report.lastDispatchState,
           commandEffect: report.lastCommandEffect,
           fiscalCommit: report.lastFiscalCommit,
           printDelivery: report.lastPrintDelivery
-        }),
-        retryable: report.retryable,
-        requestedBy: report.requestedBy,
-        requestedAt: report.requestedAt,
-        transitions: transitionRows.filter(({ reportId }) => reportId === report.id)
-          .map((transition) => ({
-            eventId: transition.eventId,
-            version: transition.aggregateVersion,
-            from: transition.fromStatus as FiscalReportState | null,
-            to: transition.toStatus as FiscalReportState,
-            actorId: transition.actorId,
-            occurredAt: transition.occurredAt,
-            errorCode: transition.errorCode,
-            evidence: restoreFiscalOperationEvidence({
-              dispatchState: transition.dispatchState,
-              commandEffect: transition.commandEffect,
-              fiscalCommit: transition.fiscalCommit,
-              printDelivery: transition.printDelivery
-            })
-          }))
-      }))
+        });
+        assertFiscalOperationSnapshot({
+          state: report.status as FiscalReportState,
+          evidence: lastEvidence,
+          referenceNumber: report.reportNumber
+        });
+        return {
+          id: report.id,
+          type: report.reportType as FiscalReportType,
+          idempotencyKey: report.idempotencyKey,
+          requestFingerprint: report.requestFingerprint,
+          status: report.status as FiscalReportState,
+          attempts: report.attempts,
+          reportNumber: report.reportNumber,
+          lastErrorCode: report.lastErrorCode,
+          lastEvidence,
+          retryable: report.retryable,
+          requestedBy: report.requestedBy,
+          requestedAt: report.requestedAt,
+          transitions: transitionRows.filter(({ reportId }) => reportId === report.id)
+            .map((transition) => ({
+              eventId: transition.eventId,
+              version: transition.aggregateVersion,
+              from: transition.fromStatus as FiscalReportState | null,
+              to: transition.toStatus as FiscalReportState,
+              actorId: transition.actorId,
+              occurredAt: transition.occurredAt,
+              errorCode: transition.errorCode,
+              evidence: restoreFiscalOperationEvidence({
+                dispatchState: transition.dispatchState,
+                commandEffect: transition.commandEffect,
+                fiscalCommit: transition.fiscalCommit,
+                printDelivery: transition.printDelivery
+              })
+            }))
+        };
+      })
     });
   }
 
@@ -236,6 +247,43 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
     };
   }
 
+  private assertPersistedTransitionSequence(dayId: string, version: number): void {
+    const transitions = this.handle.db.select({
+      aggregateVersion: fiscalReportTransitions.aggregateVersion,
+      reportId: fiscalReportTransitions.reportId,
+      toStatus: fiscalReportTransitions.toStatus
+    }).from(fiscalReportTransitions)
+      .where(eq(fiscalReportTransitions.dayId, dayId))
+      .orderBy(fiscalReportTransitions.aggregateVersion).all();
+    const reports = this.handle.db.select({
+      id: fiscalReports.id,
+      status: fiscalReports.status
+    }).from(fiscalReports).where(eq(fiscalReports.dayId, dayId)).all();
+    this.assertTransitionRows(version, transitions, reports);
+  }
+
+  private assertTransitionRows(
+    version: number,
+    transitions: readonly {
+      aggregateVersion: number;
+      reportId: string;
+      toStatus: string;
+    }[],
+    reports: readonly { id: string; status: string }[]
+  ): void {
+    if (version < 1 || transitions.length !== version - 1 || transitions.some(
+      ({ aggregateVersion }, index) => aggregateVersion !== index + 2
+    ) || reports.some((report) => {
+      const last = transitions.filter(({ reportId }) => reportId === report.id).at(-1);
+      return last?.toStatus !== report.status;
+    })) {
+      throw new InfrastructureError(
+        'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID',
+        'Persisted fiscal report transition sequence is incomplete.'
+      );
+    }
+  }
+
   private assertPersistedReportIdentity(
     row: typeof fiscalReports.$inferSelect,
     day: FiscalDay,
@@ -257,11 +305,21 @@ export class DrizzleFiscalDayRepository implements FiscalDayRepository {
     day: FiscalDay,
     persistedVersion: number
   ): Array<{ reportId: string; transition: FiscalReport['transitions'][number] }> {
-    const pending = day.reports.flatMap((report) => report.transitions.map((transition) => ({
+    const history = day.reports.flatMap((report) => report.transitions.map((transition) => ({
       reportId: report.id,
       transition
-    }))).filter(({ transition }) => transition.version > persistedVersion)
-      .sort((left, right) => left.transition.version - right.transition.version);
+    }))).sort((left, right) => left.transition.version - right.transition.version);
+    if (history.length !== day.version - 1 || history.some(({ transition }, index) =>
+      transition.version !== index + 2) || day.reports.some((report) =>
+      report.transitions.at(-1)?.to !== report.status)) {
+      throw new InfrastructureError(
+        'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID',
+        'Fiscal report transition history contradicts its snapshot.'
+      );
+    }
+    const pending = history.filter(
+      ({ transition }) => transition.version > persistedVersion
+    );
     const expectedCount = day.version - persistedVersion;
     if (expectedCount < 0 || pending.length !== expectedCount ||
       pending.some(({ transition }, index) =>

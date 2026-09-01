@@ -139,14 +139,27 @@ pertenece a 8.04 cuando exista evidencia autoritativa del primer perfil. Tambié
 falta `ReconcileFiscalReport` para X/Z.
 
 La migración forward-only 0010 añade y persiste los cuatro ejes neutrales en
-documentos, jornadas y transiciones, y migra datos anteriores sin convertir
+documentos, reportes y sus transiciones, y migra datos anteriores sin convertir
 `NOT_SENT` en permiso de retry. La 0011 neutraliza las columnas históricas tras
 el backfill, impide volver a escribirlas y añade guards SQLite para evidencia
-completa/coherente, contenido fiscal sellado y pertenencia jornada–reporte. Una
-emisión terminal heredada se conserva como `APPLIED + COMMITTED` con entrega
-`UNKNOWN`. Un timeout o CRC puede quedar en `ERROR` incluso si el cierre está
-comprometido; `ReconcileFiscalState` solo marca `ISSUED` con evidencia positiva
-y una referencia distinta conserva el bloqueo.
+completa/coherente, contenido fiscal sellado y pertenencia jornada–reporte. La
+0012, sin alterar el checksum de la 0011, añade coherencia entre estado y
+evidencia, preflight y guards de secuencia. `PENDING` y `PRINTING` no llevan
+evidencia; `ERROR` exige evidencia de un resultado no entregado completamente;
+`RETRYING` exige ausencia autoritativa de efecto; `ISSUED` exige
+`APPLIED + COMMITTED` y número; y `FAILED` exige
+`NOT_APPLIED + NOT_COMMITTED + INCOMPLETE`.
+
+Una emisión terminal heredada se conserva como `APPLIED + COMMITTED` con
+entrega `UNKNOWN`. En cambio, un `FAILED` heredado sin evidencia terminal segura
+o un `RETRYING` inseguro se reabre como `ERROR` mediante una transición
+correctiva versionada de la migración; no se reintenta ni se borra la historia.
+Antes de instalar los guards, la migración aborta si encuentra versiones
+preexistentes incompletas o una transición de reporte cruzada entre jornadas,
+para que la recuperación desde respaldo y el diagnóstico sean explícitos. Un
+timeout o CRC puede quedar en `ERROR` incluso si el cierre está comprometido;
+`ReconcileFiscalState` solo marca `ISSUED` con evidencia positiva y una
+referencia distinta conserva el bloqueo.
 
 En hardware real, que una referencia no sea el ultimo documento observado no
 demuestra que nunca fue emitida. La reconciliacion por proveedor debe producir
@@ -158,7 +171,7 @@ Reporte Z, cuyo timeout nunca habilita otro cierre a ciegas.
 
 La Fase 7 completó el puerto semántico, el fake y la persistencia sin hardware
 real. El gate 8.00 ya cerró la portabilidad segura del harness, la evidencia
-neutral, las migraciones 0010/0011, la consulta recuperable de documentos/reportes y la
+neutral, las migraciones 0010–0012, la consulta recuperable de documentos/reportes y la
 reconciliación fail-closed heredada. Siguen pendientes los campos fiscales
 abiertos, la evidencia formal del primer proveedor, el runtime nativo y la
 reconciliación X/Z; por eso no se agrega SerialPort de producción ni se declara

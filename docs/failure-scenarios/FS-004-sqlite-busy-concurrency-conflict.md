@@ -44,12 +44,20 @@ nuevo o duplicar efectos al reintentar toda la solicitud sin idempotencia.
 - El estado relacional y sus escritores transversales permanecen atómicos.
 - Ante conflicto de versión, el llamador debe releer el agregado y reevaluar el
   comando; no sobrescribir la versión ganadora.
+- La persistencia fiscal rechaza una historia cuya secuencia no sea contigua o
+  cuya versión máxima no coincida con el snapshot. El upgrade aborta y conserva
+  el respaldo si detecta esa corrupción o una transición X/Z en otra jornada.
 
 ## Garantía/invariante del sistema
 
 Una transacción de negocio confirma todos sus cambios o ninguno. Los agregados
 versionados no aceptan una versión obsoleta y cada SQLite tiene un único proceso
 owner. No se usa last-write-wins.
+
+Para documentos y jornadas fiscales, la continuidad completa de la historia se
+comprueba al migrar, rehidratar y guardar. También se exige que el estado de la
+última transición coincida con el snapshot del documento o reporte. No se
+rellena una transición faltante ni se corrige su jornada por inferencia.
 
 No se afirma que toda operación disponga hoy de versión optimista: ventas,
 turnos y persistencia fiscal sí la aplican; `StockItem` se apoya actualmente en
@@ -107,7 +115,11 @@ documento. Los mensajes finales de UI siguen pendientes de Fase 9.
   persistencia dentro de transacción y rechazo de escritura fuera de ella.
 - [`fiscal-document-repository.test.ts`](../../packages/drivers/db/src/fiscal-document-repository.test.ts)
   y [`fiscal-day-repository.test.ts`](../../packages/drivers/db/src/fiscal-day-repository.test.ts):
-  secuencia/versionado fiscal y rollback de transiciones inválidas.
+  secuencia/versionado fiscal, rechazo al rehidratar historia incompleta y
+  rollback de transiciones inválidas.
+- [`migrations.test.ts`](../../packages/drivers/db/src/migrations.test.ts):
+  rollback de DDL/DML/guards y aborto de 0012 ante secuencia incompleta o
+  transición de reporte cruzada.
 - Brecha explícita: no hay una prueba dedicada que fuerce `SQLITE_BUSY` y
   verifique un backoff de aplicación, ni una prueba uniforme de versión obsoleta
   para todos los repositorios.
@@ -122,4 +134,3 @@ documento. Los mensajes finales de UI siguen pendientes de Fase 9.
 - [ADR-0009](../architecture/adr/0009-estado-relacional-ledger-outbox.md)
 - [3.01 Conexión SQLite](../cronograma/fase-03-persistencia/3.01-conexion-sqlite.md)
 - [3.03 Repositorios](../cronograma/fase-03-persistencia/3.03-repositorios.md)
-

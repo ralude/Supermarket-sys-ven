@@ -1,5 +1,8 @@
 import {
+  isFiscalOperationCommitted,
   isFiscalOperationEvidenceCoherent,
+  isFiscalOperationRetrySafe,
+  isFiscalOperationTerminalFailureSafe,
   type FiscalCommandEffect,
   type FiscalCommit,
   type FiscalDispatchState,
@@ -13,6 +16,20 @@ type FiscalOperationEvidenceColumns = {
   readonly commandEffect: string | null;
   readonly fiscalCommit: string | null;
   readonly printDelivery: string | null;
+};
+
+type PersistedFiscalOperationState =
+  | 'PENDING'
+  | 'PRINTING'
+  | 'ISSUED'
+  | 'ERROR'
+  | 'RETRYING'
+  | 'FAILED';
+
+type FiscalOperationSnapshot = {
+  readonly state: PersistedFiscalOperationState;
+  readonly evidence: FiscalOperationEvidence | null;
+  readonly referenceNumber: string | null;
 };
 
 const dispatchStates = new Set<FiscalDispatchState>([
@@ -71,3 +88,26 @@ export const fiscalOperationEvidenceValues = (
   fiscalCommit: evidence?.fiscalCommit ?? null,
   printDelivery: evidence?.printDelivery ?? null
 });
+
+export const assertFiscalOperationSnapshot = (
+  snapshot: FiscalOperationSnapshot
+): void => {
+  const { state, evidence, referenceNumber } = snapshot;
+  const valid = state === 'PENDING' || state === 'PRINTING'
+    ? evidence === null
+    : state === 'ISSUED'
+      ? evidence !== null && isFiscalOperationCommitted(evidence) &&
+        referenceNumber !== null && referenceNumber.trim().length > 0
+      : state === 'ERROR'
+        ? evidence !== null && isFiscalOperationEvidenceCoherent(evidence) &&
+          evidence.printDelivery !== 'COMPLETE'
+        : state === 'RETRYING'
+          ? evidence !== null && isFiscalOperationRetrySafe(evidence)
+          : evidence !== null && isFiscalOperationTerminalFailureSafe(evidence);
+  if (!valid) {
+    throw new InfrastructureError(
+      'DATABASE_FISCAL_EVIDENCE_INVALID',
+      'Persisted fiscal state contradicts its operation evidence.'
+    );
+  }
+};

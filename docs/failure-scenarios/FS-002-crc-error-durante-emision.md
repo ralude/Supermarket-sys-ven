@@ -75,6 +75,8 @@ CRC, framing ni firmware real.
    conservar el bloqueo e intervención.
 4. Validar el caso por etapa con vectores dorados y HIL antes de declarar un
    perfil soportado.
+5. En un upgrade legacy, reabrir como `ERROR` cualquier `FAILED` o `RETRYING`
+   ambiguo mediante la corrección versionada de 0012, sin emitir I/O.
 
 ## Observabilidad
 
@@ -107,6 +109,8 @@ crear otra factura.
   `preserves RESULT_RECEIVED when the original command already had response evidence`.
 - [`fiscal-document.test.ts`](../../packages/core/src/domain/fiscal/fiscal-document.test.ts):
   bloqueo de retry con dimensiones `UNKNOWN`.
+- [`migrations.test.ts`](../../packages/drivers/db/src/migrations.test.ts):
+  recuperación de terminalidad legacy ambigua sin perder la evidencia.
 - Brecha explícita: aún no hay pruebas de parser, vectores de bytes ni HIL de un
   perfil real; pertenecen a 8.02, 8.04 y 8.06.
 
@@ -118,4 +122,3 @@ crear otra factura.
 - [ADR-0010](../architecture/adr/0010-transporte-serial-y-protocolos-fiscales.md)
 - [8.02 Parser de protocolo](../cronograma/fase-08-integracion-serial/8.02-parser-protocolo.md)
 - [8.04 Retry seguro y reconciliación](../cronograma/fase-08-integracion-serial/8.04-retry-reconciliacion.md)
-

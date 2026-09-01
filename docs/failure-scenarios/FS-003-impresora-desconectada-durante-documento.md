@@ -70,6 +70,9 @@ single-flight y el bloqueo de startup completo están diseñados, no compuestos.
   liberó el recurso antes de crear otro owner.
 - Reabrir SQLite, enumerar toda intención fiscal recuperable y entrar en
   `RECOVERY_REQUIRED`.
+- Si una versión anterior dejó la intención como `FAILED` o `RETRYING` con
+  evidencia insegura, 0012 la reabre en `ERROR` con una transición correctiva;
+  la migración no reconecta ni reenvía.
 - Consultar identidad, sesión abierta, referencia, contadores y número fiscal
   que permita el perfil.
 - Resolver por evidencia positiva o escalar a servicio/intervención autorizada;
@@ -106,6 +109,8 @@ con papel incompleto sigue siendo fiscalmente emitido.
   retry seguro cuando dispatch no empezó y bloqueo con evidencia desconocida.
 - [`issue-fiscal-document.test.ts`](../../packages/core/src/application/fiscal/issue-fiscal-document.test.ts):
   no confundir una consulta posterior con la respuesta del comando original.
+- [`migrations.test.ts`](../../packages/drivers/db/src/migrations.test.ts):
+  reapertura durable y recuperable de estados legacy ambiguos.
 - Brecha explícita: faltan pruebas por etapa de desconexión USB, hard recovery,
   epoch y single-flight en 8.01, 8.03, 8.04 y 8.06.
 
@@ -119,4 +124,3 @@ con papel incompleto sigue siendo fiscalmente emitido.
 - [8.01 Adaptador SerialPort](../cronograma/fase-08-integracion-serial/8.01-serialport-adapter.md)
 - [8.03 Cola y exclusión](../cronograma/fase-08-integracion-serial/8.03-command-queue.md)
 - [Diseño del orquestador](../cronograma/fase-08-integracion-serial/orquestador-arranque-fiscal.md)
-

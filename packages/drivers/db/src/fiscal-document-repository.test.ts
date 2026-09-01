@@ -187,6 +187,39 @@ describe('DrizzleFiscalDocumentRepository', () => {
     `).pluck().get()).toBe(1);
   });
 
+  it('rejects rehydration when the persisted document version has no matching history', async () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite);
+    const repository = new DrizzleFiscalDocumentRepository(handle);
+    const unitOfWork = new SqliteUnitOfWork(handle.sqlite);
+    await unitOfWork.execute(() => repository.save(createDocumentInState('PENDING', 1)));
+    handle.sqlite.prepare(`
+      update fiscal_documents set version = 2 where id = 'fiscal-001'
+    `).run();
+
+    await expect(repository.findById('fiscal-001')).rejects.toMatchObject({
+      code: 'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID'
+    });
+  });
+
+  it('rejects rehydration when the document snapshot disagrees with its last transition', async () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite);
+    const repository = new DrizzleFiscalDocumentRepository(handle);
+    const unitOfWork = new SqliteUnitOfWork(handle.sqlite);
+    await unitOfWork.execute(() => repository.save(createDocumentInState('PENDING', 1)));
+    handle.sqlite.prepare(`
+      update fiscal_documents set status = 'PRINTING', attempts = 1
+      where id = 'fiscal-001'
+    `).run();
+
+    await expect(repository.findById('fiscal-001')).rejects.toMatchObject({
+      code: 'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID'
+    });
+  });
+
   it('recovers every non-terminal document state after reopening SQLite', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'supermarket-fiscal-states-'));
     directories.push(directory);

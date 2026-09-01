@@ -19,6 +19,11 @@ Todos los errores públicos tienen código estable, mensaje seguro y detalles op
 | Aplicación | `RESOURCE_NOT_FOUND`, `SHIFT_NOT_FOUND`, `CASH_REGISTER_NOT_FOUND`, `SALE_HISTORY_NOT_FOUND`, `IDEMPOTENCY_KEY_CONFLICT`, `FISCAL_RECONCILIATION_INCONCLUSIVE`, `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT` |
 | Infraestructura | `DATABASE_BUSY`, `DATABASE_CONSTRAINT_VIOLATION`, `DATABASE_TRANSACTION_REQUIRED`, `DATABASE_CONCURRENCY_CONFLICT`, `DATABASE_MIGRATION_FAILED`, `DATABASE_MIGRATION_MISMATCH`, `DATABASE_FISCAL_EVIDENCE_INVALID`, `DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID`, `FISCAL_REPORT_IDENTITY_CONFLICT`, `FISCAL_PRINTER_NAK`, `FISCAL_PRINTER_PAPER_END`, `FISCAL_PRINTER_MEMORY_FULL`, `FISCAL_PRINTER_BUSY`, `FISCAL_PRINTER_TIMEOUT`, `FISCAL_PRINTER_CRC_ERROR`, `FISCAL_PRINTER_PORT_CLOSED`, `NETWORK_UNAVAILABLE` |
 
+`DATABASE_FISCAL_EVIDENCE_INVALID` cubre evidencia incompleta, combinaciones
+imposibles y contradicciones entre el snapshot fiscal y su estado persistido.
+`DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID` cubre versiones faltantes,
+desordenadas o cuya versión máxima no coincide con el agregado.
+
 ## Fronteras
 
 HTTP debe responder `application/problem+json` sin stack traces. IPC debe devolver un envelope serializable. WebSocket no debe filtrar detalles internos.

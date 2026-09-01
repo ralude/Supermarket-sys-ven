@@ -198,4 +198,36 @@ describe('FiscalDay', () => {
 
     expect(fiscalDay.reports[0]?.status).toBe('FAILED');
   });
+
+  it('allows an explicit terminal intervention after a safe report entered retrying', () => {
+    const fiscalDay = day();
+    const report = fiscalDay.requestReport({
+      id: 'report-x', type: 'X', idempotencyKey: 'x-key', requestFingerprint: 'x-fp',
+      actorId: 'user-001', occurredAt: at(9), eventId: 'event-002'
+    });
+    fiscalDay.startReport({
+      reportId: report.id, actorId: 'user-001', occurredAt: at(9), eventId: 'event-003'
+    });
+    fiscalDay.recordReportError({
+      reportId: report.id, code: 'FISCAL_PRINTER_MEMORY_FULL', retryable: true,
+      evidence: {
+        dispatchState: 'RESULT_RECEIVED', commandEffect: 'NOT_APPLIED',
+        fiscalCommit: 'NOT_COMMITTED', printDelivery: 'INCOMPLETE'
+      },
+      actorId: 'user-001', occurredAt: at(10), eventId: 'event-004'
+    });
+    fiscalDay.retryReport({
+      reportId: report.id, actorId: 'user-001', occurredAt: at(11), eventId: 'event-005'
+    });
+
+    fiscalDay.markReportFailed({
+      reportId: report.id, actorId: 'supervisor-001',
+      occurredAt: at(12), eventId: 'event-006'
+    });
+
+    expect(fiscalDay.reports[0]).toMatchObject({ status: 'FAILED', retryable: false });
+    expect(fiscalDay.reports[0]?.transitions.at(-1)).toMatchObject({
+      from: 'RETRYING', to: 'FAILED', actorId: 'supervisor-001'
+    });
+  });
 });

@@ -209,6 +209,43 @@ describe('DrizzleFiscalDayRepository', () => {
     `).pluck().get()).toBe(1);
   });
 
+  it('rejects rehydration when the persisted day version has no matching history', async () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite);
+    const repository = new DrizzleFiscalDayRepository(handle);
+    const unitOfWork = new SqliteUnitOfWork(handle.sqlite);
+    await unitOfWork.execute(() => repository.save(
+      createDayWithReportInState('PENDING', 1)
+    ));
+    handle.sqlite.prepare(`
+      update fiscal_days set version = version + 1 where id = 'day-001'
+    `).run();
+
+    await expect(repository.findById('day-001')).rejects.toMatchObject({
+      code: 'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID'
+    });
+  });
+
+  it('rejects rehydration when a report snapshot disagrees with its last transition', async () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite);
+    const repository = new DrizzleFiscalDayRepository(handle);
+    const unitOfWork = new SqliteUnitOfWork(handle.sqlite);
+    await unitOfWork.execute(() => repository.save(
+      createDayWithReportInState('PENDING', 1)
+    ));
+    handle.sqlite.prepare(`
+      update fiscal_reports set status = 'PRINTING', attempts = 1
+      where id = 'report-001'
+    `).run();
+
+    await expect(repository.findById('day-001')).rejects.toMatchObject({
+      code: 'DATABASE_FISCAL_TRANSITION_SEQUENCE_INVALID'
+    });
+  });
+
   it('recovers days with non-terminal reports and excludes terminal-only days', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'supermarket-fiscal-report-states-'));
     directories.push(directory);
