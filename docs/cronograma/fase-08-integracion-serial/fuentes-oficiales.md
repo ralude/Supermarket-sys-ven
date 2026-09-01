@@ -23,14 +23,19 @@ que un modelo, firmware o autorización siga vigente.
 - [SerialPort 13.0.0](https://github.com/serialport/node-serialport/releases/tag/v13.0.0):
   versión publicada que exige Node 20+. El sitio de documentación todavía se
   presenta como 12.x; la versión se fija solo después del spike.
-- [Electron 37.10.3](https://releases.electronjs.org/release/v37.10.3),
+- [Electron 44.1.0](https://releases.electronjs.org/release/v44.1.0),
   [calendario](https://releases.electronjs.org/schedule) y
   [política de soporte](https://www.electronjs.org/docs/latest/tutorial/electron-timelines):
-  el runtime actual incluye Node 22, pero Electron 37 está EOL desde
-  2026-01-13. No es una base aceptable para el piloto sin actualización.
+  el runtime actualizado incluye Node 24.19.0 y la rama 44 tiene EOL planificado
+  para 2027-03-02. Electron solo soporta sus tres ramas estables más recientes,
+  por lo que la versión se revalida antes del piloto.
 - [Módulos nativos en Electron](https://www.electronjs.org/docs/latest/tutorial/using-native-node-modules)
   y [ASAR](https://www.electronjs.org/docs/latest/tutorial/asar-archives):
   requisitos a comprobar en el artefacto empaquetado.
+- [Versiones soportadas de Windows 11](https://learn.microsoft.com/es-es/windows/release-health/windows11-release-information)
+  y [ciclo Home/Pro](https://learn.microsoft.com/en-us/lifecycle/products/windows-11-home-and-pro):
+  build 26200 corresponde a Windows 11 25H2; Home/Pro termina actualizaciones el
+  12-10-2027. El host del corte reportó Pro 25H2 x64, build 26200.9168.
 - [Ciclo de Windows 10](https://learn.microsoft.com/es-es/windows/release-health/release-information)
   y [ESU comercial](https://learn.microsoft.com/en-us/windows/whats-new/enable-extended-security-updates):
   Windows 10 general terminó soporte el 2025-10-14; una estación 2026 solo entra
@@ -44,6 +49,13 @@ Conclusión: SerialPort puede abstraer apertura, exclusividad, buffers,
 backpressure, deadlines y desconexión. No confirma que un comando haya sido
 procesado, no define el protocolo fiscal y no ofrece cancelación nativa por el
 solo hecho de que la aplicación deje vencer un deadline.
+
+El corte 8.00 fija `serialport` 13.0.0 exclusivamente como candidato del spike;
+la release oficial lo identifica como la última publicada y elimina Node 16/18.
+La web de API continúa rotulada como 12.x, así que cada firma usada por el spike
+se contrasta además con los tipos y código de la versión instalada. No se agrega
+la dependencia a producción hasta confirmar que el primer perfil autoriza una
+vía serial.
 
 ## Marco venezolano
 

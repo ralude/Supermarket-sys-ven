@@ -77,12 +77,20 @@ seriales.
 
 El servicio fiscal local del nodo es el único owner lógico y se compone en el
 límite operativo del servidor que posee SQLite. El gate correspondiente decide
-si el binding SerialPort o gateway SDK/DLL corre en ese proceso, en Electron
-main cuando allí se aloja el servidor, o en un worker supervisado controlado
-exclusivamente por el servicio. Electron puede iniciar o supervisar el runtime,
-pero renderer y Fastify no abren una segunda instancia. Un deadline no autoriza
-crear otro owner hasta terminar el runtime anterior y verificar que liberó el
-lock o recurso equivalente.
+el runtime físico. El corte 8.00 del 2026-08-31 selecciona un proceso hijo
+supervisado y dedicado por dispositivo lógico para el binding SerialPort o
+gateway SDK/DLL que pueda bloquearse. `apps/server` conserva readiness y
+ownership lógico; el hijo conserva el único handle físico. Electron puede
+iniciar o supervisar el servidor, pero renderer, preload, rutas Fastify y el
+proceso que mantiene SQLite abierto no cargan el binding ni abren otra
+instancia.
+
+Un deadline no autoriza crear otro owner. El supervisor deja de aceptar trabajo,
+intenta el cierre cooperativo, termina el PID anterior si no responde y verifica
+que el recurso quedó libre antes de crear un reemplazo. Si no puede demostrarlo,
+el dispositivo permanece `QUARANTINED`. El lifecycle detallado y las pruebas
+pendientes están en
+[`runtime-nativo-8.00.md`](../../cronograma/fase-08-integracion-serial/runtime-nativo-8.00.md).
 
 ## Consecuencias
 

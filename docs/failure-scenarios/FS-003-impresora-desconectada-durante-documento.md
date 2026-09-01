@@ -4,8 +4,9 @@
 
 **Decidido, pendiente de integración física.** El fake distingue puerto cerrado
 antes de iniciar de un fallo después de avanzar el transcript, y el dominio
-aplica la política fail-closed. No existe todavía `SerialPort` de producción,
-prueba USB por etapa ni exclusión única compuesta para documentos y reportes.
+aplica la política fail-closed. 8.00 seleccionó un proceso hijo supervisado como
+owner físico reiniciable. No existe todavía `SerialPort` de producción, prueba
+USB por etapa ni exclusión única compuesta para documentos y reportes.
 
 ## Riesgo
 
@@ -18,7 +19,8 @@ repetir puede duplicar o corromper la sesión fiscal.
 
 - `FiscalDocument` fue persistido en `PRINTING` antes de I/O.
 - El contenido quedó sellado y no hay una transacción SQLite abierta.
-- El servicio fiscal local es el owner lógico previsto del dispositivo.
+- El servicio fiscal local es el owner lógico; un proceso hijo supervisado y
+  dedicado es el único owner físico previsto del binding nativo.
 
 ## Trigger del fallo
 
@@ -66,8 +68,11 @@ single-flight y el bloqueo de startup completo están diseñados, no compuestos.
 
 ## Estrategia de recuperación
 
-- Cerrar o terminar de forma controlada el runtime propietario y verificar que
-  liberó el recurso antes de crear otro owner.
+- Dejar de aceptar trabajo, solicitar cierre cooperativo al proceso hijo y
+  esperar un plazo acotado. Si no termina, finalizar ese PID explícito.
+- Verificar la salida del proceso anterior y que el recurso pueda adquirirse de
+  forma exclusiva antes de crear otro hijo. Si no puede demostrarse, conservar
+  `QUARANTINED` y escalar.
 - Reabrir SQLite, enumerar toda intención fiscal recuperable y entrar en
   `RECOVERY_REQUIRED`.
 - Si una versión anterior dejó la intención como `FAILED` o `RETRYING` con
@@ -95,7 +100,8 @@ con papel incompleto sigue siendo fiscalmente emitido.
 
 ## Componentes involucrados
 
-- Servicio fiscal local y futuro owner del runtime nativo.
+- Servicio fiscal local como owner lógico y proceso hijo supervisado como owner
+  físico del runtime nativo.
 - Transporte SerialPort o gateway específico, según perfil.
 - Adaptador fiscal, `FiscalPrinterPort` y estado del dispositivo.
 - `FiscalDocument`, casos de uso fiscales y repositorio SQLite.

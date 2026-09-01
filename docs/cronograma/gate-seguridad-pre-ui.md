@@ -1,7 +1,8 @@
 # Gate de seguridad antes de UI operativa
 
-- **Estado:** Pendiente
+- **Estado:** En curso (paso de entrada de Fase 9)
 - **Aplica antes de:** Fase 9, sub-fase 9.00
+- **Contexto:** [Replanificación de Fase 8 a Fase 9](./replanificacion-fase-08-a-09.md)
 
 ## Propósito
 

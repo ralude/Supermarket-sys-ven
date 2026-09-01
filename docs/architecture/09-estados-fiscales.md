@@ -173,6 +173,7 @@ La Fase 7 completó el puerto semántico, el fake y la persistencia sin hardware
 real. El gate 8.00 ya cerró la portabilidad segura del harness, la evidencia
 neutral, las migraciones 0010–0012, la consulta recuperable de documentos/reportes y la
 reconciliación fail-closed heredada. Siguen pendientes los campos fiscales
-abiertos, la evidencia formal del primer proveedor, el runtime nativo y la
-reconciliación X/Z; por eso no se agrega SerialPort de producción ni se declara
-ningún perfil soportado todavía.
+abiertos, la evidencia formal del primer proveedor, el spike físico del runtime
+nativo y la reconciliación X/Z. El owner lógico ya quedó en el servicio fiscal y
+el binding se aisló por decisión en un proceso hijo supervisado; aun así no se
+agrega SerialPort de producción ni se declara ningún perfil soportado todavía.

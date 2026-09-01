@@ -1,13 +1,17 @@
 # Fase 8: Integración serial fiscal
 
-- **Estado:** En curso (planificada; gate 8.00 pendiente)
+- **Estado:** Suspendida por dependencia externa (no completada)
 - **Índice:** [Cronograma](../README.md)
+- **Replanificación:** [Suspensión de Fase 8 y avance a Fase 9](../replanificacion-fase-08-a-09.md)
 - **Decisión relacionada:** [ADR-0010](../../architecture/adr/0010-transporte-serial-y-protocolos-fiscales.md)
 - **Retrospectiva de entrada:** [Fase 7](../fase-07-driver-fiscal-fake/retrospectiva.md)
 - **Fuentes revisadas:** [Registro de fuentes primarias, de fabricante y técnicas](./fuentes-oficiales.md)
 - **Matriz:** [Perfiles candidatos y bloqueos](./matriz-compatibilidad.md)
 - **Gap contractual:** [Campos y decisiones antes del encoder](./gap-contrato-fiscal.md)
 - **Arranque fiscal:** [Diseño de barrido y bloqueo](./orquestador-arranque-fiscal.md)
+- **Plan de cierre 8.00:** [Corte interno y bloqueos](./plan-cierre-8.00.md)
+- **Runtime nativo:** [Owner, aislamiento y hard recovery](./runtime-nativo-8.00.md)
+- **Exclusión fiscal:** [Puerta única y casos de concurrencia](./exclusion-dispositivo-fiscal.md)
 
 ## Propósito
 
@@ -22,6 +26,15 @@ sea serial; un SDK, DLL u otro transporte autorizado conserva un gateway nativo
 aislado y no se fuerza a fingir SerialPort. El framing, comandos, checksums,
 estados, capacidades y reglas de recuperación pertenecen a un adaptador
 versionado por proveedor, familia, modelo y firmware.
+
+## Suspensión vigente
+
+Desde el 2026-09-01 la fase está suspendida porque no se dispone del hardware
+fiscal oficial, el protocolo/manual vigente del fabricante ni el laboratorio
+necesario. Se conservan las tareas cerradas y abiertas de 8.00, pero no se
+inicia 8.01 ni se declara soporte real hasta satisfacer el gate. La Fase 9
+avanza únicamente con el driver fake y las restricciones de simulación de la
+[decisión de replanificación](../replanificacion-fase-08-a-09.md).
 
 ## Alcance de la fase
 

@@ -2,6 +2,8 @@
 
 - **Estado:** Pendiente
 - **Aplica después de:** MVP técnico funcional
+- **Bloqueo vigente:** la Fase 8 está suspendida y debe reanudarse y completarse
+  antes de cerrar este gate; el modo fiscal simulado no habilita una tienda.
 
 ## Propósito
 

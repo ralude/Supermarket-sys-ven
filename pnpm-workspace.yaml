@@ -11,3 +11,6 @@ allowBuilds:
   better-sqlite3: true
   electron: true
   esbuild: true
+minimumReleaseAgeExclude:
+  # Excepcion exacta revisada para adoptar la rama Electron soportada del corte.
+  - electron@44.1.0

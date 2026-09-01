@@ -1,6 +1,6 @@
 # Fase 11: Seguridad
 
-- **Estado:** Pendiente
+- **Estado:** Pendiente (corte mínimo 11.01–11.03 adelantado en curso)
 - **Indice:** [Cronograma](../README.md)
 
 ## Proposito

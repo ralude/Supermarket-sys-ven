@@ -11,8 +11,9 @@ Incluye:
 - catálogo, moneda, ventas, caja e inventario básico;
 - persistencia local por nodo;
 - historial append-only, outbox, auditoría e idempotencia;
-- impresora fiscal fake, pruebas de contrato y dos perfiles reales calificados
-  por la Fase 8, sin prometer compatibilidad fuera de su matriz;
+- impresora fiscal fake y pruebas de contrato; durante la suspensión aprobada de
+  Fase 8, el MVP técnico se demuestra en modo fiscal simulado y no declara
+  perfiles reales ni compatibilidad fiscal;
 - UI para los flujos principales;
 - prueba de sincronización entre una terminal autónoma y un nodo coordinador.
 
@@ -72,4 +73,9 @@ Estas capacidades no forman parte implícita del MVP. Cada una debe incorporarse
 
 ## Regla de avance
 
-Completar las fases 0 a 12 demuestra el MVP técnico. El paso a piloto o producción depende además de sus gates operativos; no se deduce únicamente de que las funcionalidades estén implementadas.
+Con la [replanificación aprobada](../cronograma/replanificacion-fase-08-a-09.md),
+completar las fases 0–7 y 9–12 demuestra el MVP técnico únicamente en modo
+fiscal simulado. La Fase 8 sigue siendo obligatoria para habilitar el piloto:
+debe reanudarse y completarse con sus dos perfiles exactos antes de cerrar el
+gate operativo. El paso a piloto o producción depende además de los demás
+gates; no se deduce únicamente de que las funcionalidades estén implementadas.

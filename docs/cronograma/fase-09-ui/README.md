@@ -1,7 +1,8 @@
 # Fase 9: UI
 
-- **Estado:** Pendiente
+- **Estado:** En curso (gate de seguridad pre-UI)
 - **Indice:** [Cronograma](../README.md)
+- **Replanificacion:** [Suspension de Fase 8 y avance a Fase 9](../replanificacion-fase-08-a-09.md)
 
 ## Proposito
 
@@ -23,6 +24,18 @@ Construir la interfaz React y su integracion con el negocio a traves de HTTP.
 El renderer no accede directamente a Node.js, SQLite, serial ports ni secretos.
 
 Antes de 9.00 debe completarse el [gate de seguridad antes de UI operativa](../gate-seguridad-pre-ui.md). Las pantallas no crean endpoints ad hoc; consumen los contratos publicados en 9.00.
+
+Mientras la Fase 8 permanezca suspendida, la composición usa exclusivamente
+`FiscalPrinterFake`; toda capacidad fiscal visible se rotula como simulación y
+ninguna pantalla declara emisión fiscal real, compatibilidad de hardware ni
+habilitación para piloto. No se incorporan SerialPort, protocolos o SDK de
+proveedor como parte de la UI.
+
+## Orden de entrada
+
+1. Completar el corte mínimo de 11.01–11.03 del gate de seguridad pre-UI.
+2. Ejecutar 9.00 y publicar la API HTTP autenticada.
+3. Continuar 9.01–9.07 en el orden documentado.
 
 ## Criterio de salida
 

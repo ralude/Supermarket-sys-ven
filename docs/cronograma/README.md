@@ -14,14 +14,15 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 5 | Caja operativa | ~~Completada~~ |
 | 6 | Inventario operativo | ~~Completada~~ |
 | 7 | Driver fiscal fake | ~~Completada~~ |
-| 8 | Integracion serial | En curso |
-| 9 | UI | Pendiente |
+| 8 | Integracion serial | Suspendida por dependencia externa |
+| 9 | UI | En curso |
 | 10 | Sincronizacion | Pendiente |
-| 11 | Seguridad | Pendiente |
+| 11 | Seguridad | Pendiente (corte minimo pre-UI adelantado) |
 | 12 | Optimizacion | Pendiente |
 
-**Fase actual:** Fase 8 - Integracion serial
-**Sub-fase actual:** 8.00 - Gate de evidencia, contrato y proveedor
+**Fase actual:** Fase 9 - UI
+**Paso de entrada actual:** Gate de seguridad pre-UI (corte minimo de
+11.01–11.03), obligatorio antes de 9.00
 
 ## Fases
 
@@ -71,7 +72,18 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 - El corte interno de 8.00 del 2026-08-31 separa retry de terminalidad,
   persiste evidencia fiscal en cuatro ejes y añade las migraciones 0010–0012
   con recuperación determinista e integridad fail-closed. Esto no cierra el
-  gate: siguen pendientes fabricante, protocolo, registro, runtime y equipo.
+  gate: siguen pendientes fabricante, protocolo, registro, spike nativo y equipo.
+- El segundo corte interno de 8.00 del 2026-08-31 actualiza Electron a 44.1.0,
+  fija SerialPort 13.0.0 solo como candidato del spike y selecciona un proceso
+  hijo supervisado como owner físico del binding. El gate sigue pendiente:
+  faltan evidencia del fabricante, registro, decisiones del gap, laboratorio y
+  pruebas nativas/HIL; ninguna integración fiscal real queda declarada.
+- El 2026-09-01 se aprobó la
+  [suspensión de Fase 8 y el avance a Fase 9](./replanificacion-fase-08-a-09.md)
+  porque no están disponibles el hardware fiscal oficial, el protocolo/manual
+  del fabricante ni el laboratorio requerido. La Fase 8 no se considera
+  completada: la UI avanza con `FiscalPrinterFake` identificado como simulación
+  y el piloto continúa bloqueado hasta reanudar y cerrar los dos perfiles.
 - La planificacion regulatoria de Fase 8 reconoce que SNAT/2026/00084 derogo la SNAT/2024/000121 el 2026-08-12. La autorizacion por modelo y el registro del desarrollador ante el fabricante de SNAT/2018/0141 se verifican nuevamente antes del piloto.
 - La Fase 1 se completó con Electron, React, Fastify, SQLite, Drizzle y ESLint instalados y verificados mediante smoke tests.
 - ADR-0008 establece terminales POS autonomas con Fastify y SQLite local; el nodo coordinador sincroniza eventos y datos de referencia.
@@ -81,6 +93,7 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 
 ## Documentos transversales
 
+- [Replanificación de Fase 8 a Fase 9](./replanificacion-fase-08-a-09.md)
 - [Estrategia de testing](./testing.md)
 - [CI/CD local](./ci-cd.md)
 - [Hito de cierre arquitectonico](./hito-cierre-arquitectonico.md)

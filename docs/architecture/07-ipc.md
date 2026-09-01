@@ -37,6 +37,13 @@ La UI distingue conectividad y sincronización, pero los componentes no deciden 
 
 El IPC puede transportar comandos a un adaptador local de impresora fiscal, báscula, scanner o impresora térmica. El dominio solo conoce puertos, no canales IPC ni nombres de dispositivos.
 
+Para la integración fiscal seleccionada en el corte 8.00, `apps/server`
+conserva el ownership lógico y supervisa un proceso hijo dedicado que posee el
+binding o gateway nativo. Electron puede supervisar el servidor, pero renderer,
+preload, handlers IPC y rutas Fastify no abren el dispositivo. Terminar ese
+proceso hijo es el mecanismo previsto de hard recovery; un reemplazo solo nace
+después de verificar la salida del anterior y la liberación del recurso.
+
 ## Contratos
 
 Los handlers deben usar envelopes tipados:
