@@ -1,7 +1,8 @@
 # Plan de ejecución 9B.03: Proveedores
 
 - **Sub-fase:** [9B.03 Proveedores](./9b.03-proveedores.md)
-- **Estado del plan:** En ejecución; ADR-0019 aceptado para el corte 9B.03
+- **Estado del plan:** Cumplido; ADR-0019 aceptado con las reglas fiscales, documentales y
+  de ciclo de vida aprobadas el 2026-09-04
 - **Prerrequisito:** [9B.02 Datos maestros seleccionables](./9b.02-datos-maestros-seleccionables.md)
 - **Decisión arquitectónica:** [ADR-0019](../../architecture/adr/0019-proveedores-y-recepciones-de-compra.md)
 - **Disciplina de implementación:** Outside-in TDD y Ponytail `full`

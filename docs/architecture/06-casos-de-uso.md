@@ -106,7 +106,9 @@ ajustes autorizados y consultas de kardex se implementan en la Fase 6.
 Desde 9B.03, los comandos autorizan `supplier.create`, `supplier.update` o
 `supplier.tax_identity.correct`; las lecturas exigen sesión verificada. La
 identidad fiscal se normaliza en dominio y su unicidad se confirma en la misma
-transacción. La recepción de inventario carga el proveedor mediante puerto y
+transacción. El tipo fiscal lo determina el país (`RIF` en Venezuela, `TAX_ID`
+en el resto) y el dominio rechaza cualquier otra combinación; la dirección
+fiscal es opcional pero solo se acepta completa. La recepción de inventario carga el proveedor mediante puerto y
 solo acepta estado `ACTIVE`. `PurchaseReceipt` y su finalización completa se
 incorporan con el costo en 9B.04, como fija ADR-0019.
 

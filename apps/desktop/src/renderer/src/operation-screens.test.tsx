@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DesktopApi, OperationApi } from './api-client.js';
 import {
   SalesScreen, CashScreen, CatalogScreen, InventoryScreen, ReportsScreen, SuppliersScreen,
-  canManageSuppliers, filterSuppliers, money, saleCompletionBlocker, supplierUpdatePayload,
-  toSupplierForm
+  canManageSuppliers, filterSuppliers, money, saleCompletionBlocker, supplierTaxTypeFor,
+  supplierUpdatePayload, toFiscalAddress, toSupplierForm
 } from './operation-screens.js';
 import type { SaleResponse, SupplierResponse } from '@supermarket/shared';
 
@@ -103,10 +103,29 @@ describe('operation screens', () => {
     expect(supplierUpdatePayload(current, { ...form, tradeName: '', reason: 'Retiro' }))
       .toEqual({ tradeName: null, reason: 'Retiro' });
     expect(supplierUpdatePayload(current, {
-      ...form, legalName: 'Distribuidora Andina', fiscalAddress: ' Av. Bolívar ', reason: 'Mudanza'
+      ...form, legalName: 'Distribuidora Andina', addressLine: ' Av. Bolívar ', reason: 'Mudanza'
     })).toEqual({
-      legalName: 'Distribuidora Andina', fiscalAddress: 'Av. Bolívar', reason: 'Mudanza'
+      legalName: 'Distribuidora Andina',
+      fiscalAddress: { countryCode: 'VE', addressLine: 'Av. Bolívar' },
+      reason: 'Mudanza'
     });
+  });
+
+  it('sends the fiscal address complete or not at all', () => {
+    const located = { ...supplier(), fiscalAddress: { countryCode: 'VE', addressLine: 'Caracas' } };
+    const form = toSupplierForm(located);
+
+    expect(toFiscalAddress({ ...form, addressLine: '  ' })).toBeNull();
+    expect(toFiscalAddress({ ...form, addressCountry: '' })).toBeNull();
+    expect(supplierUpdatePayload(located, { ...form, addressLine: '', reason: 'Sin sede' }))
+      .toEqual({ fiscalAddress: null, reason: 'Sin sede' });
+    expect(supplierUpdatePayload(located, { ...form, reason: 'Sin cambios' })).toBeNull();
+  });
+
+  it('derives the tax identity type from the country instead of letting it be typed', () => {
+    expect(supplierTaxTypeFor('ve')).toBe('RIF');
+    expect(supplierTaxTypeFor(' co ')).toBe('TAX_ID');
+    expect(supplierTaxTypeFor('')).toBe('TAX_ID');
   });
 
   it('hides the privileged tax correction from a supplier editor', () => {

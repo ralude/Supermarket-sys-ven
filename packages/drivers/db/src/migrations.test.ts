@@ -49,7 +49,8 @@ describe('database migrations', () => {
       expect.objectContaining({ version: 12, name: 'fiscal_recovery_integrity' }),
       expect.objectContaining({ version: 13, name: 'identity_security' }),
       expect.objectContaining({ version: 14, name: 'operational_policies' }),
-      expect.objectContaining({ version: 15, name: 'suppliers' })
+      expect.objectContaining({ version: 15, name: 'suppliers' }),
+      expect.objectContaining({ version: 16, name: 'supplier_fiscal_address' })
     ]);
 
     const tables = handle.sqlite.prepare(
@@ -100,6 +101,9 @@ describe('database migrations', () => {
     ]));
     expect(handle.sqlite.prepare("pragma table_info('sales')").all())
       .toEqual(expect.arrayContaining([expect.objectContaining({ name: 'shift_id', notnull: 1 })]));
+    expect(handle.sqlite.prepare("pragma table_info('suppliers')").all()
+      .map((column) => (column as { name: string }).name))
+      .toEqual(expect.arrayContaining(['fiscal_address_country', 'fiscal_address_line']));
     expect(handle.sqlite.prepare("pragma table_info('cash_movements')").all())
       .toEqual(expect.arrayContaining([
         expect.objectContaining({ name: 'source_id' }),
@@ -598,7 +602,7 @@ describe('database migrations', () => {
       );
     `);
 
-    expect(applyMigrations(handle.sqlite)).toEqual([10, 11, 12, 13, 14, 15]);
+    expect(applyMigrations(handle.sqlite)).toEqual([10, 11, 12, 13, 14, 15, 16]);
     expect(handle.sqlite.prepare(`
       select last_dispatch_state as dispatchState,
         last_command_effect as commandEffect,
@@ -885,5 +889,35 @@ describe('database migrations', () => {
       update fiscal_report_transitions set error_code = null
       where event_id = 'legacy-report-event'
     `).run()).toThrowError('fiscal report transitions are append-only');
+  });
+
+  it('moves the free-text fiscal address to country and line without losing history', () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite, migrations.filter(({ version }) => version <= 15));
+    handle.sqlite.exec(`
+      insert into suppliers (
+        id, code, legal_name, trade_name, fiscal_address, tax_country, tax_type,
+        tax_value, tax_normalized_value, status, created_at, updated_at, version
+      ) values
+        ('legacy-with-address', 'SUP-000001', 'Distribuidora Uno', null, ' Av. Bolívar ',
+          'VE', 'RIF', 'J-12345678-9', 'J123456789', 'ACTIVE', 1, 1, 1),
+        ('legacy-without-address', 'SUP-000002', 'Distribuidora Dos', null, null,
+          'CO', 'TAX_ID', '900123456', '900123456', 'INACTIVE', 1, 1, 1);
+    `);
+
+    expect(applyMigrations(handle.sqlite)).toEqual([16]);
+
+    expect(handle.sqlite.prepare(`
+      select id, fiscal_address_country as country, fiscal_address_line as line
+      from suppliers order by code
+    `).all()).toEqual([
+      { id: 'legacy-with-address', country: 'VE', line: 'Av. Bolívar' },
+      { id: 'legacy-without-address', country: null, line: null }
+    ]);
+    expect(() => handle.sqlite.prepare(`
+      update suppliers set fiscal_address_line = 'Av. Urdaneta'
+      where id = 'legacy-without-address'
+    `).run()).toThrowError('supplier fiscal address requires country and line');
   });
 });

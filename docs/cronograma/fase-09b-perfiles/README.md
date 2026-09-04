@@ -12,9 +12,12 @@ capacidades de negocio que esos perfiles necesitan y que hoy no existen.
 
 La Fase 9 entrego una pantalla por modulo tecnico. Esta fase entrega una vista por
 trabajo real: cada operador ve lo que su rol autoriza y nada mas, y las acciones que
-faltaban (devoluciones, proveedores, conteos, transferencias, clientes, usuarios,
-configuracion y KPIs) dejan de ser una brecha declarada para convertirse en negocio
-implementado.
+faltaban (devoluciones, proveedores, conteos, transferencias, clientes, configuracion
+y KPIs) dejan de ser una brecha declarada para convertirse en negocio implementado.
+
+La creacion de operadores y roles no forma parte de esta fase: pertenece a
+[11.02](../fase-11-seguridad/11.02-roles-permisos.md). Esta fase consume los permisos que la
+sesion declara, no los administra.
 
 Esta fase no es de rendimiento. La Fase 12 conserva su alcance de optimizacion medida.
 
@@ -28,13 +31,14 @@ Esta fase no es de rendimiento. La Fase 12 conserva su alcance de optimizacion m
 
 ### Capacidades de negocio
 
-- [9B.03 Proveedores](./9b.03-proveedores.md)
+- [~~9B.03 Proveedores~~](./9b.03-proveedores.md)
 - [9B.04 Costo de compra y margen](./9b.04-costo-y-margen.md)
 - [9B.05 Clientes e identificacion fiscal](./9b.05-clientes.md)
 - [9B.06 Devoluciones y notas de credito](./9b.06-devoluciones.md)
 - [9B.07 Conteos fisicos](./9b.07-conteos-fisicos.md)
 - [9B.08 Transferencias de existencia](./9b.08-transferencias.md)
-- [9B.09 Usuarios, roles y permisos](./9b.09-usuarios-y-roles.md)
+- [9B.09 Usuarios, roles y permisos](./9b.09-usuarios-y-roles.md) — **retirada**, trasladada a
+  [11.02](../fase-11-seguridad/11.02-roles-permisos.md)
 - [9B.10 Configuracion operativa](./9b.10-configuracion-operativa.md)
 - [9B.11 Sucursales y dispositivos](./9b.11-sucursales-y-dispositivos.md)
 - [9B.12 Arqueos, reapertura y autorizaciones](./9b.12-arqueos-y-autorizaciones.md)
@@ -64,12 +68,44 @@ defaults ni se deducen del codigo existente:
 La sub-fase 9B.00 produce ADR-0015 con la decision de permisos efectivos en la sesion; esa
 decision es de ingenieria y no depende del negocio.
 
-9B.03 ya tiene reglas de proveedor aprobadas y su planificación reveló una contradicción
-entre el snapshot de una recepción `COMPLETED` —que debe incluir costos— y la prohibición de
-adelantar el costeo de 9B.04. También faltan las reglas fiscales por país/tipo y la semántica
-de corrección de recepciones. [ADR-0019](../../architecture/adr/0019-proveedores-y-recepciones-de-compra.md)
-acepta separar el maestro de proveedor en 9B.03 del documento completo de 9B.04; los puntos
-documentales pendientes permanecen enumerados en el [plan](./plan-9b.03-proveedores.md).
+9B.03 quedó completada el 2026-09-04.
+[ADR-0019](../../architecture/adr/0019-proveedores-y-recepciones-de-compra.md) separó el
+maestro de proveedor, implementado en 9B.03, del documento completo de 9B.04, y recogió las
+reglas fiscales, documentales y de ciclo de vida que el negocio aprobó ese mismo día. Las
+que pertenecen al maestro —identidad fiscal VE/RIF sin checksum, identidad genérica `TAX_ID`
+fuera de Venezuela, dirección fiscal estructurada y semántica diferenciada de estados— ya
+están implementadas. Las que pertenecen a la recepción —documento de origen, ciclo
+`DRAFT -> COMPLETED -> REVERSED` y reverso compensatorio— están decididas y esperan a 9B.04,
+que sigue bloqueada por ADR-0016.
+
+## Alcance devuelto a su fase duena — 2026-09-04
+
+La Fase 9B se planifico adelantando alcance de la Fase 11. Esa duplicacion se corrigio: la
+administracion de identidad vuelve a 11.02 y la Fase 9B queda con dieciocho sub-fases activas.
+La correccion aplica la salida que la propia
+[replanificacion](../replanificacion-fase-09b.md) previo para recortar el alcance de la fase.
+
+| Alcance | Estaba en | Queda en | Motivo |
+| --- | --- | --- | --- |
+| Alta de usuarios, creacion de roles y asignacion de permisos | 9B.09 | [11.02](../fase-11-seguridad/11.02-roles-permisos.md) | Identidad y autorizacion son de la Fase 11; mantenerlo aqui dejaba dos criterios de salida sobre la misma capacidad |
+
+Lo que **no** se movio, porque delimita en vez de duplicar:
+
+- **9B.08 Transferencias** se limita a almacenes de un mismo nodo y declara que la
+  transferencia entre nodos es Fase 10. No hay sub-fase de Fase 10 que la cubra hoy.
+- **9B.11 Sucursales y dispositivos** modela la sucursal como dato maestro y deja la autoridad
+  de escritura multi-nodo a Fase 10. Ninguna sub-fase 10.01-10.04 planifica ese dato maestro.
+- **9B.12 Arqueos y autorizaciones** define capacidades de caja con sus permisos; 11.02 prueba
+  que la autorizacion se aplique, no publica la reapertura de turno.
+- **9B.13 KPIs** publica lecturas de negocio. La Fase 12 optimiza con medicion lo que ya
+  existe; no planifica ninguna lectura.
+- **9B.00 Permisos efectivos en la sesion** ya esta completada y su decision vive en ADR-0015.
+  No se reabre.
+
+Consecuencia declarada: mientras 11.02 no se implemente, el unico rol disponible sigue siendo
+el administrador que provisiona el bootstrap por CLI. Los perfiles 9B.14-9B.18 derivan sus
+vistas de los `permissionCodes` de la sesion —mecanismo que ya funciona— y se validan con
+sesiones provisionadas por ese medio, no creando operadores desde la interfaz.
 
 ## Restriccion
 
@@ -99,8 +135,8 @@ validacion, estados de carga/error, accesibilidad basica ni el rotulo `SIMULACIO
 1. Ejecutar 9B.00, 9B.01 y 9B.02 en ese orden. Son la fundacion: sin permisos efectivos en
    la sesion no hay navegacion por perfil, y sin datos maestros seleccionables toda pantalla
    nueva repetiria el defecto de pedir identificadores escritos a mano.
-2. Continuar con las capacidades de negocio 9B.03 a 9B.13. Las que dependen de una decision
-   pendiente no se inician hasta que su ADR este aceptado.
+2. Continuar con las capacidades de negocio 9B.03 a 9B.13, salteando la retirada 9B.09. Las
+   que dependen de una decision pendiente no se inician hasta que su ADR este aceptado.
 3. Ensamblar los perfiles 9B.14 a 9B.18 al final, cuando las capacidades que agrupan ya
    existan.
 
@@ -112,10 +148,10 @@ Las tres sub-fases de fundacion ya tienen su especificacion escrita y sus criter
 aceptacion aprobados antes de implementar, como exige la disciplina spec-driven de AGENTS.md:
 [plan 9B.00](./plan-9b.00-permisos-en-sesion.md),
 [plan 9B.01](./plan-9b.01-reestructuracion-renderer.md) y
-[plan 9B.02](./plan-9b.02-datos-maestros-seleccionables.md). 9B.03 tiene un
-[plan en ejecución](./plan-9b.03-proveedores.md) y ADR-0019 aceptado para su corte. Las demás
-se escriben cuando su sub-fase entre en ejecución, y las
-bloqueadas por una decisión de negocio no abren plan hasta que su ADR esté aceptado.
+[plan 9B.02](./plan-9b.02-datos-maestros-seleccionables.md). 9B.03 cumplió su
+[plan](./plan-9b.03-proveedores.md) con ADR-0019 aceptado. Las demás se escriben cuando su
+sub-fase entre en ejecución, y las bloqueadas por una decisión de negocio no abren plan
+hasta que su ADR esté aceptado.
 
 ## Criterio de salida
 

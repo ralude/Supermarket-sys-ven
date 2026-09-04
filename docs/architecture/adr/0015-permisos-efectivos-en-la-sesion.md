@@ -93,4 +93,6 @@ ocultar la pantalla completa sería incorrecto para esas — un cajero sin
   el renderer.
 - Mientras exista un único rol sembrado (`ADMIN`, con los 21 permisos), este
   mecanismo no cambia lo que ningún operador ve; su efecto se vuelve visible
-  recién cuando 9B.09 permita crear roles con permisos distintos.
+  recién cuando 11.02 permita crear roles con permisos distintos. Esa
+  administración de identidad estuvo planificada como 9B.09 y volvió a la Fase
+  11 el 2026-09-04; la decisión de este ADR no cambia por ello.

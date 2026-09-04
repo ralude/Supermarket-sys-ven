@@ -5,6 +5,7 @@ import {
   createSupplierContract,
   isPermissionGranted,
   updateSupplierContract,
+  type FiscalAddressPayload,
   type SupplierResponse,
   type SupplierStatusResponse,
   type UpdateSupplierRequest
@@ -33,21 +34,55 @@ export const SUPPLIER_STATUS_LABELS: Record<SupplierStatusResponse, string> = {
   INACTIVE: 'Inactivo'
 };
 
+export const SUPPLIER_STATUS_HINTS: Record<SupplierStatusResponse, string> = {
+  ACTIVE: 'Opera con normalidad y admite nuevas operaciones.',
+  BLOCKED: 'Vigente pero suspendido: no admite operaciones nuevas y puede reactivarse.',
+  INACTIVE: 'Relación comercial retirada: queda fuera de los selectores operativos.'
+};
+
+/**
+ * Tipo fiscal que Cullen v1 admite por país: `RIF` en Venezuela y la identidad
+ * genérica `TAX_ID` en el resto. El operador no lo escribe; el dominio vuelve a
+ * exigirlo en el servidor.
+ */
+export const supplierTaxTypeFor = (country: string): string =>
+  (country.trim().toUpperCase() === 'VE' ? 'RIF' : 'TAX_ID');
+
 export type SupplierForm = {
   readonly legalName: string;
   readonly tradeName: string;
-  readonly fiscalAddress: string;
+  readonly addressCountry: string;
+  readonly addressLine: string;
   readonly reason: string;
 };
 
 export const toSupplierForm = (supplier: SupplierResponse): SupplierForm => ({
   legalName: supplier.legalName,
   tradeName: supplier.tradeName ?? '',
-  fiscalAddress: supplier.fiscalAddress ?? '',
+  addressCountry: supplier.fiscalAddress?.countryCode ?? supplier.taxIdentity.country,
+  addressLine: supplier.fiscalAddress?.addressLine ?? '',
   reason: ''
 });
 
 const optional = (value: string): string | null => (value.trim() === '' ? null : value.trim());
+
+/**
+ * La dirección fiscal viaja completa o no viaja: país y línea son inseparables.
+ * Una línea vacía la retira; una línea escrita sin país no llega al servidor
+ * como media dirección.
+ */
+export const toFiscalAddress = (form: SupplierForm): FiscalAddressPayload | null => {
+  const addressLine = form.addressLine.trim();
+  const countryCode = form.addressCountry.trim().toUpperCase();
+  return addressLine === '' || countryCode === '' ? null : { countryCode, addressLine };
+};
+
+const sameAddress = (
+  left: FiscalAddressPayload | null,
+  right: FiscalAddressPayload | null
+): boolean => (left === null || right === null
+  ? left === right
+  : left.countryCode === right.countryCode && left.addressLine === right.addressLine);
 
 /**
  * Construye la actualización con los campos que realmente cambiaron. El
@@ -60,19 +95,19 @@ export const supplierUpdatePayload = (
 ): UpdateSupplierRequest | null => {
   const legalName = form.legalName.trim();
   const tradeName = optional(form.tradeName);
-  const fiscalAddress = optional(form.fiscalAddress);
+  const fiscalAddress = toFiscalAddress(form);
   const changes = {
     ...(legalName !== supplier.legalName && legalName !== '' ? { legalName } : {}),
     ...(tradeName !== supplier.tradeName ? { tradeName } : {}),
-    ...(fiscalAddress !== supplier.fiscalAddress ? { fiscalAddress } : {})
+    ...(sameAddress(fiscalAddress, supplier.fiscalAddress) ? {} : { fiscalAddress })
   };
   if (Object.keys(changes).length === 0) return null;
   return { ...changes, reason: form.reason.trim() };
 };
 
 const emptyCreateForm = {
-  legalName: '', tradeName: '', fiscalAddress: '',
-  country: 'VE', type: 'RIF', value: '', reason: ''
+  legalName: '', tradeName: '', addressCountry: 'VE', addressLine: '',
+  country: 'VE', value: '', reason: ''
 };
 
 export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JSX.Element => {
@@ -80,11 +115,10 @@ export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JS
   const [statusFilter, setStatusFilter] = useState<'' | SupplierStatusResponse>('');
   const [selected, setSelected] = useState<SupplierResponse | null>(null);
   const [form, setForm] = useState<SupplierForm>({
-    legalName: '', tradeName: '', fiscalAddress: '', reason: ''
+    legalName: '', tradeName: '', addressCountry: 'VE', addressLine: '', reason: ''
   });
   const [status, setStatus] = useState<SupplierStatusResponse>('ACTIVE');
   const [statusReason, setStatusReason] = useState('');
-  const [taxType, setTaxType] = useState('RIF');
   const [taxValue, setTaxValue] = useState('');
   const [taxCountry, setTaxCountry] = useState('VE');
   const [taxReason, setTaxReason] = useState('');
@@ -120,7 +154,6 @@ export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JS
     setStatus(supplier.status);
     setStatusReason('');
     setTaxCountry(supplier.taxIdentity.country);
-    setTaxType(supplier.taxIdentity.type);
     setTaxValue(supplier.taxIdentity.value);
     setTaxReason('');
   };
@@ -142,14 +175,15 @@ export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JS
 
   const create = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+    const fiscalAddress = toFiscalAddress(createForm);
     await run(async () => {
       const created = await api.createSupplier({
         legalName: createForm.legalName.trim(),
         ...(createForm.tradeName.trim() ? { tradeName: createForm.tradeName.trim() } : {}),
-        ...(createForm.fiscalAddress.trim() ? { fiscalAddress: createForm.fiscalAddress.trim() } : {}),
+        ...(fiscalAddress ? { fiscalAddress } : {}),
         taxIdentity: {
           country: createForm.country.trim().toUpperCase(),
-          type: createForm.type.trim().toUpperCase(),
+          type: supplierTaxTypeFor(createForm.country),
           value: createForm.value.trim()
         },
         reason: createForm.reason.trim()
@@ -193,7 +227,7 @@ export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JS
       () => api.correctSupplierTaxIdentity(selected.id, {
         taxIdentity: {
           country: taxCountry.trim().toUpperCase(),
-          type: taxType.trim().toUpperCase(),
+          type: supplierTaxTypeFor(taxCountry),
           value: taxValue.trim()
         },
         reason: taxReason.trim()
@@ -247,16 +281,22 @@ export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JS
                   onChange={(event) => setCreateForm({ ...createForm, country: event.target.value.toUpperCase() })} />
               </label>
               <label>Tipo fiscal
-                <input value={createForm.type} required
-                  onChange={(event) => setCreateForm({ ...createForm, type: event.target.value.toUpperCase() })} />
+                <input value={supplierTaxTypeFor(createForm.country)} readOnly
+                  />
               </label>
               <label>Identificación fiscal
                 <input value={createForm.value} placeholder="J-12345678-9" required
                   onChange={(event) => setCreateForm({ ...createForm, value: event.target.value })} />
               </label>
+              <label>País de la dirección
+                <input value={createForm.addressCountry} maxLength={2}
+                  onChange={(event) => setCreateForm({
+                    ...createForm, addressCountry: event.target.value.toUpperCase()
+                  })} />
+              </label>
               <label>Dirección fiscal
-                <input value={createForm.fiscalAddress}
-                  onChange={(event) => setCreateForm({ ...createForm, fiscalAddress: event.target.value })} />
+                <input value={createForm.addressLine} placeholder="Opcional en el maestro"
+                  onChange={(event) => setCreateForm({ ...createForm, addressLine: event.target.value })} />
               </label>
             </div>
             <label>Motivo
@@ -327,9 +367,15 @@ export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JS
                 <input value={form.tradeName}
                   onChange={(event) => setForm({ ...form, tradeName: event.target.value })} />
               </label>
+              <label>País de la dirección
+                <input value={form.addressCountry} maxLength={2}
+                  onChange={(event) => setForm({
+                    ...form, addressCountry: event.target.value.toUpperCase()
+                  })} />
+              </label>
               <label>Dirección fiscal
-                <input value={form.fiscalAddress}
-                  onChange={(event) => setForm({ ...form, fiscalAddress: event.target.value })} />
+                <input value={form.addressLine} placeholder="Vacía retira la dirección"
+                  onChange={(event) => setForm({ ...form, addressLine: event.target.value })} />
               </label>
             </div>
             <label>Motivo
@@ -351,6 +397,7 @@ export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JS
                 <option value="INACTIVE">Inactivo</option>
               </select>
             </label>
+            <p className="muted">{SUPPLIER_STATUS_HINTS[status]}</p>
             <label>Motivo
               <input value={statusReason} required
                 onChange={(event) => setStatusReason(event.target.value)} />
@@ -372,8 +419,7 @@ export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JS
                     onChange={(event) => setTaxCountry(event.target.value.toUpperCase())} />
                 </label>
                 <label>Tipo fiscal
-                  <input value={taxType} required
-                    onChange={(event) => setTaxType(event.target.value.toUpperCase())} />
+                  <input value={supplierTaxTypeFor(taxCountry)} readOnly />
                 </label>
                 <label>Identificación fiscal
                   <input value={taxValue} required onChange={(event) => setTaxValue(event.target.value)} />

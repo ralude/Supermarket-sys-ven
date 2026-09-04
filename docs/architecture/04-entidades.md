@@ -54,8 +54,11 @@ Admite cantidades enteras y fraccionarias con escala definida por unidad de medi
 - `Batch` pertenece a `StockItem`, normaliza su número de lote y conserva un vencimiento UTC opcional sin exponer fechas mutables.
 - `Supplier` conserva un código humano inmutable separado de su identidad fiscal, estado
   `ACTIVE`, `BLOCKED` o `INACTIVE` y timestamps UTC. No se elimina para corregir historia.
+- `FiscalAddress` es un value object de `Supplier` con país ISO 3166-1 alpha-2 y línea de
+  dirección, ambos no vacíos. Es opcional en el maestro y no admite mitades.
 - `PurchaseReceipt` se implementa con costos en 9B.04; su número de documento de origen no
-  sustituye su ID técnico.
+  sustituye su ID técnico. Su documento de origen es `INVOICE` o `DELIVERY_NOTE`, nunca
+  `PURCHASE_ORDER`, y su ciclo de vida es `DRAFT -> COMPLETED -> REVERSED` según ADR-0019.
 
 ## Fases
 

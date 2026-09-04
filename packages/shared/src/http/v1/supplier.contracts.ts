@@ -2,12 +2,22 @@ import { problemDetailsSchema, type HttpContractV1 } from './common.contracts.js
 
 export type SupplierStatusResponse = 'ACTIVE' | 'BLOCKED' | 'INACTIVE';
 
+/**
+ * Dirección fiscal mínima. Es opcional en el maestro y obligatoria antes de
+ * completar una recepción venezolana con factura o guía de despacho, regla que
+ * evalúa la aplicación cuando 9B.04 incorpore `PurchaseReceipt`.
+ */
+export type FiscalAddressPayload = {
+  readonly countryCode: string;
+  readonly addressLine: string;
+};
+
 export type SupplierResponse = {
   readonly id: string;
   readonly code: string;
   readonly legalName: string;
   readonly tradeName: string | null;
-  readonly fiscalAddress: string | null;
+  readonly fiscalAddress: FiscalAddressPayload | null;
   readonly taxIdentity: {
     readonly country: string;
     readonly type: string;
@@ -23,7 +33,7 @@ export type SupplierResponse = {
 export type CreateSupplierRequest = {
   readonly legalName: string;
   readonly tradeName?: string;
-  readonly fiscalAddress?: string;
+  readonly fiscalAddress?: FiscalAddressPayload;
   readonly taxIdentity: { readonly country?: string; readonly type: string; readonly value: string };
   readonly reason: string;
 };
@@ -31,7 +41,7 @@ export type CreateSupplierRequest = {
 export type UpdateSupplierRequest = {
   readonly legalName?: string;
   readonly tradeName?: string | null;
-  readonly fiscalAddress?: string | null;
+  readonly fiscalAddress?: FiscalAddressPayload | null;
   readonly reason: string;
 };
 
@@ -55,6 +65,14 @@ const supplierParams = {
   properties: { supplierId: { type: 'string', minLength: 1, maxLength: 128 } }
 } as const;
 
+const fiscalAddressSchema = {
+  type: 'object', additionalProperties: false, required: ['countryCode', 'addressLine'],
+  properties: {
+    countryCode: { type: 'string', pattern: '^[A-Za-z]{2}$' },
+    addressLine: { type: 'string', minLength: 1, maxLength: 500 }
+  }
+} as const;
+
 const taxIdentitySchema = {
   type: 'object', additionalProperties: false, required: ['type', 'value'],
   properties: {
@@ -72,7 +90,8 @@ const supplierResponseSchema = {
   ],
   properties: {
     id: { type: 'string' }, code: { type: 'string' }, legalName: { type: 'string' },
-    tradeName: { type: ['string', 'null'] }, fiscalAddress: { type: ['string', 'null'] },
+    tradeName: { type: ['string', 'null'] },
+    fiscalAddress: { anyOf: [fiscalAddressSchema, { type: 'null' }] },
     taxIdentity: {
       type: 'object', additionalProperties: false,
       required: ['country', 'type', 'value', 'normalizedValue'],
@@ -104,7 +123,7 @@ export const createSupplierContract = {
       properties: {
         legalName: { type: 'string', minLength: 1, maxLength: 200 },
         tradeName: { type: 'string', maxLength: 200 },
-        fiscalAddress: { type: 'string', maxLength: 500 },
+        fiscalAddress: fiscalAddressSchema,
         taxIdentity: taxIdentitySchema,
         reason: { type: 'string', minLength: 1, maxLength: 500 }
       }
@@ -113,7 +132,8 @@ export const createSupplierContract = {
   },
   errorCodes: [
     'HTTP_VALIDATION_FAILED', 'UNAUTHORIZED', 'FORBIDDEN',
-    'SUPPLIER_LEGAL_NAME_REQUIRED', 'SUPPLIER_TAX_COUNTRY_INVALID',
+    'SUPPLIER_LEGAL_NAME_REQUIRED', 'SUPPLIER_FISCAL_ADDRESS_COUNTRY_INVALID',
+    'SUPPLIER_FISCAL_ADDRESS_LINE_REQUIRED', 'SUPPLIER_TAX_COUNTRY_INVALID',
     'SUPPLIER_TAX_TYPE_INVALID', 'SUPPLIER_TAX_IDENTITY_REQUIRED',
     'SUPPLIER_TAX_IDENTITY_INVALID', 'SUPPLIER_TAX_IDENTITY_CONFLICT',
     'IDEMPOTENCY_KEY_CONFLICT', 'DATABASE_BUSY'
@@ -154,7 +174,7 @@ export const updateSupplierContract = {
       properties: {
         legalName: { type: 'string', minLength: 1, maxLength: 200 },
         tradeName: { type: ['string', 'null'], maxLength: 200 },
-        fiscalAddress: { type: ['string', 'null'], maxLength: 500 },
+        fiscalAddress: { anyOf: [fiscalAddressSchema, { type: 'null' }] },
         reason: { type: 'string', minLength: 1, maxLength: 500 }
       }
     },
@@ -163,6 +183,7 @@ export const updateSupplierContract = {
   errorCodes: [
     'HTTP_VALIDATION_FAILED', 'UNAUTHORIZED', 'FORBIDDEN', 'SUPPLIER_NOT_FOUND',
     'SUPPLIER_LEGAL_NAME_REQUIRED', 'SUPPLIER_UPDATE_REQUIRED',
+    'SUPPLIER_FISCAL_ADDRESS_COUNTRY_INVALID', 'SUPPLIER_FISCAL_ADDRESS_LINE_REQUIRED',
     'IDEMPOTENCY_KEY_CONFLICT', 'DATABASE_BUSY'
   ]
 } as const satisfies HttpContractV1;

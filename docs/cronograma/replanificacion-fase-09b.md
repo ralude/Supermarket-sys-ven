@@ -40,13 +40,41 @@ todavia no cubre el trabajo de cuatro de los cinco perfiles.
 
 ## Alcance adelantado desde otras fases
 
-- **De la Fase 11 (11.02 Roles y permisos):** la sub-fase 9B.09 adelanta la administracion de
+- **De la Fase 11 (11.02 Roles y permisos):** ~~la sub-fase 9B.09 adelanta la administracion de
   identidad, es decir el alta de usuarios, la creacion de roles y la asignacion de permisos
-  desde la interfaz. La 11.02 conserva la auditoria de decisiones de autorizacion y sus
-  pruebas de anulaciones, retiros, ajustes y cambios de precio; la 11.04 y la 11.05 conservan
-  cifrado y hardening de logs sin cambios.
+  desde la interfaz.~~ **Revertido el 2026-09-04**, ver la correccion mas abajo. La 11.02
+  conserva la auditoria de decisiones de autorizacion y sus pruebas de anulaciones, retiros,
+  ajustes y cambios de precio; la 11.04 y la 11.05 conservan cifrado y hardening de logs sin
+  cambios.
 - El corte minimo 11.01-11.03 del gate de seguridad pre-UI ya esta completado y no se
   modifica.
+
+## Correccion del 2026-09-04: la Fase 9B deja de adelantar alcance de la Fase 11
+
+Esta replanificacion previo que una decision documentada posterior pudiera recortar el alcance
+de la Fase 9B. Esa decision se toma aqui.
+
+**Motivo.** Adelantar la administracion de identidad dejaba la misma capacidad planificada en
+dos fases con dos criterios de salida distintos. Una fase de perfiles operativos no debe ser
+tambien la duena de identidad y autorizacion.
+
+**Recorte.** La sub-fase 9B.09 se retira de la Fase 9B y su alcance completo —objetivo,
+contexto, decision pendiente sobre siembra de roles y sus seis tareas— vuelve a
+[11.02 Roles y permisos](./fase-11-seguridad/11.02-roles-permisos.md). El numero 9B.09 no se
+reutiliza y ninguna otra sub-fase se renumera, conforme a la regla 6 del cronograma. La Fase
+9B queda con dieciocho sub-fases activas.
+
+**Revision del resto de la fase.** Se revisaron las demas sub-fases contra las Fases 10, 11 y
+12. Ninguna otra duplica alcance ya planificado: 9B.08 y 9B.11 delimitan explicitamente lo que
+pertenece a Fase 10 sin que exista una sub-fase 10.01-10.04 que lo cubra; 9B.12 publica
+capacidades de caja que 11.02 solo prueba desde la autorizacion; 9B.13 publica lecturas que la
+Fase 12 no planifica, porque esa fase optimiza con medicion lo que ya existe.
+
+**Consecuencia aceptada.** Hasta que 11.02 se implemente, el unico rol disponible es el
+administrador que provisiona el bootstrap por CLI. Los perfiles 9B.14-9B.18 siguen derivando
+sus vistas de los `permissionCodes` que la sesion declara —mecanismo ya entregado por 9B.00 y
+fijado en ADR-0015— y se validan con sesiones provisionadas por ese medio. La Fase 9B no
+publica una pantalla de alta de operadores.
 
 ## Limites de la Fase 9B
 
@@ -66,9 +94,10 @@ todavia no cubre el trabajo de cuatro de los cinco perfiles.
 
 ## Condicion para avanzar a Fase 10
 
-La Fase 10 se retoma desde 10.01 cuando las diecinueve sub-fases de la Fase 9B esten
+La Fase 10 se retoma desde 10.01 cuando las dieciocho sub-fases activas de la Fase 9B esten
 completadas, o cuando una decision documentada posterior recorte el alcance de la Fase 9B y
-declare cuales de sus sub-fases quedan diferidas.
+declare cuales de sus sub-fases quedan diferidas. La correccion del 2026-09-04 ya ejercio esa
+salida al retirar 9B.09.
 
 ## Efecto sobre los niveles de entrega
 

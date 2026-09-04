@@ -31,8 +31,9 @@ export { CashScreen } from './screens/cash.js';
 export { CatalogScreen } from './screens/catalog.js';
 export { filterSuppliers, InventoryScreen } from './screens/inventory.js';
 export {
-  SuppliersScreen, canManageSuppliers, supplierUpdatePayload, toSupplierForm,
-  SUPPLIER_STATUS_LABELS, type SupplierForm
+  SuppliersScreen, canManageSuppliers, supplierTaxTypeFor, supplierUpdatePayload,
+  toFiscalAddress, toSupplierForm, SUPPLIER_STATUS_HINTS, SUPPLIER_STATUS_LABELS,
+  type SupplierForm
 } from './screens/suppliers.js';
 export {
   ReportsScreen, loadOperationalReports, toCsv, toReportQuery, type OperationalReports

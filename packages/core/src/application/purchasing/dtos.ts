@@ -1,11 +1,11 @@
-import type { SupplierStatus } from '../../domain/purchasing/index.js';
+import type { FiscalAddress, SupplierStatus } from '../../domain/purchasing/index.js';
 
 export type SupplierDto = {
   id: string;
   code: string;
   legalName: string;
   tradeName: string | null;
-  fiscalAddress: string | null;
+  fiscalAddress: FiscalAddress | null;
   taxIdentity: {
     country: string;
     type: string;
@@ -21,7 +21,7 @@ export type SupplierDto = {
 export type CreateSupplierInput = {
   legalName: string;
   tradeName?: string;
-  fiscalAddress?: string;
+  fiscalAddress?: FiscalAddress;
   taxIdentity: { country?: string; type: string; value: string };
   reason: string;
 };
@@ -30,7 +30,7 @@ export type UpdateSupplierInput = {
   supplierId: string;
   legalName?: string;
   tradeName?: string | null;
-  fiscalAddress?: string | null;
+  fiscalAddress?: FiscalAddress | null;
   reason: string;
 };
 

@@ -6,7 +6,7 @@ import { ADMIN_PERMISSIONS, createSecurityRuntime, type SecurityRuntime } from '
 const supplier: CreateSupplierRequest = {
   legalName: 'Distribuidora Los Andes, C.A.',
   tradeName: 'Los Andes',
-  fiscalAddress: 'Caracas',
+  fiscalAddress: { countryCode: 'VE', addressLine: 'Caracas' },
   taxIdentity: { country: 've', type: 'rif', value: 'J-12345678-9' },
   reason: 'Alta de proveedor'
 };
@@ -101,6 +101,97 @@ describe('supplier HTTP contracts', () => {
     ]);
     expect(audit.find((entry) => entry.action === 'SUPPLIER_TAX_IDENTITY_CORRECTED'))
       .toMatchObject({ reason: 'Corrección verificada contra documento fiscal' });
+  });
+
+  it('accepts a generic tax identity outside Venezuela and rejects a country-specific type', async () => {
+    const { app, cookie } = await setup();
+    const created = await app.inject({
+      method: 'POST', url: '/api/v1/suppliers',
+      headers: { cookie, 'idempotency-key': 'supplier-create-foreign' },
+      payload: {
+        legalName: 'Importadora Andina S.A.S.',
+        fiscalAddress: { countryCode: 'co', addressLine: 'Bogotá' },
+        taxIdentity: { country: 'co', type: 'TAX_ID', value: ' 900 123 456 ' },
+        reason: 'Proveedor extranjero'
+      }
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      fiscalAddress: { countryCode: 'CO', addressLine: 'Bogotá' },
+      taxIdentity: { country: 'CO', type: 'TAX_ID', normalizedValue: '900123456' }
+    });
+
+    const rejected = await app.inject({
+      method: 'POST', url: '/api/v1/suppliers',
+      headers: { cookie, 'idempotency-key': 'supplier-create-nit' },
+      payload: {
+        legalName: 'Importadora Dos S.A.S.',
+        taxIdentity: { country: 'CO', type: 'NIT', value: '900123457' },
+        reason: 'Proveedor extranjero'
+      }
+    });
+    expect(rejected.statusCode).toBe(400);
+    expect(rejected.json()).toMatchObject({ code: 'SUPPLIER_TAX_TYPE_INVALID' });
+  });
+
+  it('rejects a fiscal address without its country and keeps it optional', async () => {
+    const { app, cookie } = await setup();
+    const halfAddress = await app.inject({
+      method: 'POST', url: '/api/v1/suppliers',
+      headers: { cookie, 'idempotency-key': 'supplier-create-half-address' },
+      payload: {
+        legalName: 'Distribuidora Sin País',
+        fiscalAddress: { addressLine: 'Caracas' },
+        taxIdentity: { type: 'RIF', value: 'J-12345670-1' },
+        reason: 'Alta con dirección incompleta'
+      }
+    });
+    expect(halfAddress.statusCode).toBe(400);
+    expect(halfAddress.json()).toMatchObject({ code: 'HTTP_VALIDATION_FAILED' });
+
+    const withoutAddress = await app.inject({
+      method: 'POST', url: '/api/v1/suppliers',
+      headers: { cookie, 'idempotency-key': 'supplier-create-no-address' },
+      payload: {
+        legalName: 'Distribuidora Sin Dirección',
+        taxIdentity: { type: 'RIF', value: 'J-12345670-1' },
+        reason: 'Alta sin dirección'
+      }
+    });
+    expect(withoutAddress.statusCode).toBe(201);
+    expect(withoutAddress.json()).toMatchObject({ fiscalAddress: null });
+  });
+
+  it('keeps a blocked supplier reactivable and its history readable', async () => {
+    const { app, cookie } = await setup();
+    const created = await app.inject({
+      method: 'POST', url: '/api/v1/suppliers',
+      headers: { cookie, 'idempotency-key': 'supplier-create-lifecycle' }, payload: supplier
+    });
+    const supplierId = created.json<{ id: string }>().id;
+    const blocked = await app.inject({
+      method: 'PUT', url: `/api/v1/suppliers/${supplierId}/status`,
+      headers: { cookie, 'idempotency-key': 'supplier-lifecycle-blocked' },
+      payload: { status: 'BLOCKED', reason: 'Suspensión temporal' }
+    });
+    expect(blocked.statusCode).toBe(200);
+
+    const activeOnly = await app.inject({
+      method: 'GET', url: '/api/v1/suppliers?status=ACTIVE', headers: { cookie }
+    });
+    expect(activeOnly.json()).toEqual([]);
+    const history = await app.inject({
+      method: 'GET', url: `/api/v1/suppliers/${supplierId}`, headers: { cookie }
+    });
+    expect(history.json()).toMatchObject({ status: 'BLOCKED' });
+
+    const reactivated = await app.inject({
+      method: 'PUT', url: `/api/v1/suppliers/${supplierId}/status`,
+      headers: { cookie, 'idempotency-key': 'supplier-lifecycle-active' },
+      payload: { status: 'ACTIVE', reason: 'Suspensión levantada' }
+    });
+    expect(reactivated.statusCode).toBe(200);
+    expect(reactivated.json()).toMatchObject({ status: 'ACTIVE', version: 3 });
   });
 
   it('denies mutations without their permission before persistence', async () => {

@@ -16,23 +16,24 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 7 | Driver fiscal fake | ~~Completada~~ |
 | 8 | Integracion serial | Suspendida por dependencia externa |
 | 9 | UI | ~~Completada~~ |
-| 9B | Perfiles operativos | Pendiente |
+| 9B | Perfiles operativos | En progreso (4 de 18 sub-fases activas completadas) |
 | 10 | Sincronizacion | Pendiente |
 | 11 | Seguridad | Pendiente (corte minimo pre-UI adelantado) |
 | 12 | Optimizacion | Pendiente |
 
 **Fase actual:** Fase 9B - Perfiles operativos y capacidades faltantes
-**Sub-fase actual:** 9B.03 - Proveedores, en progreso. Su
+**Sub-fase actual:** 9B.03 - Proveedores quedó **completada** el 2026-09-04. Su
 [plan](./fase-09b-perfiles/plan-9b.03-proveedores.md) detectó que el snapshot de una recepción
-`COMPLETED` exige costos de 9B.04 y que la arquitectura aún no reconoce `Supplier` ni
+`COMPLETED` exige costos de 9B.04 y que la arquitectura aún no reconocía `Supplier` ni
 `PurchaseReceipt` como raíces. [ADR-0019](../architecture/adr/0019-proveedores-y-recepciones-de-compra.md)
-aceptó implementar el maestro `Supplier` ahora y reservar la recepción completa para 9B.04;
-las definiciones fiscales/documentales restantes no bloquean este primer corte. El corte del
-2026-09-04 entregó la pantalla administrativa de proveedores con controles derivados de los
-permisos efectivos y quitó de la recepción los datos técnicos que escribía el renderer: la
-aplicación genera el artículo de inventario de la primera recepción, deriva unidad y escala
-del catálogo y escala la cantidad decimal escrita por el operador. Solo quedan abiertas las
-reglas fiscales que el plan enumera como decisión de negocio. La fundación de la fase
+implementó el maestro `Supplier` y reservó la recepción completa para 9B.04. La sub-fase
+entregó el maestro persistido y auditado, la pantalla administrativa con controles derivados
+de los permisos efectivos, la recepción sin datos técnicos escritos por el renderer y, en su
+corte de cierre, las reglas fiscales aprobadas por el negocio: RIF venezolano estructural sin
+checksum, identidad genérica `TAX_ID` fuera de Venezuela, dirección fiscal estructurada y
+semántica diferenciada de `BLOCKED` e `INACTIVE`. La siguiente sub-fase con trabajo
+disponible es 9B.07; 9B.04, 9B.05 y 9B.06 siguen bloqueadas por ADR-0016, ADR-0017 y
+ADR-0018. La fundación de la fase
 (9B.00 permisos efectivos en la sesión, 9B.01 reestructuración del renderer,
 9B.02 datos maestros seleccionables) se completó el 2026-09-04; el detalle de
 cada una vive en sus archivos de sub-fase. Las siguientes capacidades de
@@ -130,8 +131,9 @@ conserva sus cuatro sub-fases intactas y ninguna ha iniciado.
   dependen de capacidades inexistentes: clientes con RIF, proveedores como
   entidad, costo de compra, devoluciones, conteos, transferencias, alta de
   usuarios y roles, configuración de datos maestros y KPIs. La Fase 9B agrega
-  esas diecinueve sub-fases sin renumerar ninguna fase y adelanta la
-  administración de identidad de 11.02. No ejecuta trabajo de Fase 10: la
+  esas diecinueve sub-fases sin renumerar ninguna fase; la administración de
+  identidad que adelantaba de 11.02 se devolvió a la Fase 11 el 2026-09-04 y la
+  fase quedó con dieciocho activas. No ejecuta trabajo de Fase 10: la
   sucursal es solo dato maestro y la transferencia se limita a un mismo nodo.
   Tres sub-fases quedan bloqueadas hasta que el negocio decida método de costeo
   (ADR-0016), política de devolución (ADR-0017) y datos obligatorios del cliente
@@ -168,6 +170,33 @@ conserva sus cuatro sub-fases intactas y ninguna ha iniciado.
   `tracksBatches` de un artículo nuevo se fija según la primera recepción traiga
   lote o no: el catálogo no modela ese atributo y decidirlo pertenece a la
   configuración de datos maestros de 9B.10.
+- El 2026-09-04 el negocio aprobó las reglas fiscales, documentales y de ciclo
+  de vida que faltaban, ADR-0019 las incorporó y 9B.03 quedó completada. El
+  maestro implementa RIF venezolano de una letra soportada más nueve dígitos
+  **sin checksum**, porque el proyecto no tiene una fuente oficial verificable
+  del SENIAT y no se copian algoritmos comunitarios como norma; identidad
+  genérica `TAX_ID` fuera de Venezuela sin validadores por país; dirección
+  fiscal estructurada en país y línea, opcional pero nunca a medias, con la
+  migración forward-only `0016`; y estados diferenciados donde `BLOCKED` es
+  suspensión temporal reversible e `INACTIVE` una relación retirada, ambos con
+  historia conservada y revalidación de `ACTIVE` dentro de la transacción. El
+  documento de origen (`INVOICE`/`DELIVERY_NOTE`), el ciclo
+  `DRAFT -> COMPLETED -> REVERSED`, el reverso compensatorio con
+  `replacesReceiptId` y la dirección obligatoria antes de completar quedan
+  decididos en ADR-0019 y se implementan en 9B.04 con el costo de ADR-0016.
+- El 2026-09-04 se corrigió el solapamiento entre la Fase 9B y la Fase 11. La
+  sub-fase 9B.09, que existía solo como alcance adelantado de 11.02, se retiró
+  y su alcance completo volvió a
+  [11.02 Roles y permisos](./fase-11-seguridad/11.02-roles-permisos.md): alta de
+  usuarios, creación de roles, asignación de permisos, bloqueo de
+  auto-exclusión y su pantalla. El número 9B.09 no se reutiliza y ninguna
+  sub-fase se renumera. Se revisó el resto de la fase contra las Fases 10, 11 y
+  12 y no se encontró otra duplicación: 9B.08 y 9B.11 delimitan lo que
+  pertenece a Fase 10 sin que exista una sub-fase de esa fase que lo cubra,
+  9B.12 publica capacidades que 11.02 solo prueba desde la autorización y 9B.13
+  publica lecturas que la Fase 12 no planifica. Queda declarado que hasta
+  implementar 11.02 el único rol disponible es el administrador provisionado por
+  CLI, y que 9B.17 deja de presentar usuarios y roles.
 - El 2026-09-04 se agregó la sub-fase correctiva 9.08 tras una auditoría de
   `apps/desktop`. Corrige el defecto reportado en la venta (barcode aceptado y
   pantalla en blanco), cuya causa raíz es del renderer: `Intl.NumberFormat` con

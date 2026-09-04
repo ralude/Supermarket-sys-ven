@@ -28,7 +28,8 @@ export class DrizzleSupplierRepository implements SupplierRepository {
       const values = {
         legalName: supplier.legalName,
         tradeName: supplier.tradeName,
-        fiscalAddress: supplier.fiscalAddress,
+        fiscalAddressCountry: supplier.fiscalAddress?.countryCode ?? null,
+        fiscalAddressLine: supplier.fiscalAddress?.addressLine ?? null,
         taxCountry: supplier.taxIdentity.country,
         taxType: supplier.taxIdentity.type,
         taxValue: supplier.taxIdentity.value,
@@ -91,7 +92,10 @@ export class DrizzleSupplierRepository implements SupplierRepository {
   private restore(row: typeof suppliers.$inferSelect | undefined): Supplier | null {
     return row ? Supplier.restore({
       id: row.id, code: row.code, legalName: row.legalName,
-      tradeName: row.tradeName, fiscalAddress: row.fiscalAddress,
+      tradeName: row.tradeName,
+      fiscalAddress: row.fiscalAddressCountry !== null && row.fiscalAddressLine !== null
+        ? { countryCode: row.fiscalAddressCountry, addressLine: row.fiscalAddressLine }
+        : null,
       taxIdentity: {
         country: row.taxCountry, type: row.taxType,
         value: row.taxValue, normalizedValue: row.taxNormalizedValue

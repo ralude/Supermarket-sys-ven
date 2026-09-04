@@ -100,6 +100,17 @@ nuevas. `BLOCKED` e `INACTIVE` permanecen consultables, y no existe borrado
 físico de historia. Los cambios sensibles y la corrección privilegiada de
 identidad se auditan conforme ADR-0019.
 
+La identidad fiscal admite `RIF` en Venezuela —una letra soportada seguida de
+nueve dígitos, sin checksum mientras no exista fuente oficial verificable— y la
+identidad genérica `TAX_ID` en el resto de los países, sin validadores
+específicos. Los estados se distinguen: `BLOCKED` es una suspensión temporal
+reversible y `INACTIVE` una relación retirada que sale de los selectores
+operativos; ambos conservan la historia y toda operación con efectos durables
+revalida `ACTIVE` dentro de su transacción. La dirección fiscal es opcional en el
+maestro, se guarda como país más línea y nunca se persiste a medias; la regla que
+la exige antes de completar una recepción venezolana con factura o guía de
+despacho se implementa con `PurchaseReceipt` en 9B.04.
+
 `PurchaseReceipt` será una raíz separada cuando 9B.04 incorpore costo. El caso de
 uso coordinará su confirmación con el movimiento de `StockItem` mediante puertos
 y una sola unidad de trabajo; no se crea en 9B.03 una recepción completada sin

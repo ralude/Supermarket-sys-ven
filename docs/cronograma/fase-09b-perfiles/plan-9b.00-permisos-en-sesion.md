@@ -110,7 +110,9 @@ se registran en **ADR-0015** como parte de esta sub-fase, antes de implementar.
 
 ## Fuera de alcance
 
-- Alta de usuarios, creación de roles y asignación de permisos: pertenecen a 9B.09.
-- Siembra de roles predefinidos: es la decisión pendiente de 9B.09.
+- Alta de usuarios, creación de roles y asignación de permisos: pertenecen a
+  [11.02](../fase-11-seguridad/11.02-roles-permisos.md) desde que 9B.09 se retiró el
+  2026-09-04.
+- Siembra de roles predefinidos: es la decisión pendiente de 11.02.
 - Cambiar dónde ocurre la autorización; sigue dentro del caso de uso.
 - Permisos nuevos: cada uno llega con la sub-fase que crea su capacidad.

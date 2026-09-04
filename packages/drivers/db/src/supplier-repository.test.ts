@@ -6,7 +6,8 @@ import { DrizzleSupplierRepository } from './supplier-repository.js';
 import { SqliteUnitOfWork } from './unit-of-work.js';
 
 const create = (id: string, code: string, value: string): Supplier => Supplier.create({
-  id, code, legalName: `Proveedor ${id}`, tradeName: 'Comercial', fiscalAddress: 'Caracas',
+  id, code, legalName: `Proveedor ${id}`, tradeName: 'Comercial',
+  fiscalAddress: { countryCode: 'VE', addressLine: 'Caracas' },
   taxIdentity: { country: 'VE', type: 'RIF', value },
   createdAt: new Date('2026-09-04T12:00:00Z')
 });

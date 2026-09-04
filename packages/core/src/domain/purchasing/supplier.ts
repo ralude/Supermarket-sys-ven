@@ -9,12 +9,21 @@ export type TaxIdentity = {
   readonly normalizedValue: string;
 };
 
+/**
+ * Representación mínima evaluable por dominio y aplicación. Estado, municipio,
+ * ciudad y código postal se agregarán cuando exista una regla que los exija.
+ */
+export type FiscalAddress = {
+  readonly countryCode: string;
+  readonly addressLine: string;
+};
+
 export type SupplierProps = {
   id: string;
   code: string;
   legalName: string;
   tradeName?: string | null;
-  fiscalAddress?: string | null;
+  fiscalAddress?: FiscalAddress | null;
   taxIdentity: Omit<TaxIdentity, 'normalizedValue'>;
   status?: SupplierStatus;
   createdAt: Date;
@@ -30,7 +39,7 @@ export type RestoredSupplierProps = Omit<SupplierProps, 'taxIdentity' | 'created
 export type SupplierChanges = {
   legalName?: string;
   tradeName?: string | null;
-  fiscalAddress?: string | null;
+  fiscalAddress?: FiscalAddress | null;
 };
 
 const optionalText = (value: string | null | undefined): string | null => {
@@ -38,6 +47,12 @@ const optionalText = (value: string | null | undefined): string | null => {
   const normalized = value.trim();
   return normalized.length === 0 ? null : normalized;
 };
+
+const optionalAddress = (
+  value: FiscalAddress | null | undefined
+): FiscalAddress | null => (value === undefined || value === null
+  ? null
+  : createFiscalAddress(value));
 
 const supplierStatuses = new Set<SupplierStatus>(['ACTIVE', 'BLOCKED', 'INACTIVE']);
 
@@ -48,6 +63,27 @@ const validStatus = (status: SupplierStatus): SupplierStatus => {
   return status;
 };
 
+/**
+ * Prefijos VE/RIF que Cullen v1 soporta explícitamente. La lista es del
+ * producto, no una transcripción de una norma: ampliarla exige una fuente
+ * oficial verificable.
+ */
+const VE_RIF_PREFIXES = 'VEJPGC';
+const VE_RIF_PATTERN = new RegExp(`^[${VE_RIF_PREFIXES}][0-9]{9}$`);
+
+/** Tipo fiscal admitido por país. Los validadores por país se agregan después. */
+export const taxIdentityTypeFor = (country: string): string =>
+  (country === 'VE' ? 'RIF' : 'TAX_ID');
+
+/**
+ * Canonicaliza la identidad fiscal de forma determinista. Para VE/RIF elimina
+ * los separadores admitidos y exige una letra soportada seguida de nueve
+ * dígitos; **no** aplica checksum, porque el proyecto todavía no tiene una
+ * fuente oficial verificable del SENIAT que defina el algoritmo y no se
+ * incorporan algoritmos comunitarios como requisito normativo. Para el resto de
+ * los países la identidad es genérica `TAX_ID`: solo se normalizan mayúsculas y
+ * espacios, sin reglas ni checksum específicos.
+ */
 export const createTaxIdentity = (
   input: Omit<TaxIdentity, 'normalizedValue'>
 ): TaxIdentity => {
@@ -57,26 +93,50 @@ export const createTaxIdentity = (
   if (!/^[A-Z]{2}$/.test(country)) {
     throw new DomainError('SUPPLIER_TAX_COUNTRY_INVALID', 'Tax identity country is invalid.');
   }
-  if (!/^[A-Z0-9_]{1,32}$/.test(type)) {
-    throw new DomainError('SUPPLIER_TAX_TYPE_INVALID', 'Tax identity type is invalid.');
+  if (type !== taxIdentityTypeFor(country)) {
+    throw new DomainError('SUPPLIER_TAX_TYPE_INVALID', 'Tax identity type is not supported for this country.');
   }
   if (value.length === 0) {
     throw new DomainError('SUPPLIER_TAX_IDENTITY_REQUIRED', 'Tax identity value is required.');
   }
   const canonical = value.normalize('NFKC').toUpperCase();
-  const normalizedValue = country === 'VE' && type === 'RIF'
-    ? canonical.replace(/[\s-]/g, '')
-    : canonical.trim();
-  if (country === 'VE' && type === 'RIF' && !/^[VEJPGC][0-9]{9}$/.test(normalizedValue)) {
+  if (country !== 'VE') {
+    return { country, type, value, normalizedValue: canonical.replace(/\s+/g, '') };
+  }
+  const normalizedValue = canonical.replace(/[\s.-]/g, '');
+  if (!VE_RIF_PATTERN.test(normalizedValue)) {
     throw new DomainError('SUPPLIER_TAX_IDENTITY_INVALID', 'Venezuelan RIF format is invalid.');
   }
   return { country, type, value, normalizedValue };
 };
 
+/**
+ * La dirección fiscal es opcional en el maestro. Cuando existe, país y línea
+ * son obligatorios: la regla que la exige antes de completar una recepción
+ * venezolana debe poder evaluarse en aplicación, no en la interfaz.
+ */
+export const createFiscalAddress = (input: FiscalAddress): FiscalAddress => {
+  const countryCode = input.countryCode.trim().toUpperCase();
+  const addressLine = input.addressLine.trim();
+  if (!/^[A-Z]{2}$/.test(countryCode)) {
+    throw new DomainError(
+      'SUPPLIER_FISCAL_ADDRESS_COUNTRY_INVALID',
+      'Fiscal address country must be an ISO 3166-1 alpha-2 code.'
+    );
+  }
+  if (addressLine.length === 0) {
+    throw new DomainError(
+      'SUPPLIER_FISCAL_ADDRESS_LINE_REQUIRED',
+      'Fiscal address line is required.'
+    );
+  }
+  return { countryCode, addressLine };
+};
+
 export class Supplier {
   private currentLegalName: string;
   private currentTradeName: string | null;
-  private currentFiscalAddress: string | null;
+  private currentFiscalAddress: FiscalAddress | null;
   private currentTaxIdentity: TaxIdentity;
   private currentStatus: SupplierStatus;
   private currentUpdatedAt: Date;
@@ -88,7 +148,7 @@ export class Supplier {
     props: {
       legalName: string;
       tradeName: string | null;
-      fiscalAddress: string | null;
+      fiscalAddress: FiscalAddress | null;
       taxIdentity: TaxIdentity;
       status: SupplierStatus;
       createdAt: Date;
@@ -120,7 +180,7 @@ export class Supplier {
     return new Supplier(props.id, code, {
       legalName,
       tradeName: optionalText(props.tradeName),
-      fiscalAddress: optionalText(props.fiscalAddress),
+      fiscalAddress: optionalAddress(props.fiscalAddress),
       taxIdentity: createTaxIdentity(props.taxIdentity),
       status: validStatus(props.status ?? 'ACTIVE'),
       createdAt: props.createdAt,
@@ -141,7 +201,9 @@ export class Supplier {
 
   get legalName(): string { return this.currentLegalName; }
   get tradeName(): string | null { return this.currentTradeName; }
-  get fiscalAddress(): string | null { return this.currentFiscalAddress; }
+  get fiscalAddress(): FiscalAddress | null {
+    return this.currentFiscalAddress ? { ...this.currentFiscalAddress } : null;
+  }
   get taxIdentity(): TaxIdentity { return { ...this.currentTaxIdentity }; }
   get status(): SupplierStatus { return this.currentStatus; }
   get updatedAt(): Date { return new Date(this.currentUpdatedAt); }
@@ -160,7 +222,7 @@ export class Supplier {
     }
     if (changes.tradeName !== undefined) this.currentTradeName = optionalText(changes.tradeName);
     if (changes.fiscalAddress !== undefined) {
-      this.currentFiscalAddress = optionalText(changes.fiscalAddress);
+      this.currentFiscalAddress = optionalAddress(changes.fiscalAddress);
     }
     this.touch(occurredAt);
   }
