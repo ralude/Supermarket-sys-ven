@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit",
     "bootstrap-admin": "tsx src/bootstrap-admin.ts",
     "bootstrap-admin:dev": "tsx --env-file=config/development.env src/bootstrap-admin.ts",
+    "bootstrap-operations": "tsx src/bootstrap-operations.ts",
+    "bootstrap-operations:dev": "tsx --env-file=config/development.env src/bootstrap-operations.ts",
     "seed:products": "tsx src/seed-products.ts"
   },
   "dependencies": {

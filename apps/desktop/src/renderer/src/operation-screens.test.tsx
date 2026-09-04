@@ -15,7 +15,7 @@ const operationApi = (): OperationApi => {
     applySaleDiscount: vi.fn(), registerSalePayments: vi.fn(), completeSale: vi.fn(), voidSale: vi.fn(),
     getOpenShift: vi.fn(), openShift: vi.fn(), registerCashMovement: vi.fn(), closeShift: vi.fn(),
     findProductByBarcode: vi.fn(), listProducts: vi.fn(), getPriceHistory: vi.fn(), createProduct: vi.fn(), updatePrice: vi.fn(), getKardex: vi.fn(),
-    receivePurchase: vi.fn(), registerStockAdjustment: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn()
+    receivePurchase: vi.fn(), registerStockAdjustment: vi.fn(), getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn()
   }) as OperationApi;
 };
 

@@ -55,4 +55,34 @@ usuario se destruye al terminar cada prueba, no se inserta en
 `supermarket-node.sqlite` y no constituye una credencial de desarrollo o
 producción.
 
+## Configuración operativa mínima
+
+Autenticarse no basta para operar caja ni venta: el nodo necesita una caja del
+terminal actual, métodos de pago y las políticas de descuento e IGTF. Sin ellas,
+abrir un turno falla con `CASH_REGISTER_NOT_FOUND` y cobrar falla con
+`POLICY_NOT_CONFIGURED`. Desde `apps/server`:
+
+```bash
+npm run bootstrap-operations:dev -- --database ./supermarket-node.sqlite \
+  --currency USD --discount-max-basis-points 1500 \
+  --igtf-basis-points 300 --igtf-payment-methods CARD --igtf-currencies USD
+```
+
+El comando crea una caja (`--cash-register-id`, `--cash-register-name`) cuyo
+terminal y nodo se toman de la misma identidad que usa el servidor, los métodos
+de pago `CASH` y `CARD` en la moneda indicada, y activa una versión de cada
+política. Es repetible: si la política activa ya tiene esa configuración no crea
+una versión nueva, y si cambia desactiva la anterior y añade la siguiente sin
+borrar historia.
+
+Ningún valor fiscal o comercial tiene default: la tasa de IGTF, el tope de
+descuento y la moneda se indican al ejecutarlo. Una tasa de IGTF mayor que cero
+exige `--igtf-payment-methods` y `--igtf-currencies`, porque sin ambas listas
+nunca se aplicaría. Para un nodo instalado se usa `npm run bootstrap-operations`
+con la identidad de `%ProgramData%` o `NODE_IDENTITY_PATH`.
+
+Detén el servidor antes de ejecutar este comando o el seed: SQLite admite un
+solo proceso dueño por nodo y, con el servidor activo, fallan con
+`DATABASE_NODE_LOCKED`.
+
 `SERVER_HOST` y `SERVER_PORT` permiten cambiar el bind y el puerto para desarrollo. El valor por defecto es loopback (`127.0.0.1`) para el modo standalone.

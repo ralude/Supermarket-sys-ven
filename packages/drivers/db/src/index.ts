@@ -12,6 +12,13 @@ export {
   SqliteDiscountPolicyProvider,
   SqliteFinancialTransactionTaxPolicyProvider
 } from './operational-policy-providers.js';
+export { SqliteOperationalPolicyWriter } from './operational-policy-writer.js';
+export type {
+  DiscountPolicyInput,
+  FinancialTransactionTaxPolicyInput,
+  OperationalPolicyMetadata,
+  PolicyActivation
+} from './operational-policy-writer.js';
 export { DrizzleFiscalDocumentRepository } from './fiscal-document-repository.js';
 export { DrizzleCatalogReadRepository } from './catalog-read-repository.js';
 export {

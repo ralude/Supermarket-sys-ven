@@ -15,15 +15,17 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 6 | Inventario operativo | ~~Completada~~ |
 | 7 | Driver fiscal fake | ~~Completada~~ |
 | 8 | Integracion serial | Suspendida por dependencia externa |
-| 9 | UI | En curso |
+| 9 | UI | ~~Completada~~ |
 | 10 | Sincronizacion | Pendiente |
 | 11 | Seguridad | Pendiente (corte minimo pre-UI adelantado) |
 | 12 | Optimizacion | Pendiente |
 
-**Fase actual:** Fase 9 - UI
-**Sub-fase actual:** 9.07 - Tasas de cambio. Las sub-fases 9.00–9.06 y el gate
-de seguridad pre-UI están completados; 9.07 conserva abierta la aprobación de la
-fuente externa y la pantalla de tasas.
+**Fase actual:** Fase 10 - Sincronizacion
+**Sub-fase actual:** 10.01 - Sync queue. La Fase 9 cerró sus ocho sub-fases el
+2026-09-04; la Fase 8 permanece suspendida por dependencia externa y no bloquea
+el avance porque así lo aprobó la
+[replanificación del 2026-09-01](./replanificacion-fase-08-a-09.md). Ningún
+trabajo de Fase 10 se ha iniciado todavía.
 
 ## Fases
 
@@ -36,7 +38,7 @@ fuente externa y la pantalla de tasas.
 - [~~Fase 6 - Inventario~~](./fase-06-inventario/README.md)
 - [~~Fase 7 - Driver fiscal fake~~](./fase-07-driver-fiscal-fake/README.md)
 - [Fase 8 - Integracion serial](./fase-08-integracion-serial/README.md)
-- [Fase 9 - UI](./fase-09-ui/README.md)
+- [~~Fase 9 - UI~~](./fase-09-ui/README.md)
 - [Fase 10 - Sincronizacion](./fase-10-sincronizacion/README.md)
 - [Fase 11 - Seguridad](./fase-11-seguridad/README.md)
 - [Fase 12 - Optimizacion](./fase-12-optimizacion/README.md)
@@ -98,6 +100,15 @@ fuente externa y la pantalla de tasas.
   aplicación, exportación CSV local sin permiso ni auditoría adicionales y
   captura manual de la jornada de X/Z. La auditoría no proyecta los resúmenes
   antes/después y la sincronización sigue como estado estático de Fase 10.
+- El 2026-09-04 se cerró 9.07 con ADR-0014, y con ello la Fase 9 completa:
+  vigencia por `validFrom` más reciente sin cerrar ventanas solapadas, límite
+  de histórico acotado (1-500, 100 por defecto), lecturas de moneda con solo
+  sesión verificada y timeout configurable sin reintento automático. La fuente
+  externa de sugerencia (proveedor, credenciales, pares por tienda) queda
+  diferida como decisión de negocio; el mecanismo es agnóstico de proveedor y
+  falla cerrado con `EXCHANGE_RATE_PROVIDER_NOT_CONFIGURED` sin bloquear la
+  tasa vigente, el histórico ni la carga manual. El avance a Fase 10 no inicia
+  su implementación; solo refleja que Fase 9 no tiene tareas abiertas.
 - La planificacion regulatoria de Fase 8 reconoce que SNAT/2026/00084 derogo la SNAT/2024/000121 el 2026-08-12. La autorizacion por modelo y el registro del desarrollador ante el fabricante de SNAT/2018/0141 se verifican nuevamente antes del piloto.
 - La Fase 1 se completó con Electron, React, Fastify, SQLite, Drizzle y ESLint instalados y verificados mediante smoke tests.
 - ADR-0008 establece terminales POS autonomas con Fastify y SQLite local; el nodo coordinador sincroniza eventos y datos de referencia.

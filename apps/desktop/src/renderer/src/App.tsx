@@ -1,50 +1,56 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Component, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type { CapabilitiesResponse, SessionResponse } from '@supermarket/shared';
 import { ApiProblemError, createDesktopApi, type DesktopApi, type OperationApi } from './api-client.js';
 import { routeScreen } from './operation-screens.js';
+
+export const PRODUCT_NAME = 'Cullen';
 
 type AppRoute = {
   readonly id: string;
   readonly hash: string;
   readonly label: string;
   readonly title: string;
-  readonly phase: string;
+  readonly shortcut: string;
   readonly description: string;
 };
 
 const ROUTES: readonly AppRoute[] = [
   {
-    id: 'home', hash: '#/', label: 'Inicio', title: 'Estación preparada', phase: '9.01',
-    description: 'La base React está conectada y lista para recibir los flujos operativos.'
+    id: 'home', hash: '#/', label: 'Inicio', title: 'Inicio', shortcut: '1',
+    description: 'Resumen de la estación y accesos directos a la operación diaria.'
   },
   {
-    id: 'sales', hash: '#/sales', label: 'Venta', title: 'Punto de venta', phase: '9.02',
-    description: 'El flujo de venta se habilitará en la subfase 9.02.'
+    id: 'sales', hash: '#/sales', label: 'Venta', title: 'Punto de venta', shortcut: '2',
+    description: 'Escanea productos, cobra y completa la venta del turno abierto.'
   },
   {
-    id: 'cash', hash: '#/cash', label: 'Caja', title: 'Operación de caja', phase: '9.03',
-    description: 'Apertura, movimientos y cierre se habilitarán en la subfase 9.03.'
+    id: 'cash', hash: '#/cash', label: 'Caja', title: 'Operación de caja', shortcut: '3',
+    description: 'Apertura de turno, movimientos de efectivo y cierre con arqueo.'
   },
   {
-    id: 'catalog', hash: '#/catalog', label: 'Catálogo', title: 'Catálogo', phase: '9.04',
-    description: 'La consulta y administración de productos se habilitará en la subfase 9.04.'
+    id: 'catalog', hash: '#/catalog', label: 'Catálogo', title: 'Catálogo', shortcut: '4',
+    description: 'Consulta productos por barcode y administra precios auditados.'
   },
   {
-    id: 'inventory', hash: '#/inventory', label: 'Inventario', title: 'Inventario', phase: '9.05',
-    description: 'Kardex y movimientos autorizados se habilitarán en la subfase 9.05.'
+    id: 'inventory', hash: '#/inventory', label: 'Inventario', title: 'Inventario', shortcut: '5',
+    description: 'Kardex, recepciones de compra y ajustes autorizados de existencia.'
   },
   {
-    id: 'reports', hash: '#/reports', label: 'Reportes', title: 'Reportes y cierres', phase: '9.06',
-    description: 'Reportes, estados fiscales y cierres se habilitarán en la subfase 9.06.'
+    id: 'reports', hash: '#/reports', label: 'Reportes', title: 'Reportes y cierres', shortcut: '6',
+    description: 'Cierres de caja, auditoría y estados fiscales del período.'
   },
   {
-    id: 'rates', hash: '#/rates', label: 'Tasas', title: 'Tasas de cambio', phase: '9.07',
-    description: 'La tasa vigente, su histórico y sugerencias se habilitarán en la subfase 9.07.'
+    id: 'rates', hash: '#/rates', label: 'Tasas', title: 'Tasas de cambio', shortcut: '7',
+    description: 'Tasa vigente, histórico local y confirmación de sugerencias externas.'
   }
 ];
 
 export const resolveRoute = (hash: string): AppRoute =>
   ROUTES.find((route) => route.hash === hash) ?? ROUTES[0]!;
+
+/** Atajo de teclado del POS: Alt + dígito lleva a la pantalla correspondiente. */
+export const shortcutHash = (key: string): string | null =>
+  ROUTES.find((route) => route.shortcut === key)?.hash ?? null;
 
 export type AppViewState =
   | { readonly kind: 'loading' }
@@ -68,6 +74,42 @@ export const loadInitialState = async (api: DesktopApi): Promise<AppViewState> =
   }
 };
 
+/**
+ * Evita que un fallo de render deje la ventana en blanco: aísla la pantalla
+ * activa y ofrece recuperación sin reiniciar la estación.
+ */
+export class ScreenErrorBoundary extends Component<
+  { readonly children: ReactNode },
+  { readonly failed: boolean }
+> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError(): { readonly failed: boolean } {
+    return { failed: true };
+  }
+
+  override render(): ReactNode {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="panel" role="alert">
+        <h2>No pudimos dibujar esta pantalla</h2>
+        <p className="muted">
+          La operación en el nodo no se vio afectada. Vuelve a intentarlo o cambia de pantalla.
+        </p>
+        <div className="button-row">
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => this.setState({ failed: false })}
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
 type AppViewProps = {
   readonly state: AppViewState;
   readonly route: AppRoute;
@@ -83,9 +125,40 @@ type AppViewProps = {
 };
 
 const Brand = (): React.JSX.Element => (
-  <div className="brand" aria-label="Supermarket Platform">
-    <span className="brand-mark" aria-hidden="true">SP</span>
-    <span><strong>Supermarket</strong><small>Plataforma POS</small></span>
+  <div className="brand" aria-label={PRODUCT_NAME}>
+    <span className="brand-mark" aria-hidden="true">CU</span>
+    <span><strong>{PRODUCT_NAME}</strong><small>Punto de venta</small></span>
+  </div>
+);
+
+const HomeScreen = ({ capabilities }: {
+  readonly capabilities: CapabilitiesResponse;
+}): React.JSX.Element => (
+  <div className="operation-screen">
+    <p className="screen-note">
+      {PRODUCT_NAME} está conectado al nodo local. Elige una operación para comenzar.
+    </p>
+    <nav className="quick-actions" aria-label="Accesos directos">
+      {ROUTES.filter((item) => item.id !== 'home').map((item) => (
+        <a key={item.id} className="quick-action" href={item.hash}>
+          <span className="quick-action-key" aria-hidden="true">Alt+{item.shortcut}</span>
+          <strong>{item.label}</strong>
+          <small>{item.description}</small>
+        </a>
+      ))}
+    </nav>
+    <section className="panel" aria-labelledby="station-status-title">
+      <h2 id="station-status-title">Estado de la estación</h2>
+      <dl className="detail-grid">
+        <div><dt>Sesión</dt><dd>Activa</dd></div>
+        <div><dt>API</dt><dd>v1</dd></div>
+        <div><dt>Modo fiscal</dt><dd>{capabilities.fiscalMode}</dd></div>
+        <div>
+          <dt>Reportes X/Z</dt>
+          <dd>{capabilities.simulatedReportsEnabled ? 'Simulados habilitados' : 'Deshabilitados'}</dd>
+        </div>
+      </dl>
+    </section>
   </div>
 );
 
@@ -104,7 +177,7 @@ export const AppView = ({
 }: AppViewProps): React.JSX.Element => {
   if (state.kind === 'loading') {
     return (
-      <main className="centered-state" aria-live="polite">
+      <main className="centered-state" aria-live="polite" aria-busy="true">
         <Brand />
         <span className="spinner" aria-hidden="true" />
         <h1>Conectando con el nodo</h1>
@@ -131,7 +204,7 @@ export const AppView = ({
         <section className="access-intro" aria-labelledby="access-title">
           <Brand />
           <p className="eyebrow">Nodo local · {platform}</p>
-          <h1 id="access-title">Ingresar a la estación</h1>
+          <h1 id="access-title">Ingresar a {PRODUCT_NAME}</h1>
           <p>Usa tu código de operador y PIN. La sesión permanece protegida en una cookie local.</p>
           <span className="simulation-label">Fiscal · SIMULACIÓN</span>
         </section>
@@ -184,8 +257,10 @@ export const AppView = ({
               key={item.id}
               href={item.hash}
               aria-current={route.id === item.id ? 'page' : undefined}
+              title={item.description}
             >
-              {item.label}
+              <span>{item.label}</span>
+              <kbd aria-hidden="true">Alt+{item.shortcut}</kbd>
             </a>
           ))}
         </nav>
@@ -197,8 +272,8 @@ export const AppView = ({
       <main className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Subfase {route.phase}</p>
-            <h1>{route.title}</h1>
+            <h1 id="workspace-title">{route.title}</h1>
+            <p className="topbar-hint">{route.description}</p>
           </div>
           <div className="topbar-actions">
             <span className="status-label"><i aria-hidden="true" />Servidor conectado</span>
@@ -210,19 +285,11 @@ export const AppView = ({
           </div>
         </header>
         <section className="workspace-content" aria-labelledby="workspace-title">
-          {(api ? routeScreen(route.id, { api: api as OperationApi, capabilities: state.capabilities }) : null) ?? <div className="phase-card">
-            <p className="eyebrow">Base operativa</p>
-            <h2 id="workspace-title">{route.label}</h2>
-            <p>{route.description}</p>
-            <dl>
-              <div><dt>Sesión</dt><dd>Activa</dd></div>
-              <div><dt>API</dt><dd>v1</dd></div>
-              <div>
-                <dt>Reportes X/Z</dt>
-                <dd>{state.capabilities.simulatedReportsEnabled ? 'Simulados habilitados' : 'Deshabilitados'}</dd>
-              </div>
-            </dl>
-          </div>}
+          <ScreenErrorBoundary key={route.id}>
+            {(api
+              ? routeScreen(route.id, { api: api as OperationApi, capabilities: state.capabilities })
+              : null) ?? <HomeScreen capabilities={state.capabilities} />}
+          </ScreenErrorBoundary>
         </section>
       </main>
     </div>
@@ -250,6 +317,17 @@ export const App = ({ api = defaultApi }: { readonly api?: DesktopApi }): React.
     const updateRoute = (): void => setRoute(resolveRoute(window.location.hash || '#/'));
     window.addEventListener('hashchange', updateRoute);
     return () => window.removeEventListener('hashchange', updateRoute);
+  }, []);
+  useEffect(() => {
+    const navigate = (event: KeyboardEvent): void => {
+      if (!event.altKey || event.ctrlKey || event.metaKey) return;
+      const hash = shortcutHash(event.key);
+      if (!hash) return;
+      event.preventDefault();
+      window.location.hash = hash;
+    };
+    window.addEventListener('keydown', navigate);
+    return () => window.removeEventListener('keydown', navigate);
   }, []);
 
   const login = async (event: FormEvent<HTMLFormElement>): Promise<void> => {

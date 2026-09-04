@@ -1,6 +1,6 @@
 # Fase 9: UI
 
-- **Estado:** En curso (sub-fase 9.07; 9.00–9.06 completadas)
+- **Estado:** Completada
 - **Indice:** [Cronograma](../README.md)
 - **Replanificacion:** [Suspension de Fase 8 y avance a Fase 9](../replanificacion-fase-08-a-09.md)
 
@@ -17,7 +17,7 @@ Construir la interfaz React y su integracion con el negocio a traves de HTTP.
 - [~~9.04 Pantalla de catalogo~~](./9.04-pantalla-catalogo.md)
 - [~~9.05 Pantalla de inventario~~](./9.05-pantalla-inventario.md)
 - [~~9.06 Reportes y cierres~~](./9.06-pantalla-reportes.md)
-- [9.07 Tasas de cambio](./9.07-tasas-de-cambio.md)
+- [~~9.07 Tasas de cambio~~](./9.07-tasas-de-cambio.md)
 
 ## Restriccion
 
@@ -52,3 +52,18 @@ Ponytail no se aplica a la API, seguridad, dominio, persistencia ni pruebas de
 ## Criterio de salida
 
 Los flujos principales se pueden operar desde la UI y tienen pruebas E2E.
+
+## Resultado
+
+La Fase 9 se completó el 2026-09-04 con las ocho sub-fases cerradas: API HTTP
+autenticada, base React, venta, caja, catálogo, inventario, reportes/cierres y
+tasas de cambio. Toda capacidad fiscal visible sigue rotulada `SIMULACION`
+mientras la Fase 8 permanezca suspendida; ninguna pantalla declara emisión
+fiscal real, compatibilidad de hardware ni habilitación para piloto.
+
+9.07 cierra con una brecha de negocio explícita y no bloqueante: la fuente
+externa de sugerencia de tasa (proveedor, credenciales, pares por tienda)
+queda diferida (ADR-0014); el mecanismo es agnóstico de proveedor y falla
+cerrado sin bloquear la tasa vigente, el histórico ni la carga manual. Esa
+brecha, junto con la sincronización entre nodos (Fase 10) y el hardware fiscal
+real (Fase 8 suspendida), no impide operar la UI descrita en este README.

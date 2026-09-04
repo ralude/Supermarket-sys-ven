@@ -34,6 +34,8 @@ las fases correspondientes.
 
 - `UpdateExchangeRate`
 - `GetCurrentExchangeRate`
+- `GetExchangeRateHistory`
+- `GetSuggestedExchangeRate`
 - `CalculateMixedPaymentTotals`
 
 Desde Fase 9, los comandos de catálogo y moneda reciben `ExecutionContext` y
@@ -41,6 +43,15 @@ autorizan `catalog.product.create`, `catalog.product.update`,
 `catalog.price.update` o `currency.rate.update` antes de cualquier efecto. Sus
 lecturas solo requieren la sesión verificada por HTTP. La fuente de políticas
 operativas y el comportamiento fail-closed se fijan en ADR-0012.
+
+Desde 9.07, `GetExchangeRateHistory` proyecta el histórico local de un par con
+límite acotado (1-500, 100 por defecto) y orden determinista, y
+`GetSuggestedExchangeRate` es una lectura pura sobre el puerto
+`ExchangeRateProvider` que nunca persiste ni sustituye a `UpdateExchangeRate`.
+Ambas exigen solo sesión verificada, igual que las demás lecturas de moneda.
+ADR-0014 fija esas reglas y deja explícitamente diferida la aprobación de un
+proveedor externo concreto; sin uno configurado, la sugerencia falla cerrado
+con `EXCHANGE_RATE_PROVIDER_NOT_CONFIGURED` sin afectar la tasa vigente.
 
 ### `cash`
 

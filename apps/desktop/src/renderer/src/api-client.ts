@@ -8,10 +8,13 @@ import {
   findProductByBarcodeContract,
   getAuditReportContract,
   getCashClosureReportContract,
+  getCurrentExchangeRateContract,
+  getExchangeRateHistoryContract,
   getFiscalOperationsReportContract,
   getKardexContract,
   getOpenShiftContract,
   getSaleContract,
+  getSuggestedExchangeRateContract,
   openShiftContract,
   printSimulatedXReportContract,
   printSimulatedZReportContract,
@@ -25,11 +28,14 @@ import {
   logoutContract,
   startSaleContract,
   createProductContract,
+  updateExchangeRateContract,
   updatePriceContract,
   getPriceHistoryContract,
   voidSaleContract,
   type CapabilitiesResponse,
   type CloseShiftRequest,
+  type ExchangeRateResponse,
+  type ExchangeRateSuggestionResponse,
   type OpenShiftRequest,
   type RegisterCashMovementRequest,
   type RegisterSalePaymentsRequest,
@@ -47,6 +53,7 @@ import {
   type StartSaleRequest,
   type AddSaleItemRequest,
   type ApplySaleDiscountRequest,
+  type UpdateExchangeRateRequest,
   type VoidSaleRequest,
   type SimulatedFiscalReportRequest,
   type SimulatedFiscalReportResponse,
@@ -107,7 +114,13 @@ export type ReportQuery = {
   readonly action?: string; readonly entityType?: string;
 };
 
-const search = (query: ReportQuery): string => {
+export type ExchangeRateHistoryQuery = {
+  readonly baseCurrency: string; readonly quoteCurrency: string; readonly limit?: number;
+};
+
+export type ExchangeRatePairQuery = { readonly baseCurrency: string; readonly quoteCurrency: string };
+
+const search = (query: Readonly<Record<string, string | number | undefined>>): string => {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined && value !== '') params.set(key, String(value));
@@ -115,6 +128,25 @@ const search = (query: ReportQuery): string => {
   const serialized = params.toString();
   return serialized ? '?' + serialized : '';
 };
+
+/**
+ * Convierte un texto decimal a un entero escalado sin `float`, infiriendo la
+ * escala de los dígitos escritos. No admite más de 8 decimales: el dominio de
+ * `ExchangeRate` rechaza una escala mayor.
+ */
+export const parseScaledDecimal = (value: string): { readonly value: number; readonly scale: number } => {
+  const normalized = value.trim().replace(',', '.');
+  const match = /^(\d+)(?:\.(\d{1,8}))?$/.exec(normalized);
+  if (!match) throw new Error('RATE_INPUT_INVALID');
+  const fraction = match[2] ?? '';
+  const parsed = Number(`${match[1]}${fraction}`);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error('RATE_INPUT_INVALID');
+  return { value: parsed, scale: fraction.length };
+};
+
+/** Formatea un entero escalado como texto decimal sin perder precisión. */
+export const formatScaledDecimal = (value: number, scale: number): string =>
+  (value / (10 ** scale)).toFixed(scale);
 
 const path = (template: string, ...parts: string[]): string =>
   parts.reduce((value, part) => value.replace(/:[A-Za-z]+/, encodeURIComponent(part)), template);
@@ -220,6 +252,22 @@ export const createDesktopApi = (fetcher: typeof fetch = globalThis.fetch) => ({
   getFiscalOperationsReport: (query: ReportQuery = {}): Promise<FiscalOperationsReportResponse> => requestJson(
     fetcher, getFiscalOperationsReportContract.path + search(query),
     { method: getFiscalOperationsReportContract.method }
+  ),
+  getCurrentExchangeRate: (query: ExchangeRatePairQuery): Promise<ExchangeRateResponse> => requestJson(
+    fetcher, getCurrentExchangeRateContract.path + search(query),
+    { method: getCurrentExchangeRateContract.method }
+  ),
+  getExchangeRateHistory: (query: ExchangeRateHistoryQuery): Promise<readonly ExchangeRateResponse[]> => requestJson(
+    fetcher, getExchangeRateHistoryContract.path + search(query),
+    { method: getExchangeRateHistoryContract.method }
+  ),
+  getSuggestedExchangeRate: (query: ExchangeRatePairQuery): Promise<{ suggestion: ExchangeRateSuggestionResponse }> => requestJson(
+    fetcher, getSuggestedExchangeRateContract.path + search(query),
+    { method: getSuggestedExchangeRateContract.method }
+  ),
+  updateExchangeRate: (input: UpdateExchangeRateRequest, idempotencyKey: string): Promise<ExchangeRateResponse> => requestJson(
+    fetcher, updateExchangeRateContract.path,
+    { method: updateExchangeRateContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
   ),
   printXReport: (input: SimulatedFiscalReportRequest, idempotencyKey: string): Promise<SimulatedFiscalReportResponse> => requestJson(
     fetcher, printSimulatedXReportContract.path,

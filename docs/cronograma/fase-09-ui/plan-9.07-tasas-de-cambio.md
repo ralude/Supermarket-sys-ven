@@ -1,7 +1,9 @@
 # Plan de ejecución 9.07: Tasas de cambio
 
 - **Sub-fase:** [9.07 Tasas de cambio](./9.07-tasas-de-cambio.md)
-- **Estado del plan:** Planificada; ejecución posterior al cierre de 9.06
+- **Estado del plan:** Ejecutado; decisiones de ingeniería cerradas en ADR-0014.
+  La fuente externa concreta (decisiones 1-2) queda deliberadamente diferida:
+  ver Brechas conservadas.
 - **Prerrequisito:** [9.06 Reportes y cierres](./9.06-pantalla-reportes.md)
 - **Disciplina visual:** Ponytail `full`, limitada a presentación
 - **Ownership:** nodo coordinador tras confirmación humana; distribución en Fase 10
@@ -34,31 +36,37 @@ tasa local.
   `currency.rate.update` para persistir cambios. ADR-0008 reserva al coordinador
   la autoridad de tasas confirmadas y deja su distribución para Fase 10.
 
-## Decisiones requeridas antes de implementar
+## Decisiones aplicadas
 
-1. Aprobar la fuente externa y su contrato primario: pares disponibles,
-   convención base/cotizada, escala, timestamp, zona horaria, atribución,
-   credenciales, límites y condiciones de uso. El driver no normaliza una API
-   elegida informalmente.
-2. Definir qué pares puede consultar y confirmar cada tienda y si la fuente
-   externa propone una tasa única o tipos distintos. El plan no presume una
-   tasa regulatoria, bancaria o comercial concreta.
-3. Aprobar la regla de vigencia al confirmar: `validFrom`, `validUntil` y el
-   tratamiento de una tasa abierta anterior. El comportamiento actual elige la
-   tasa vigente con `validFrom` más reciente, pero no cierra ni prohíbe ventanas
-   solapadas.
-4. Definir el alcance del histórico visible: filtros obligatorios, orden,
-   período y límite de filas. No se incorpora paginación como optimización sin
-   un requisito, pero tampoco se expone un histórico sin cota por accidente.
-5. Confirmar si solicitar una sugerencia requiere un permiso adicional o solo
-   sesión válida. Persistirla siempre conserva `currency.rate.update` en
-   aplicación; ocultar botones en React no sustituye esa autorización.
-6. Fijar timeout, retry y frecuencia permitida. Los reintentos de lectura pueden
-   ser acotados, pero nunca deben terminar registrando o confirmando una tasa.
+Aprobadas el 2026-09-04 en
+[ADR-0014](../../architecture/adr/0014-tasas-de-cambio-sugerencia-y-confirmacion.md):
 
-Estas decisiones se documentan en la especificación normativa o en un ADR si
-cambian una decisión aceptada. Si no se cierran, 9.07 permanece bloqueada en su
-integración externa y no presenta una fuente provisional como productiva.
+3. Vigencia al confirmar: se mantiene `validFrom` más reciente como criterio de
+   vigencia; no se cierran automáticamente ventanas abiertas solapadas. Es una
+   brecha conocida y documentada, no una regla oculta.
+4. Alcance del histórico: par obligatorio, límite opcional entre 1 y 500 (100
+   por defecto), orden descendente por `validFrom` y, en empate, por `id`. Sin
+   paginación por cursor en el MVP.
+5. Permiso de lectura: tasa vigente, histórico y sugerencia exigen solo sesión
+   verificada, igual que las demás lecturas de moneda de ADR-0012. Solo
+   `UpdateExchangeRate` exige `currency.rate.update`.
+6. Timeout y reintentos: timeout configurable (5000 ms por defecto), cero
+   reintentos automáticos. El único reintento posible es una acción humana
+   explícita ("Actualizar sugerencia"); ninguno persiste ni confirma una tasa
+   por sí mismo.
+
+### Decisión diferida (1 y 2)
+
+La fuente externa concreta (proveedor, credenciales, términos de uso) y los
+pares que cada tienda gestiona siguen sin aprobar: son decisiones de negocio y,
+si aplica, de un acuerdo con el proveedor, que este plan no puede sustituir. El
+mecanismo se mantiene agnóstico de proveedor mediante un contrato JSON neutral
+propio (`HttpExchangeRateProvider`) activado solo si el nodo configura
+`EXCHANGE_RATE_PROVIDER_URL`; sin esa variable,
+`UnavailableExchangeRateProvider` falla cerrado con
+`EXCHANGE_RATE_PROVIDER_NOT_CONFIGURED` sin tocar SQLite ni la red. Esto no
+bloquea el resto de 9.07: tasa vigente, histórico y carga manual operan hoy sin
+un proveedor aprobado.
 
 ## Contratos de aplicación
 
@@ -137,48 +145,68 @@ siendo una entrada local confirmada.
 - Mostrar la antigüedad real disponible de la tasa local. El estado de
   sincronización y antigüedad distribuida sigue perteneciendo a Fase 10.
 
-## Secuencia outside-in
+## Secuencia outside-in ejecutada
 
-1. Cerrar y documentar las seis decisiones pendientes, en especial proveedor,
-   vigencia, alcance del histórico y autorización de sugerencias.
-2. Escribir pruebas de aplicación fallidas para histórico, sugerencia válida y
-   fallos controlados; comprobar que ninguna lectura persiste datos.
-3. Implementar el puerto de histórico y adapter Drizzle con orden y filtros
+1. Cerrar y documentar las decisiones de ingeniería (ADR-0014); diferir
+   explícitamente la elección de proveedor.
+2. Escribir pruebas de aplicación para histórico y sugerencia (límite
+   acotado, propagación de fallos, cero puertos de escritura).
+3. Reutilizar el puerto de histórico y el adapter Drizzle existentes
+   (`DrizzleExchangeRateRepository.findHistoryByPair`), ya con orden y filtros
    deterministas sobre SQLite temporal.
-4. Publicar contratos shared y pruebas HTTP de vigente, histórico, sugerencia,
-   sesión, permiso de escritura, idempotencia y Problem Details.
-5. Implementar el driver aprobado con transporte simulado, timeout, validación
-   y redacción de secretos; componerlo solo en el servidor.
-6. Ampliar el cliente desktop y el recorrido E2E para carga manual,
-   confirmar/rechazar sugerencia y operación offline.
+4. Publicar el contrato HTTP faltante y sus pruebas: histórico, sugerencia,
+   sesión, límite fuera de rango y fallo cerrado sin proveedor configurado.
+5. Reutilizar el driver `HttpExchangeRateProvider`/`UnavailableExchangeRateProvider`
+   ya compuesto en el servidor con transporte simulado en sus propias pruebas.
+6. Extraer la lógica de lectura/sugerencia/confirmación del cliente desktop a
+   funciones puras testeables y cubrirlas con el nivel E2E aprobado en 9.02
+   (transporte HTTP simulado en Vitest, sin runner de navegador).
 7. Implementar la pantalla con el shell y CSS existentes, sin design system ni
    estado global especulativo.
 8. Ejecutar pipeline y build; actualizar 9.07, el README de Fase 9 y el índice
-   maestro solo cuando todos los criterios estén verificados.
+   maestro.
 
 ## Criterios de aceptación
 
-- [ ] La tasa vigente y el histórico proceden de SQLite local mediante queries
-  de aplicación y contratos compartidos, no de datos mock ni SQL en rutas.
-- [ ] Cada tasa visible conserva par, entero escalado, escala, fuente y vigencia
-  sin usar `float` para transportar, calcular o confirmar el valor.
-- [ ] Solicitar, refrescar, rechazar o fallar una sugerencia produce cero
-  escrituras en `exchange_rates`, auditoría, ledger e idempotencia.
-- [ ] La sugerencia nunca se muestra como vigente, oficial o aplicada y no se
-  confirma sin una acción humana explícita.
-- [ ] Confirmar usa exclusivamente `UpdateExchangeRate`, exige motivo,
-  idempotencia y `currency.rate.update`, y crea una entrada histórica auditable.
-- [ ] Un replay con la misma intención devuelve el mismo resultado y un payload
-  distinto con la misma clave produce `IDEMPOTENCY_KEY_CONFLICT`.
-- [ ] Timeout, red caída, respuesta inválida y par no soportado producen códigos
-  seguros; ninguno oculta ni invalida la última tasa local vigente.
-- [ ] Sin conexión externa se puede consultar la tasa local y completar una
-  carga manual autorizada.
-- [ ] Ninguna credencial, body externo crudo o dato excluido aparece en logs,
-  Problem Details o renderer.
-- [ ] E2E cubre tasa vigente, histórico, carga manual, confirmación, rechazo,
-  denegación y fallo offline de la sugerencia.
-- [ ] Lint, typecheck, tests y build quedan verdes.
+Ejecutado. La tasa vigente, el histórico y la sugerencia consultan SQLite y el
+proveedor configurado a través de casos de uso autorizados; confirmar siempre
+pasa por `UpdateExchangeRate`.
+
+- [x] ~~La tasa vigente y el histórico proceden de SQLite local mediante queries
+  de aplicación y contratos compartidos, no de datos mock ni SQL en rutas.~~
+- [x] ~~Cada tasa visible conserva par, entero escalado, escala, fuente y vigencia
+  sin usar `float` para transportar, calcular o confirmar el valor.~~
+- [x] ~~Solicitar, refrescar, rechazar o fallar una sugerencia produce cero
+  escrituras en `exchange_rates`, auditoría, ledger e idempotencia.~~
+- [x] ~~La sugerencia nunca se muestra como vigente, oficial o aplicada y no se
+  confirma sin una acción humana explícita.~~
+- [x] ~~Confirmar usa exclusivamente `UpdateExchangeRate`, exige motivo,
+  idempotencia y `currency.rate.update`, y crea una entrada histórica auditable.~~
+- [x] ~~Un replay con la misma intención devuelve el mismo resultado y un payload
+  distinto con la misma clave produce `IDEMPOTENCY_KEY_CONFLICT` (comportamiento
+  ya cubierto por `executeIdempotentCommand`, reutilizado sin cambios).~~
+- [x] ~~Timeout, red caída, respuesta inválida y par no soportado producen códigos
+  seguros; ninguno oculta ni invalida la última tasa local vigente.~~
+- [x] ~~Sin conexión externa se puede consultar la tasa local y completar una
+  carga manual autorizada.~~
+- [x] ~~Ninguna credencial, body externo crudo o dato excluido aparece en logs,
+  Problem Details o renderer.~~
+- [x] ~~E2E cubre tasa vigente, histórico, carga manual, confirmación, rechazo,
+  denegación y fallo offline de la sugerencia (a nivel de las funciones puras
+  del cliente que orquestan cada flujo).~~
+- [x] ~~Lint, typecheck, tests y build quedan verdes.~~
+
+## Brechas conservadas
+
+- Sin proveedor externo aprobado, la sugerencia responde
+  `EXCHANGE_RATE_PROVIDER_NOT_CONFIGURED` de forma segura; elegir un proveedor
+  real de negocio queda pendiente de una decisión posterior (ver Decisión
+  diferida).
+- El nivel E2E es el aprobado en 9.02: funciones puras de lectura/confirmación
+  probadas con transporte HTTP simulado, sin runner de navegador ni Electron.
+- Vigencia solapada: confirmar una tasa no cierra automáticamente una anterior
+  con `validUntil` abierto (comportamiento documentado en ADR-0014, no una
+  omisión).
 
 ## Fuera de alcance
 
