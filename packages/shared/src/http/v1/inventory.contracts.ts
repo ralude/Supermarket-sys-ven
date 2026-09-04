@@ -1,8 +1,12 @@
 import { problemDetailsSchema, type HttpContractV1 } from './common.contracts.js';
 
+/**
+ * La recepción solo declara negocio: qué producto, cuánto, de quién y con qué
+ * recibo. El artículo de inventario, su unidad, su escala y si maneja lotes los
+ * deriva la aplicación desde el catálogo o desde el artículo ya existente.
+ */
 export type ReceivePurchaseRequest = {
-  readonly stockItemId: string; readonly productId: string; readonly unitCode: string;
-  readonly quantityScale: number; readonly tracksBatches: boolean; readonly quantityScaled: number;
+  readonly productId: string; readonly quantity: string;
   readonly supplierId: string; readonly receiptId: string; readonly reason: string;
   readonly lot?: { readonly lotNumber: string; readonly expiresAt?: string };
 };
@@ -69,14 +73,10 @@ export const receivePurchaseContract = {
     headers,
     body: {
       type: 'object', additionalProperties: false,
-      required: [
-        'stockItemId', 'productId', 'unitCode', 'quantityScale', 'tracksBatches',
-        'quantityScaled', 'supplierId', 'receiptId', 'reason'
-      ],
+      required: ['productId', 'quantity', 'supplierId', 'receiptId', 'reason'],
       properties: {
-        stockItemId: id, productId: id, unitCode: { type: 'string', minLength: 1 },
-        quantityScale: { type: 'integer', minimum: 0, maximum: 12 },
-        tracksBatches: { type: 'boolean' }, quantityScaled: { type: 'integer', minimum: 1 },
+        productId: id,
+        quantity: { type: 'string', pattern: '^\\d+([.,]\\d+)?$', maxLength: 24 },
         supplierId: id, receiptId: id, reason: { type: 'string', minLength: 1, maxLength: 500 },
         lot: {
           type: 'object', additionalProperties: false, required: ['lotNumber'],
@@ -90,7 +90,9 @@ export const receivePurchaseContract = {
   },
   errorCodes: [
     'HTTP_VALIDATION_FAILED', 'UNAUTHORIZED', 'FORBIDDEN', 'STOCK_BATCH_REQUIRED',
-    'STOCK_ITEM_CONFIGURATION_MISMATCH', 'IDEMPOTENCY_KEY_CONFLICT'
+    'STOCK_BATCH_NOT_ACCEPTED', 'PRODUCT_NOT_FOUND', 'QUANTITY_INVALID_TEXT',
+    'QUANTITY_SCALE_EXCEEDED', 'STOCK_MOVEMENT_QUANTITY_INVALID',
+    'SUPPLIER_NOT_FOUND', 'SUPPLIER_NOT_ACTIVE', 'IDEMPOTENCY_KEY_CONFLICT'
   ]
 } as const satisfies HttpContractV1;
 

@@ -3,6 +3,7 @@ export * from './domain/catalog/index.js';
 export * from './domain/cash/index.js';
 export * from './domain/identity/index.js';
 export * from './domain/inventory/index.js';
+export * from './domain/purchasing/index.js';
 export * from './domain/fiscal/index.js';
 export * from './domain/sales/index.js';
 export * as application from './application/index.js';
@@ -83,6 +84,7 @@ export type {
   SaleRepository,
   ShiftRepository,
   StockItemRepository,
+  SupplierRepository,
   UnitOfWork,
   UnitOfMeasureRepository,
   AuditReportRepository,

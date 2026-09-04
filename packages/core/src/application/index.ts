@@ -4,6 +4,7 @@ export * from './currency/index.js';
 export * from './sales/index.js';
 export * from './events/index.js';
 export * from './inventory/index.js';
+export * from './purchasing/index.js';
 export * from './fiscal/index.js';
 export * from './reporting/index.js';
 export * from './identity/index.js';

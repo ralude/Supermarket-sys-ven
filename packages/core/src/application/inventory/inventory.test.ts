@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Quantity } from '@supermarket/shared';
+import { Money, Quantity, TaxRate } from '@supermarket/shared';
+import { Barcode, Product, UnitOfMeasure } from '../../domain/catalog/index.js';
 import { StockItem } from '../../domain/inventory/index.js';
+import { Supplier, type SupplierStatus } from '../../domain/purchasing/index.js';
 import type { ExecutionContext } from '../execution-context.js';
 import type { BusinessEventV1 } from '../events/index.js';
 import type {
@@ -8,7 +10,9 @@ import type {
   AuditWriter,
   BusinessEventStore,
   IdGenerator,
+  ProductRepository,
   StockItemRepository,
+  SupplierRepository,
   UnitOfWork
 } from '../ports/index.js';
 import { ApplySaleCompletedToInventory } from './apply-sale-completed-to-inventory.js';
@@ -34,6 +38,46 @@ class FakeStockItemRepository implements StockItemRepository {
   async findByProductId(productId: string): Promise<StockItem | null> {
     return this.stored?.productId === productId ? this.stored : null;
   }
+}
+
+const supplierFixture = (status: SupplierStatus = 'ACTIVE'): Supplier => Supplier.create({
+  id: 'supplier-001', code: 'SUP-000001', legalName: 'Proveedor Uno',
+  taxIdentity: { country: 'VE', type: 'RIF', value: 'J-12345678-9' },
+  status, createdAt: new Date('2026-08-01T00:00:00.000Z')
+});
+
+class FakeSupplierRepository implements SupplierRepository {
+  constructor(private readonly supplier: Supplier | null = supplierFixture()) {}
+  async nextCode(): Promise<string> { return 'SUP-000001'; }
+  async save(): Promise<void> {}
+  async findById(id: string): Promise<Supplier | null> {
+    return this.supplier?.id === id ? this.supplier : null;
+  }
+  async findByTaxIdentity(): Promise<Supplier | null> { return null; }
+  async findAll(status?: SupplierStatus): Promise<readonly Supplier[]> {
+    return this.supplier && (status === undefined || this.supplier.status === status) ? [this.supplier] : [];
+  }
+}
+
+const productFixture = (quantityScale = 0): Product => Product.create({
+  id: 'product-001', name: 'Café molido', description: 'Café de prueba',
+  categoryId: 'category-001',
+  unitOfMeasure: UnitOfMeasure.create({
+    id: 'unit-001', code: 'KG', name: 'Kilogramo', quantityScale
+  }),
+  barcodes: [Barcode.create({ id: 'barcode-001', value: '759000000001' })],
+  price: Money.fromMinorUnits(1250, 'USD'), taxRate: TaxRate.fromBasisPoints(1600),
+  priceHistoryId: 'price-001', recordedBy: 'user-001',
+  occurredAt: new Date('2026-08-15T10:00:00.000Z'), eventId: 'product-event-001'
+});
+
+class FakeProductRepository implements ProductRepository {
+  constructor(private readonly product: Product | null = productFixture(3)) {}
+  async save(): Promise<void> {}
+  async findById(productId: string): Promise<Product | null> {
+    return this.product?.id === productId ? this.product : null;
+  }
+  async findByActiveBarcode(): Promise<Product | null> { return null; }
 }
 
 const sequence = (prefix: string): IdGenerator => {
@@ -75,33 +119,141 @@ const stockedBatches = (): StockItem => {
   return item;
 };
 
+const receivePurchase = (
+  repository: FakeStockItemRepository,
+  recorded: ReturnType<typeof evidence>,
+  options: {
+    readonly suppliers?: FakeSupplierRepository;
+    readonly products?: FakeProductRepository;
+    readonly authorize?: (context: ExecutionContext, permission: string) => Promise<boolean>;
+  } = {}
+): ReceivePurchase => new ReceivePurchase(
+  repository,
+  options.suppliers ?? new FakeSupplierRepository(),
+  options.products ?? new FakeProductRepository(),
+  { authorize: options.authorize ?? (async () => true) },
+  sequence('stock'), sequence('movement'), sequence('batch'), sequence('event'), sequence('audit'),
+  { now: () => new Date('2026-08-20T10:00:00.000Z') }, unitOfWork,
+  eventStore(recorded.ledger), auditWriter(recorded.audit)
+);
+
 describe('inventory application', () => {
-  it('receives a purchase by lot and records supplier, ledger and audit evidence', async () => {
+  it('creates the stock item from the catalog on the first receipt of a product', async () => {
     const repository = new FakeStockItemRepository();
     const recorded = evidence();
-    const service = new ReceivePurchase(
-      repository,
-      { authorize: async (_context, permission) => permission === 'inventory.purchase.receive' },
-      sequence('movement'), sequence('batch'), sequence('event'), sequence('audit'),
-      { now: () => new Date('2026-08-20T10:00:00.000Z') }, unitOfWork,
-      eventStore(recorded.ledger), auditWriter(recorded.audit)
-    );
+    const permissions: string[] = [];
+    const service = receivePurchase(repository, recorded, {
+      authorize: async (_context, permission) => {
+        permissions.push(permission);
+        return permission === 'inventory.purchase.receive';
+      }
+    });
 
     const result = await service.execute({
-      stockItemId: 'stock-001', productId: 'product-001', unitCode: 'UNIT',
-      quantityScale: 0, tracksBatches: true, quantityScaled: 10,
+      productId: 'product-001', quantity: '10,5',
       supplierId: 'supplier-001', receiptId: 'receipt-001', reason: 'Supplier delivery',
       lot: { lotNumber: 'lot-001', expiresAt: new Date('2027-08-20T00:00:00.000Z') }
     }, context);
 
     expect(result.ok).toBe(true);
-    expect(repository.stored?.balance.scaledValue).toBe(10);
+    expect(permissions).toEqual(['inventory.purchase.receive']);
+    expect(repository.stored?.id).toBe('stock-1');
+    expect(repository.stored?.unitCode).toBe('KG');
+    expect(repository.stored?.quantityScale).toBe(3);
+    expect(repository.stored?.tracksBatches).toBe(true);
+    expect(repository.stored?.balance.scaledValue).toBe(10500);
     expect(repository.stored?.batches[0]?.lotNumber).toBe('LOT-001');
     expect(recorded.ledger).toEqual(['StockMovementRegistered']);
     expect(recorded.audit).toMatchObject([{
       action: 'PURCHASE_RECEIPT_REGISTERED',
-      after: { supplierId: 'supplier-001', receiptId: 'receipt-001' }
+      after: { supplierId: 'supplier-001', receiptId: 'receipt-001', quantityScale: 3 }
     }]);
+  });
+
+  it('keeps the configuration of the stock item that already exists', async () => {
+    const repository = new FakeStockItemRepository(stockedBatches());
+    const recorded = evidence();
+
+    const result = await receivePurchase(repository, recorded).execute({
+      productId: 'product-001', quantity: '3',
+      supplierId: 'supplier-001', receiptId: 'receipt-003', reason: 'Supplier delivery',
+      lot: { lotNumber: 'FIRST' }
+    }, context);
+
+    expect(result.ok).toBe(true);
+    expect(repository.stored?.id).toBe('stock-001');
+    expect(repository.stored?.unitCode).toBe('UNIT');
+    expect(repository.stored?.quantityScale).toBe(0);
+    expect(repository.stored?.balance.scaledValue).toBe(10);
+  });
+
+  it('rejects a receipt for a product that the catalog does not know', async () => {
+    const repository = new FakeStockItemRepository();
+    const recorded = evidence();
+
+    const result = await receivePurchase(repository, recorded, {
+      products: new FakeProductRepository(null)
+    }).execute({
+      productId: 'product-001', quantity: '10',
+      supplierId: 'supplier-001', receiptId: 'receipt-001', reason: 'Supplier delivery'
+    }, context);
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'PRODUCT_NOT_FOUND' } });
+    expect(repository.saves).toBe(0);
+    expect(recorded).toEqual({ ledger: [], audit: [] });
+  });
+
+  it('rejects a quantity with more decimals than the unit of measure allows', async () => {
+    const repository = new FakeStockItemRepository();
+    const recorded = evidence();
+
+    const result = await receivePurchase(repository, recorded, {
+      products: new FakeProductRepository(productFixture(0))
+    }).execute({
+      productId: 'product-001', quantity: '1.5',
+      supplierId: 'supplier-001', receiptId: 'receipt-001', reason: 'Supplier delivery'
+    }, context);
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'QUANTITY_SCALE_EXCEEDED' } });
+    expect(repository.saves).toBe(0);
+    expect(recorded).toEqual({ ledger: [], audit: [] });
+  });
+
+  it.each(['BLOCKED', 'INACTIVE'] as const)(
+    'rejects a %s supplier before creating inventory evidence',
+    async (status) => {
+      const repository = new FakeStockItemRepository();
+      const recorded = evidence();
+      const service = receivePurchase(repository, recorded, {
+        suppliers: new FakeSupplierRepository(supplierFixture(status))
+      });
+
+      const result = await service.execute({
+        productId: 'product-001', quantity: '10',
+        supplierId: 'supplier-001', receiptId: 'receipt-001', reason: 'Supplier delivery'
+      }, context);
+
+      expect(result).toMatchObject({ ok: false, error: { code: 'SUPPLIER_NOT_ACTIVE' } });
+      expect(repository.saves).toBe(0);
+      expect(recorded).toEqual({ ledger: [], audit: [] });
+    }
+  );
+
+  it('rejects an unknown supplier before creating inventory evidence', async () => {
+    const repository = new FakeStockItemRepository();
+    const recorded = evidence();
+    const service = receivePurchase(repository, recorded, {
+      suppliers: new FakeSupplierRepository(null)
+    });
+
+    const result = await service.execute({
+      productId: 'product-001', quantity: '10',
+      supplierId: 'missing', receiptId: 'receipt-001', reason: 'Supplier delivery'
+    }, context);
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'SUPPLIER_NOT_FOUND' } });
+    expect(repository.saves).toBe(0);
+    expect(recorded).toEqual({ ledger: [], audit: [] });
   });
 
   it('applies SaleCompleted with FEFO and ignores an identical redelivery', async () => {

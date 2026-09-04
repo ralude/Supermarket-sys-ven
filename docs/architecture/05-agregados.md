@@ -12,6 +12,8 @@ Un agregado es una frontera de consistencia. Solo su raíz se carga y modifica d
 | `StockItem` | Stock, lotes y movimientos | saldo derivado; stock y saldo por lote no negativos |
 | `Shift` | Turno y movimientos de caja | un turno abierto por caja; arqueo trazable |
 | `PurchaseOrder` | Orden y recepción | recepción acumulada no supera cantidad ordenada |
+| `Supplier` | Identidad y estado del proveedor | identidad fiscal única; código inmutable; sin borrado histórico |
+| `PurchaseReceipt` | Evidencia de compra recibida | snapshot, líneas, cantidades y costos inmutables al completar |
 | `User` | Identidad y concesiones | roles activos, asignables y sin duplicados; sin credenciales en Fase 2 |
 
 El agregado `Product` contiene barcodes, precio vigente e historial append-only.
@@ -79,6 +81,29 @@ Cuando `tracksBatches` está activo, todo movimiento exige un lote registrado y
 la disponibilidad se valida por lote. Sin esa marca, no se aceptan lotes. La
 selección FEFO, el consumo idempotente de ventas, el kardex y la reconciliación
 offline pertenecen a la Fase 6.
+
+El artículo se crea en la primera recepción del producto: la aplicación genera
+su ID y toma unidad y escala del producto del catálogo; un producto que el
+catálogo no conoce no puede recibirse. Una vez creado, el artículo conserva esa
+configuración aunque el catálogo cambie después, porque su historia de
+movimientos ya está escrita en esa escala. `tracksBatches` se fija en esa
+primera recepción según traiga lote o no: el catálogo todavía no modela ese
+atributo y esta sub-fase no lo inventa; queda declarado como brecha para la
+configuración de datos maestros de 9B.10.
+
+## Agregado `Supplier`
+
+`Supplier` es una raíz del módulo `purchasing`. Su ID técnico y código humano
+son inmutables; la identidad fiscal no funciona como clave primaria y es única
+por país, tipo y valor normalizado. Solo `ACTIVE` participa en operaciones
+nuevas. `BLOCKED` e `INACTIVE` permanecen consultables, y no existe borrado
+físico de historia. Los cambios sensibles y la corrección privilegiada de
+identidad se auditan conforme ADR-0019.
+
+`PurchaseReceipt` será una raíz separada cuando 9B.04 incorpore costo. El caso de
+uso coordinará su confirmación con el movimiento de `StockItem` mediante puertos
+y una sola unidad de trabajo; no se crea en 9B.03 una recepción completada sin
+costo.
 
 ## Agregado `FiscalDocument`
 

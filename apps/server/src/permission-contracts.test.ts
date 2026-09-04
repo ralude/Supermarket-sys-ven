@@ -1,7 +1,10 @@
 import {
   applySaleDiscountContract,
   closeShiftContract,
+  changeSupplierStatusContract,
+  correctSupplierTaxIdentityContract,
   createProductContract,
+  createSupplierContract,
   getAuditReportContract,
   getCashClosureReportContract,
   getFiscalOperationsReportContract,
@@ -16,6 +19,7 @@ import {
   updateExchangeRateContract,
   updatePriceContract,
   updateProductContract,
+  updateSupplierContract,
   voidSaleContract,
   type HttpContractV1
 } from '@supermarket/shared';
@@ -74,6 +78,16 @@ describe('el permiso declarado por cada contrato coincide con el que su caso de 
     expectedPermission(getCashClosureReportContract, application.REPORT_PERMISSIONS.READ_CASH);
     expectedPermission(getAuditReportContract, application.REPORT_PERMISSIONS.READ_AUDIT);
     expectedPermission(getFiscalOperationsReportContract, application.REPORT_PERMISSIONS.READ_FISCAL);
+  });
+
+  it('proveedores', () => {
+    expectedPermission(createSupplierContract, application.SUPPLIER_PERMISSIONS.CREATE);
+    expectedPermission(updateSupplierContract, application.SUPPLIER_PERMISSIONS.UPDATE);
+    expectedPermission(changeSupplierStatusContract, application.SUPPLIER_PERMISSIONS.UPDATE);
+    expectedPermission(
+      correctSupplierTaxIdentityContract,
+      application.SUPPLIER_PERMISSIONS.CORRECT_TAX_IDENTITY
+    );
   });
 
   it('venta', () => {

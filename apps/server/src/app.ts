@@ -28,6 +28,7 @@ import { registerCashRoutes } from './routes/cash.ts';
 import { registerInventoryRoutes } from './routes/inventory.ts';
 import { registerFiscalDocumentRoutes } from './routes/fiscal-documents.ts';
 import { registerReportRoutes } from './routes/reports.ts';
+import { registerSupplierRoutes } from './routes/suppliers.ts';
 
 type FiscalReportUseCase = {
   execute(
@@ -86,6 +87,14 @@ export type ServerDependencies = {
     readonly registerStockAdjustment: application.RegisterStockAdjustment;
     readonly getKardex: application.GetKardex;
   };
+  readonly suppliers: {
+    readonly create: application.CreateSupplier;
+    readonly get: application.GetSupplier;
+    readonly list: application.ListSuppliers;
+    readonly update: application.UpdateSupplier;
+    readonly changeStatus: application.ChangeSupplierStatus;
+    readonly correctTaxIdentity: application.CorrectSupplierTaxIdentity;
+  };
   readonly fiscalDocuments: {
     readonly issue: application.IssueFiscalDocument;
     readonly get: application.GetFiscalDocument;
@@ -116,6 +125,7 @@ const statusFor = (code: string): number => {
   if (code.includes('CONFLICT') || code.includes('ALREADY_') || code.endsWith('_INVALID_STATE')) {
     return 409;
   }
+  if (code === 'SUPPLIER_NOT_ACTIVE') return 409;
   if (code === 'POLICY_NOT_CONFIGURED') return 409;
   if (code === 'DATABASE_BUSY' || code === 'NETWORK_UNAVAILABLE') return 503;
   return 400;
@@ -230,6 +240,7 @@ export const buildApp = (dependencies?: ServerDependencies): FastifyInstance => 
     registerSalesRoutes(app, dependencies);
     registerCashRoutes(app, dependencies);
     registerInventoryRoutes(app, dependencies);
+    registerSupplierRoutes(app, dependencies);
     registerFiscalDocumentRoutes(app, dependencies);
     registerReportRoutes(app, dependencies);
     if (dependencies.simulatedReportsEnabled && dependencies.fiscalReports) {

@@ -22,7 +22,17 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 12 | Optimizacion | Pendiente |
 
 **Fase actual:** Fase 9B - Perfiles operativos y capacidades faltantes
-**Sub-fase actual:** 9B.03 - Proveedores, no iniciada. La fundación de la fase
+**Sub-fase actual:** 9B.03 - Proveedores, en progreso. Su
+[plan](./fase-09b-perfiles/plan-9b.03-proveedores.md) detectó que el snapshot de una recepción
+`COMPLETED` exige costos de 9B.04 y que la arquitectura aún no reconoce `Supplier` ni
+`PurchaseReceipt` como raíces. [ADR-0019](../architecture/adr/0019-proveedores-y-recepciones-de-compra.md)
+aceptó implementar el maestro `Supplier` ahora y reservar la recepción completa para 9B.04;
+las definiciones fiscales/documentales restantes no bloquean este primer corte. El corte del
+2026-09-04 entregó la pantalla administrativa de proveedores con controles derivados de los
+permisos efectivos y quitó de la recepción los datos técnicos que escribía el renderer: la
+aplicación genera el artículo de inventario de la primera recepción, deriva unidad y escala
+del catálogo y escala la cantidad decimal escrita por el operador. Solo quedan abiertas las
+reglas fiscales que el plan enumera como decisión de negocio. La fundación de la fase
 (9B.00 permisos efectivos en la sesión, 9B.01 reestructuración del renderer,
 9B.02 datos maestros seleccionables) se completó el 2026-09-04; el detalle de
 cada una vive en sus archivos de sub-fase. Las siguientes capacidades de
@@ -147,6 +157,17 @@ conserva sus cuatro sub-fases intactas y ninguna ha iniciado.
   agregado nuevo no es derivable sin decidir generación de id desde el
   renderer) y la cobertura de interacción DOM, que sigue sin entorno de
   pruebas (`jsdom`) en el monorepo.
+- El 2026-09-04, el segundo corte de 9B.03 cerró esa recepción pendiente y
+  agregó la pantalla administrativa de proveedores. `ReceivePurchase` dejó de
+  aceptar `stockItemId`, `unitCode`, `quantityScale` y `tracksBatches`: la
+  aplicación genera el artículo de la primera recepción, toma unidad y escala
+  del producto del catálogo, rechaza un producto desconocido con
+  `PRODUCT_NOT_FOUND` y escala la cantidad decimal del operador con la unidad
+  derivada. La ruta `#/suppliers` se oculta sin permisos de proveedor porque su
+  lectura solo existe para el selector de recepción. Queda reportado que
+  `tracksBatches` de un artículo nuevo se fija según la primera recepción traiga
+  lote o no: el catálogo no modela ese atributo y decidirlo pertenece a la
+  configuración de datos maestros de 9B.10.
 - El 2026-09-04 se agregó la sub-fase correctiva 9.08 tras una auditoría de
   `apps/desktop`. Corrige el defecto reportado en la venta (barcode aceptado y
   pantalla en blanco), cuya causa raíz es del renderer: `Intl.NumberFormat` con

@@ -124,15 +124,21 @@ describe('desktop renderer base states', () => {
     expect(shortcutHash('9')).toBeNull();
   });
 
-  it('reaches every screen but Reportes with no permission at all, since every other screen has a read open to any valid session', () => {
+  it('reaches every operational screen with no permission at all, since each one has a read open to any valid session', () => {
     const noPermission: readonly string[] = [];
     expect(isRouteReachable(resolveRoute('#/sales'), noPermission)).toBe(true);
     expect(isRouteReachable(resolveRoute('#/cash'), noPermission)).toBe(true);
     expect(isRouteReachable(resolveRoute('#/catalog'), noPermission)).toBe(true);
     expect(isRouteReachable(resolveRoute('#/inventory'), noPermission)).toBe(true);
     expect(isRouteReachable(resolveRoute('#/rates'), noPermission)).toBe(true);
+  });
+
+  it('gates the screens whose whole purpose is a command behind their permissions', () => {
+    const noPermission: readonly string[] = [];
     expect(isRouteReachable(resolveRoute('#/reports'), noPermission)).toBe(false);
     expect(isRouteReachable(resolveRoute('#/reports'), ['reports.audit.read'])).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/suppliers'), noPermission)).toBe(false);
+    expect(isRouteReachable(resolveRoute('#/suppliers'), ['supplier.update'])).toBe(true);
   });
 
   it('hides the Reportes entry and blocks the hash without a report permission, without touching the server', () => {

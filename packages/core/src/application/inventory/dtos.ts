@@ -1,10 +1,11 @@
+/**
+ * Entrada de negocio de una recepción. El artículo de inventario, su unidad y
+ * su escala no viajan aquí: los deriva la aplicación del artículo existente o,
+ * la primera vez, del producto del catálogo.
+ */
 export type ReceivePurchaseInput = {
-  stockItemId: string;
   productId: string;
-  unitCode: string;
-  quantityScale: number;
-  tracksBatches: boolean;
-  quantityScaled: number;
+  quantity: string;
   supplierId: string;
   receiptId: string;
   reason: string;

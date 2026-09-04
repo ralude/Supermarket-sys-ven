@@ -8,6 +8,7 @@ export { DrizzleOutboxStore } from './outbox-store.js';
 export { DrizzleAuditWriter } from './audit-writer.js';
 export { DrizzleIdempotencyStore } from './idempotency-store.js';
 export { DrizzleProductSnapshotProvider } from './product-snapshot-provider.js';
+export { DrizzleSupplierRepository } from './supplier-repository.js';
 export {
   SqliteDiscountPolicyProvider,
   SqliteFinancialTransactionTaxPolicyProvider

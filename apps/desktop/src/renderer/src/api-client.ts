@@ -29,6 +29,11 @@ import {
   listUnitsOfMeasureContract,
   loginContract,
   listProductsContract,
+  listSuppliersContract,
+  createSupplierContract,
+  updateSupplierContract,
+  changeSupplierStatusContract,
+  correctSupplierTaxIdentityContract,
   logoutContract,
   startSaleContract,
   createProductContract,
@@ -64,6 +69,12 @@ import {
   type LoginRequest,
   type ProblemDetails,
   type SessionResponse,
+  type SupplierResponse,
+  type SupplierStatusResponse,
+  type CreateSupplierRequest,
+  type UpdateSupplierRequest,
+  type ChangeSupplierStatusRequest,
+  type CorrectSupplierTaxIdentityRequest,
   type CashRegisterResponse,
   type CategoryResponse,
   type PaymentMethodResponse,
@@ -230,6 +241,26 @@ export const createDesktopApi = (fetcher: typeof fetch = globalThis.fetch) => ({
   listProducts: (query = ''): Promise<readonly ProductResponse[]> => requestJson(
     fetcher, listProductsContract.path + (query ? '?query=' + encodeURIComponent(query) : ''),
     { method: listProductsContract.method }
+  ),
+  listSuppliers: (status?: SupplierStatusResponse): Promise<readonly SupplierResponse[]> => requestJson(
+    fetcher, listSuppliersContract.path + search({ status }),
+    { method: listSuppliersContract.method }
+  ),
+  createSupplier: (input: CreateSupplierRequest, idempotencyKey: string): Promise<SupplierResponse> => requestJson(
+    fetcher, createSupplierContract.path,
+    { method: createSupplierContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  updateSupplier: (supplierId: string, input: UpdateSupplierRequest, idempotencyKey: string): Promise<SupplierResponse> => requestJson(
+    fetcher, path(updateSupplierContract.path, supplierId),
+    { method: updateSupplierContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  changeSupplierStatus: (supplierId: string, input: ChangeSupplierStatusRequest, idempotencyKey: string): Promise<SupplierResponse> => requestJson(
+    fetcher, path(changeSupplierStatusContract.path, supplierId),
+    { method: changeSupplierStatusContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  correctSupplierTaxIdentity: (supplierId: string, input: CorrectSupplierTaxIdentityRequest, idempotencyKey: string): Promise<SupplierResponse> => requestJson(
+    fetcher, path(correctSupplierTaxIdentityContract.path, supplierId),
+    { method: correctSupplierTaxIdentityContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
   ),
   getPriceHistory: (productId: string): Promise<readonly PriceHistoryResponse[]> => requestJson(
     fetcher, path(getPriceHistoryContract.path, productId), { method: getPriceHistoryContract.method }

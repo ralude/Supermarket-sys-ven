@@ -48,7 +48,8 @@ describe('database migrations', () => {
       expect.objectContaining({ version: 11, name: 'fiscal_integrity_guards' }),
       expect.objectContaining({ version: 12, name: 'fiscal_recovery_integrity' }),
       expect.objectContaining({ version: 13, name: 'identity_security' }),
-      expect.objectContaining({ version: 14, name: 'operational_policies' })
+      expect.objectContaining({ version: 14, name: 'operational_policies' }),
+      expect.objectContaining({ version: 15, name: 'suppliers' })
     ]);
 
     const tables = handle.sqlite.prepare(
@@ -93,7 +94,9 @@ describe('database migrations', () => {
       'shifts',
       'stock_batches',
       'stock_items',
-      'stock_movements'
+      'stock_movements',
+      'supplier_code_sequence',
+      'suppliers'
     ]));
     expect(handle.sqlite.prepare("pragma table_info('sales')").all())
       .toEqual(expect.arrayContaining([expect.objectContaining({ name: 'shift_id', notnull: 1 })]));
@@ -595,7 +598,7 @@ describe('database migrations', () => {
       );
     `);
 
-    expect(applyMigrations(handle.sqlite)).toEqual([10, 11, 12, 13, 14]);
+    expect(applyMigrations(handle.sqlite)).toEqual([10, 11, 12, 13, 14, 15]);
     expect(handle.sqlite.prepare(`
       select last_dispatch_state as dispatchState,
         last_command_effect as commandEffect,

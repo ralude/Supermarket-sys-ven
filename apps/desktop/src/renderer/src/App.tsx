@@ -8,7 +8,7 @@ import {
   type SessionResponse
 } from '@supermarket/shared';
 import { ApiProblemError, createDesktopApi, type DesktopApi, type OperationApi } from './api-client.js';
-import { routeScreen } from './operation-screens.js';
+import { canManageSuppliers, routeScreen } from './operation-screens.js';
 
 export const PRODUCT_NAME = 'Cullen';
 
@@ -24,7 +24,8 @@ type AppRoute = {
    * cualquier sesión válida. La mayoría de las pantallas mezclan lecturas sin
    * permiso con comandos que sí lo exigen, así que ocultar la pantalla entera
    * solo es correcto cuando ninguna de sus acciones es de solo sesión — hoy
-   * únicamente ocurre en Reportes.
+   * ocurre en Reportes y en Proveedores, cuya lectura solo existe para el
+   * selector de recepción.
    */
   readonly isReachable?: (permissionCodes: readonly string[]) => boolean;
 };
@@ -55,14 +56,20 @@ const ROUTES: readonly AppRoute[] = [
     description: 'Kardex, recepciones de compra y ajustes autorizados de existencia.'
   },
   {
-    id: 'reports', hash: '#/reports', label: 'Reportes', title: 'Reportes y cierres', shortcut: '6',
+    id: 'suppliers', hash: '#/suppliers', label: 'Proveedores', title: 'Proveedores',
+    shortcut: '6',
+    description: 'Maestro de proveedores con identidad fiscal, estados y auditoría.',
+    isReachable: canManageSuppliers
+  },
+  {
+    id: 'reports', hash: '#/reports', label: 'Reportes', title: 'Reportes y cierres', shortcut: '7',
     description: 'Cierres de caja, auditoría y estados fiscales del período.',
     isReachable: (permissionCodes) => REPORTS_READ_CONTRACTS.some(
       (contract) => isPermissionGranted(contract.permission, permissionCodes)
     )
   },
   {
-    id: 'rates', hash: '#/rates', label: 'Tasas', title: 'Tasas de cambio', shortcut: '7',
+    id: 'rates', hash: '#/rates', label: 'Tasas', title: 'Tasas de cambio', shortcut: '8',
     description: 'Tasa vigente, histórico local y confirmación de sugerencias externas.'
   }
 ];

@@ -1,0 +1,394 @@
+import { useCallback, useEffect, useState } from 'react';
+import {
+  changeSupplierStatusContract,
+  correctSupplierTaxIdentityContract,
+  createSupplierContract,
+  isPermissionGranted,
+  updateSupplierContract,
+  type SupplierResponse,
+  type SupplierStatusResponse,
+  type UpdateSupplierRequest
+} from '@supermarket/shared';
+import { createIdempotencyKey } from '../api-client.js';
+import { ActionButton, EmptyState, Feedback, ScreenNote, type ScreenProps } from './shared.js';
+
+/** Contratos que convierten esta pantalla en trabajo real y no en una lectura. */
+const SUPPLIER_COMMAND_CONTRACTS = [
+  createSupplierContract, updateSupplierContract, correctSupplierTaxIdentityContract
+] as const;
+
+/**
+ * El maestro de proveedores solo se ofrece a quien puede administrarlo. La
+ * lectura sigue disponible para el selector de recepción, que cualquier sesión
+ * válida puede consultar; el servidor vuelve a autorizar cada comando.
+ */
+export const canManageSuppliers = (permissionCodes: readonly string[]): boolean =>
+  SUPPLIER_COMMAND_CONTRACTS.some(
+    (contract) => isPermissionGranted(contract.permission, permissionCodes)
+  );
+
+export const SUPPLIER_STATUS_LABELS: Record<SupplierStatusResponse, string> = {
+  ACTIVE: 'Activo',
+  BLOCKED: 'Bloqueado',
+  INACTIVE: 'Inactivo'
+};
+
+export type SupplierForm = {
+  readonly legalName: string;
+  readonly tradeName: string;
+  readonly fiscalAddress: string;
+  readonly reason: string;
+};
+
+export const toSupplierForm = (supplier: SupplierResponse): SupplierForm => ({
+  legalName: supplier.legalName,
+  tradeName: supplier.tradeName ?? '',
+  fiscalAddress: supplier.fiscalAddress ?? '',
+  reason: ''
+});
+
+const optional = (value: string): string | null => (value.trim() === '' ? null : value.trim());
+
+/**
+ * Construye la actualización con los campos que realmente cambiaron. El
+ * contrato exige al menos uno: sin cambios no hay comando que enviar y la
+ * pantalla no debe inventar uno.
+ */
+export const supplierUpdatePayload = (
+  supplier: SupplierResponse,
+  form: SupplierForm
+): UpdateSupplierRequest | null => {
+  const legalName = form.legalName.trim();
+  const tradeName = optional(form.tradeName);
+  const fiscalAddress = optional(form.fiscalAddress);
+  const changes = {
+    ...(legalName !== supplier.legalName && legalName !== '' ? { legalName } : {}),
+    ...(tradeName !== supplier.tradeName ? { tradeName } : {}),
+    ...(fiscalAddress !== supplier.fiscalAddress ? { fiscalAddress } : {})
+  };
+  if (Object.keys(changes).length === 0) return null;
+  return { ...changes, reason: form.reason.trim() };
+};
+
+const emptyCreateForm = {
+  legalName: '', tradeName: '', fiscalAddress: '',
+  country: 'VE', type: 'RIF', value: '', reason: ''
+};
+
+export const SuppliersScreen = ({ api, permissionCodes }: ScreenProps): React.JSX.Element => {
+  const [suppliers, setSuppliers] = useState<readonly SupplierResponse[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'' | SupplierStatusResponse>('');
+  const [selected, setSelected] = useState<SupplierResponse | null>(null);
+  const [form, setForm] = useState<SupplierForm>({
+    legalName: '', tradeName: '', fiscalAddress: '', reason: ''
+  });
+  const [status, setStatus] = useState<SupplierStatusResponse>('ACTIVE');
+  const [statusReason, setStatusReason] = useState('');
+  const [taxType, setTaxType] = useState('RIF');
+  const [taxValue, setTaxValue] = useState('');
+  const [taxCountry, setTaxCountry] = useState('VE');
+  const [taxReason, setTaxReason] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState(emptyCreateForm);
+  const [error, setError] = useState<unknown>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const canCreate = isPermissionGranted(createSupplierContract.permission, permissionCodes);
+  const canUpdate = isPermissionGranted(updateSupplierContract.permission, permissionCodes);
+  const canChangeStatus = isPermissionGranted(
+    changeSupplierStatusContract.permission, permissionCodes
+  );
+  const canCorrect = isPermissionGranted(
+    correctSupplierTaxIdentityContract.permission, permissionCodes
+  );
+
+  const load = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    try { setSuppliers(await api.listSuppliers(statusFilter === '' ? undefined : statusFilter)); }
+    catch (nextError) { setError(nextError); }
+    finally { setLoading(false); }
+  }, [api, statusFilter]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const dismissFeedback = (): void => { setError(null); setNotice(null); };
+
+  const select = (supplier: SupplierResponse): void => {
+    setSelected(supplier);
+    setForm(toSupplierForm(supplier));
+    setStatus(supplier.status);
+    setStatusReason('');
+    setTaxCountry(supplier.taxIdentity.country);
+    setTaxType(supplier.taxIdentity.type);
+    setTaxValue(supplier.taxIdentity.value);
+    setTaxReason('');
+  };
+
+  const run = async (
+    command: () => Promise<SupplierResponse>,
+    message: string
+  ): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const supplier = await command();
+      select(supplier);
+      setNotice(message);
+      await load();
+    } catch (nextError) { setError(nextError); }
+    finally { setLoading(false); }
+  };
+
+  const create = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    await run(async () => {
+      const created = await api.createSupplier({
+        legalName: createForm.legalName.trim(),
+        ...(createForm.tradeName.trim() ? { tradeName: createForm.tradeName.trim() } : {}),
+        ...(createForm.fiscalAddress.trim() ? { fiscalAddress: createForm.fiscalAddress.trim() } : {}),
+        taxIdentity: {
+          country: createForm.country.trim().toUpperCase(),
+          type: createForm.type.trim().toUpperCase(),
+          value: createForm.value.trim()
+        },
+        reason: createForm.reason.trim()
+      }, createIdempotencyKey());
+      setCreateForm(emptyCreateForm);
+      setShowCreate(false);
+      return created;
+    }, 'Proveedor registrado.');
+  };
+
+  const update = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!selected) return;
+    const payload = supplierUpdatePayload(selected, form);
+    if (!payload) {
+      setError(null);
+      setNotice('No hay cambios que guardar en este proveedor.');
+      return;
+    }
+    await run(
+      () => api.updateSupplier(selected.id, payload, createIdempotencyKey()),
+      'Proveedor actualizado.'
+    );
+  };
+
+  const changeStatus = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!selected) return;
+    await run(
+      () => api.changeSupplierStatus(
+        selected.id, { status, reason: statusReason.trim() }, createIdempotencyKey()
+      ),
+      'Estado del proveedor actualizado.'
+    );
+  };
+
+  const correctTaxIdentity = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!selected) return;
+    await run(
+      () => api.correctSupplierTaxIdentity(selected.id, {
+        taxIdentity: {
+          country: taxCountry.trim().toUpperCase(),
+          type: taxType.trim().toUpperCase(),
+          value: taxValue.trim()
+        },
+        reason: taxReason.trim()
+      }, createIdempotencyKey()),
+      'Identidad fiscal corregida.'
+    );
+  };
+
+  return (
+    <div className="operation-screen">
+      <ScreenNote>
+        Administra el maestro de proveedores. Cada alta, cambio y corrección queda auditada; el
+        estado sustituye al borrado y solo un proveedor activo puede recibir compras nuevas.
+      </ScreenNote>
+      <Feedback error={error} notice={notice} onDismiss={dismissFeedback} />
+      <section className="panel">
+        <div className="screen-toolbar">
+          <label>Estado
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as '' | SupplierStatusResponse)}
+            >
+              <option value="">Todos</option>
+              <option value="ACTIVE">Activos</option>
+              <option value="BLOCKED">Bloqueados</option>
+              <option value="INACTIVE">Inactivos</option>
+            </select>
+          </label>
+          <ActionButton type="button" onClick={() => void load()} busy={loading} disabled={loading}>
+            {loading ? 'Consultando…' : 'Actualizar listado'}
+          </ActionButton>
+          {canCreate && (
+            <button type="button" onClick={() => setShowCreate((value) => !value)}>
+              {showCreate ? 'Cancelar' : 'Nuevo proveedor'}
+            </button>
+          )}
+        </div>
+        {showCreate && canCreate && (
+          <form className="stack-form" onSubmit={create}>
+            <div className="form-grid">
+              <label>Razón social
+                <input value={createForm.legalName} required
+                  onChange={(event) => setCreateForm({ ...createForm, legalName: event.target.value })} />
+              </label>
+              <label>Nombre comercial
+                <input value={createForm.tradeName}
+                  onChange={(event) => setCreateForm({ ...createForm, tradeName: event.target.value })} />
+              </label>
+              <label>País
+                <input value={createForm.country} maxLength={2} required
+                  onChange={(event) => setCreateForm({ ...createForm, country: event.target.value.toUpperCase() })} />
+              </label>
+              <label>Tipo fiscal
+                <input value={createForm.type} required
+                  onChange={(event) => setCreateForm({ ...createForm, type: event.target.value.toUpperCase() })} />
+              </label>
+              <label>Identificación fiscal
+                <input value={createForm.value} placeholder="J-12345678-9" required
+                  onChange={(event) => setCreateForm({ ...createForm, value: event.target.value })} />
+              </label>
+              <label>Dirección fiscal
+                <input value={createForm.fiscalAddress}
+                  onChange={(event) => setCreateForm({ ...createForm, fiscalAddress: event.target.value })} />
+              </label>
+            </div>
+            <label>Motivo
+              <input value={createForm.reason} required
+                onChange={(event) => setCreateForm({ ...createForm, reason: event.target.value })} />
+            </label>
+            <ActionButton className="primary-button" type="submit" busy={loading} disabled={loading}>
+              {loading ? 'Registrando…' : 'Registrar proveedor'}
+            </ActionButton>
+          </form>
+        )}
+        {suppliers.length === 0 ? (
+          <EmptyState>No hay proveedores registrados para este filtro.</EmptyState>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Código</th><th>Razón social</th><th>Identidad fiscal</th>
+                  <th>Estado</th><th />
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.map((supplier) => (
+                  <tr key={supplier.id}>
+                    <td>{supplier.code}</td>
+                    <td>
+                      {supplier.legalName}
+                      {supplier.tradeName && <small className="muted"> · {supplier.tradeName}</small>}
+                    </td>
+                    <td>{supplier.taxIdentity.type} {supplier.taxIdentity.value}</td>
+                    <td>{SUPPLIER_STATUS_LABELS[supplier.status]}</td>
+                    <td>
+                      <button type="button" onClick={() => select(supplier)}>Ver ficha</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      {selected && (
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">{selected.code}</p>
+              <h3>{selected.legalName}</h3>
+            </div>
+            <strong className="total-figure">{SUPPLIER_STATUS_LABELS[selected.status]}</strong>
+          </div>
+          <dl className="detail-grid">
+            <div><dt>Identidad fiscal</dt><dd>
+              {selected.taxIdentity.country} · {selected.taxIdentity.type} {selected.taxIdentity.value}
+            </dd></div>
+            <div><dt>Normalizada</dt><dd>{selected.taxIdentity.normalizedValue}</dd></div>
+            <div><dt>Alta</dt><dd>{new Date(selected.createdAt).toLocaleString('es-VE')}</dd></div>
+            <div><dt>Versión</dt><dd>{selected.version}</dd></div>
+          </dl>
+          <form className="stack-form" onSubmit={update}>
+            <p className="eyebrow">Datos comerciales</p>
+            <div className="form-grid">
+              <label>Razón social
+                <input value={form.legalName} required
+                  onChange={(event) => setForm({ ...form, legalName: event.target.value })} />
+              </label>
+              <label>Nombre comercial
+                <input value={form.tradeName}
+                  onChange={(event) => setForm({ ...form, tradeName: event.target.value })} />
+              </label>
+              <label>Dirección fiscal
+                <input value={form.fiscalAddress}
+                  onChange={(event) => setForm({ ...form, fiscalAddress: event.target.value })} />
+              </label>
+            </div>
+            <label>Motivo
+              <input value={form.reason} required
+                onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+            </label>
+            <ActionButton className="primary-button" type="submit" busy={loading}
+              disabled={loading || !canUpdate}>
+              {loading ? 'Guardando…' : 'Guardar cambios'}
+            </ActionButton>
+          </form>
+          <form className="stack-form" onSubmit={changeStatus}>
+            <p className="eyebrow">Estado</p>
+            <label>Nuevo estado
+              <select value={status}
+                onChange={(event) => setStatus(event.target.value as SupplierStatusResponse)}>
+                <option value="ACTIVE">Activo</option>
+                <option value="BLOCKED">Bloqueado</option>
+                <option value="INACTIVE">Inactivo</option>
+              </select>
+            </label>
+            <label>Motivo
+              <input value={statusReason} required
+                onChange={(event) => setStatusReason(event.target.value)} />
+            </label>
+            <ActionButton type="submit" busy={loading} disabled={loading || !canChangeStatus}>
+              {loading ? 'Aplicando…' : 'Cambiar estado'}
+            </ActionButton>
+          </form>
+          {canCorrect && (
+            <form className="stack-form" onSubmit={correctTaxIdentity}>
+              <p className="eyebrow">Corrección privilegiada</p>
+              <p className="muted">
+                Corrige la identidad fiscal de la misma entidad legal. Un contribuyente distinto
+                exige registrar otro proveedor.
+              </p>
+              <div className="form-grid">
+                <label>País
+                  <input value={taxCountry} maxLength={2} required
+                    onChange={(event) => setTaxCountry(event.target.value.toUpperCase())} />
+                </label>
+                <label>Tipo fiscal
+                  <input value={taxType} required
+                    onChange={(event) => setTaxType(event.target.value.toUpperCase())} />
+                </label>
+                <label>Identificación fiscal
+                  <input value={taxValue} required onChange={(event) => setTaxValue(event.target.value)} />
+                </label>
+              </div>
+              <label>Motivo
+                <input value={taxReason} required onChange={(event) => setTaxReason(event.target.value)} />
+              </label>
+              <ActionButton type="submit" busy={loading} disabled={loading}>
+                {loading ? 'Corrigiendo…' : 'Corregir identidad fiscal'}
+              </ActionButton>
+            </form>
+          )}
+        </section>
+      )}
+    </div>
+  );
+};

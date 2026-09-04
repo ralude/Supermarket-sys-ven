@@ -35,6 +35,32 @@ export class Quantity {
     return new Quantity(scaledValue, scale);
   }
 
+  /**
+   * Convierte el texto decimal que escribe el operador a un entero escalado
+   * usando la escala que define la unidad de medida. No pasa por `float`: los
+   * dígitos se concatenan y la fracción se completa hasta la escala.
+   */
+  static fromDecimal(text: string, scale: number): Quantity {
+    const normalized = text.trim().replace(',', '.');
+    const match = /^(\d+)(?:\.(\d+))?$/.exec(normalized);
+    if (!match) {
+      throw new DomainError(
+        'QUANTITY_INVALID_TEXT',
+        'Quantity must be written as a positive decimal number.'
+      );
+    }
+
+    const fraction = match[2] ?? '';
+    if (fraction.length > scale) {
+      throw new DomainError(
+        'QUANTITY_SCALE_EXCEEDED',
+        'Quantity has more decimals than the unit of measure allows.'
+      );
+    }
+
+    return Quantity.fromScaled(Number(`${match[1]}${fraction.padEnd(scale, '0')}`), scale);
+  }
+
   static zero(scale: number): Quantity {
     return Quantity.fromScaled(0, scale);
   }

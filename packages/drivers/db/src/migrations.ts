@@ -25,6 +25,7 @@ import { fiscalIntegrityGuardsSql } from './migrations/0011-fiscal-integrity-gua
 import { fiscalRecoveryIntegritySql } from './migrations/0012-fiscal-recovery-integrity.js';
 import { identitySecuritySql } from './migrations/0013-identity-security.js';
 import { operationalPoliciesSql } from './migrations/0014-operational-policies.js';
+import { suppliersSql } from './migrations/0015-suppliers.js';
 
 export type Migration = {
   readonly version: number;
@@ -88,6 +89,10 @@ export const migrations: readonly Migration[] = [{
   version: 14,
   name: 'operational_policies',
   sql: operationalPoliciesSql
+}, {
+  version: 15,
+  name: 'suppliers',
+  sql: suppliersSql
 }];
 
 const checksum = (migration: Migration): string => createHash('sha256')

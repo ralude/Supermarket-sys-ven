@@ -1,15 +1,242 @@
-import { useState } from 'react';
-import type { KardexDto } from '@supermarket/shared';
-import { isPermissionGranted, receivePurchaseContract, registerStockAdjustmentContract } from '@supermarket/shared';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  isPermissionGranted,
+  receivePurchaseContract,
+  registerStockAdjustmentContract,
+  type KardexDto,
+  type SupplierResponse
+} from '@supermarket/shared';
 import { createIdempotencyKey } from '../api-client.js';
-import { ActionButton, Feedback, ScreenNote, type ScreenProps } from './shared.js';
+import { ActionButton, EmptyState, Feedback, ScreenNote, type ScreenProps } from './shared.js';
+
+export const filterSuppliers = (
+  suppliers: readonly SupplierResponse[],
+  query: string
+): readonly SupplierResponse[] => {
+  const normalized = query.trim().toLocaleUpperCase('es-VE');
+  if (!normalized) return suppliers;
+  return suppliers.filter((supplier) => [
+    supplier.code,
+    supplier.legalName,
+    supplier.tradeName ?? '',
+    supplier.taxIdentity.normalizedValue
+  ].some((value) => value.toLocaleUpperCase('es-VE').includes(normalized)));
+};
 
 export const InventoryScreen = ({ api, permissionCodes }: ScreenProps): React.JSX.Element => {
-  const [productId, setProductId] = useState(''); const [kardex, setKardex] = useState<KardexDto | null>(null); const [type, setType] = useState<'WASTE' | 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT'>('WASTE'); const [quantity, setQuantity] = useState(''); const [reason, setReason] = useState(''); const [referenceId, setReferenceId] = useState(''); const [supplierId, setSupplierId] = useState(''); const [receiptId, setReceiptId] = useState(''); const [receiveQuantity, setReceiveQuantity] = useState(''); const [lotNumber, setLotNumber] = useState(''); const [lotExpiresAt, setLotExpiresAt] = useState(''); const [error, setError] = useState<unknown>(null); const [notice, setNotice] = useState<string | null>(null); const [loading, setLoading] = useState(false);
+  const [productId, setProductId] = useState('');
+  const [consultedProductId, setConsultedProductId] = useState('');
+  const [kardex, setKardex] = useState<KardexDto | null>(null);
+  const [type, setType] = useState<'WASTE' | 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT'>('WASTE');
+  const [quantity, setQuantity] = useState('');
+  const [reason, setReason] = useState('');
+  const [referenceId, setReferenceId] = useState('');
+  const [suppliers, setSuppliers] = useState<readonly SupplierResponse[]>([]);
+  const [supplierQuery, setSupplierQuery] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [receiptId, setReceiptId] = useState('');
+  const [receiveQuantity, setReceiveQuantity] = useState('');
+  const [lotNumber, setLotNumber] = useState('');
+  const [lotExpiresAt, setLotExpiresAt] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const visibleSuppliers = useMemo(
+    () => filterSuppliers(suppliers, supplierQuery),
+    [suppliers, supplierQuery]
+  );
+
+  useEffect(() => {
+    void api.listSuppliers('ACTIVE').then(setSuppliers).catch(setError);
+  }, [api]);
+
   const dismissFeedback = (): void => { setError(null); setNotice(null); };
-  const load = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => { event.preventDefault(); setLoading(true); setError(null); try { setKardex(await api.getKardex(productId.trim())); } catch (nextError) { setError(nextError); } finally { setLoading(false); } };
-  /** El stock item, su unidad y su escala se toman del kardex ya consultado; ninguna de las dos acciones se ofrece sin haberlo cargado antes. */
-  const adjust = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => { event.preventDefault(); if (!kardex) return; setLoading(true); setError(null); try { setKardex(await api.registerStockAdjustment(kardex.id, { type, quantityScaled: Number(quantity), quantityScale: kardex.quantityScale, reason: reason.trim(), referenceId: referenceId.trim() }, createIdempotencyKey())); setNotice('Movimiento de inventario registrado.'); } catch (nextError) { setError(nextError); } finally { setLoading(false); } };
-  const receive = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => { event.preventDefault(); if (!kardex) return; setLoading(true); setError(null); try { await api.receivePurchase({ stockItemId: kardex.id, productId: kardex.productId, unitCode: kardex.unitCode, quantityScale: kardex.quantityScale, tracksBatches: Boolean(lotNumber.trim()), quantityScaled: Number(receiveQuantity), supplierId: supplierId.trim(), receiptId: receiptId.trim(), reason: reason.trim(), ...(lotNumber.trim() ? { lot: { lotNumber: lotNumber.trim(), ...(lotExpiresAt ? { expiresAt: new Date(lotExpiresAt).toISOString() } : {}) } } : {}) }, createIdempotencyKey()); setKardex(await api.getKardex(kardex.productId)); setNotice('Recepción registrada.'); } catch (nextError) { setError(nextError); } finally { setLoading(false); } };
-  return <div className="operation-screen"><ScreenNote>Consulta el kardex y registra recepciones o ajustes autorizados. La existencia y la trazabilidad pertenecen al agregado del nodo.</ScreenNote><Feedback error={error} notice={notice} onDismiss={dismissFeedback} /><section className="panel"><form className="inline-form" onSubmit={load}><label className="grow">Producto<input value={productId} onChange={(event) => setProductId(event.target.value)} placeholder="Identificador del producto" required /></label><ActionButton className="primary-button" type="submit" busy={loading} disabled={loading}>{loading ? 'Consultando…' : 'Consultar kardex'}</ActionButton></form></section>{kardex && <div className="inventory-layout"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">Saldo actual</p><h3>{kardex.productId}</h3></div><strong className="total-figure">{kardex.currentBalanceScaled / (10 ** kardex.quantityScale)}</strong></div>{kardex.batches.length > 0 && <div><p className="eyebrow">Lotes y vencimientos</p><div className="detail-grid">{kardex.batches.map((batch) => <div key={batch.id}><dt>{batch.lotNumber}</dt><dd>{batch.expiresAt ? new Date(batch.expiresAt).toLocaleDateString('es-VE') : 'Sin vencimiento'}</dd></div>)}</div></div>}<div className="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Dirección</th><th>Cantidad</th><th>Motivo</th></tr></thead><tbody>{kardex.movements.map((movement) => <tr key={movement.id}><td>{new Date(movement.occurredAt).toLocaleString('es-VE')}</td><td>{movement.type}</td><td>{movement.direction}</td><td>{movement.quantityScaled / (10 ** movement.quantityScale)}</td><td>{movement.reason}</td></tr>)}</tbody></table></div></section><section className="panel"><p className="eyebrow">Recepción</p><h3>Registrar compra</h3><form className="stack-form" onSubmit={receive}><p className="muted">Existencia de <strong>{kardex.productId}</strong> ({kardex.unitCode}); el stock item se toma del kardex ya consultado.</p><label>Proveedor<input value={supplierId} onChange={(event) => setSupplierId(event.target.value)} required /></label><label>Recibo<input value={receiptId} onChange={(event) => setReceiptId(event.target.value)} required /></label><label>Cantidad escalada<input type="number" min="1" value={receiveQuantity} onChange={(event) => setReceiveQuantity(event.target.value)} required /></label><label>Lote (opcional)<input value={lotNumber} onChange={(event) => setLotNumber(event.target.value)} /></label><label>Vencimiento<input type="date" value={lotExpiresAt} onChange={(event) => setLotExpiresAt(event.target.value)} /></label><label>Motivo<input value={reason} onChange={(event) => setReason(event.target.value)} required /></label><ActionButton className="primary-button" type="submit" busy={loading} disabled={loading || !isPermissionGranted(receivePurchaseContract.permission, permissionCodes)}>{loading ? 'Registrando…' : 'Registrar recepción'}</ActionButton></form><p className="eyebrow">Movimiento autorizado</p><h3>Ajustar existencia</h3><form className="stack-form" onSubmit={adjust}><label>Tipo<select value={type} onChange={(event) => setType(event.target.value as typeof type)}><option value="WASTE">Merma</option><option value="ADJUSTMENT_IN">Ajuste entrada</option><option value="ADJUSTMENT_OUT">Ajuste salida</option></select></label><label>Cantidad escalada<input type="number" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></label><label>Referencia<input value={referenceId} onChange={(event) => setReferenceId(event.target.value)} required /></label><label>Motivo<input value={reason} onChange={(event) => setReason(event.target.value)} required /></label><ActionButton className="primary-button" type="submit" busy={loading} disabled={loading || !isPermissionGranted(registerStockAdjustmentContract.permission, permissionCodes)}>{loading ? 'Registrando…' : 'Registrar ajuste'}</ActionButton></form></section></div>}</div>;
+
+  /**
+   * Un producto sin kardex todavía puede recibirse: el nodo crea el artículo
+   * en la primera recepción. Por eso la consulta conserva el producto aunque
+   * no exista existencia previa que mostrar.
+   */
+  const load = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    const consulted = productId.trim();
+    setLoading(true);
+    setError(null);
+    setNotice(null);
+    setConsultedProductId(consulted);
+    try { setKardex(await api.getKardex(consulted)); }
+    catch (nextError) {
+      setKardex(null);
+      setError(nextError);
+    }
+    finally { setLoading(false); }
+  };
+
+  /** El stock item, su unidad y su escala se toman del kardex ya consultado. */
+  const adjust = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!kardex) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setKardex(await api.registerStockAdjustment(kardex.id, {
+        type, quantityScaled: Number(quantity), quantityScale: kardex.quantityScale,
+        reason: reason.trim(), referenceId: referenceId.trim()
+      }, createIdempotencyKey()));
+      setNotice('Movimiento de inventario registrado.');
+    } catch (nextError) { setError(nextError); }
+    finally { setLoading(false); }
+  };
+
+  /**
+   * La recepción solo declara negocio. El artículo de inventario, su unidad,
+   * su escala y si maneja lotes los resuelve el nodo desde el catálogo.
+   */
+  const receive = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!consultedProductId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await api.receivePurchase({
+        productId: consultedProductId, quantity: receiveQuantity.trim(), supplierId,
+        receiptId: receiptId.trim(), reason: reason.trim(),
+        ...(lotNumber.trim() ? {
+          lot: {
+            lotNumber: lotNumber.trim(),
+            ...(lotExpiresAt ? { expiresAt: new Date(lotExpiresAt).toISOString() } : {})
+          }
+        } : {})
+      }, createIdempotencyKey());
+      setKardex(await api.getKardex(consultedProductId));
+      setNotice('Recepción registrada.');
+    } catch (nextError) { setError(nextError); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="operation-screen">
+      <ScreenNote>
+        Consulta el kardex y registra recepciones o ajustes autorizados. La existencia y la
+        trazabilidad pertenecen al agregado del nodo.
+      </ScreenNote>
+      <Feedback error={error} notice={notice} onDismiss={dismissFeedback} />
+      <section className="panel">
+        <form className="inline-form" onSubmit={load}>
+          <label className="grow">Producto
+            <input value={productId} onChange={(event) => setProductId(event.target.value)}
+              placeholder="Identificador del producto" required />
+          </label>
+          <ActionButton className="primary-button" type="submit" busy={loading} disabled={loading}>
+            {loading ? 'Consultando…' : 'Consultar kardex'}
+          </ActionButton>
+        </form>
+      </section>
+      {consultedProductId && (
+        <div className="inventory-layout">
+          {kardex ? (
+          <section className="panel">
+            <div className="panel-heading">
+              <div><p className="eyebrow">Saldo actual</p><h3>{kardex.productId}</h3></div>
+              <strong className="total-figure">
+                {kardex.currentBalanceScaled / (10 ** kardex.quantityScale)}
+              </strong>
+            </div>
+            {kardex.batches.length > 0 && (
+              <div>
+                <p className="eyebrow">Lotes y vencimientos</p>
+                <div className="detail-grid">
+                  {kardex.batches.map((batch) => (
+                    <div key={batch.id}>
+                      <dt>{batch.lotNumber}</dt>
+                      <dd>{batch.expiresAt
+                        ? new Date(batch.expiresAt).toLocaleDateString('es-VE')
+                        : 'Sin vencimiento'}</dd>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Dirección</th><th>Cantidad</th><th>Motivo</th></tr></thead>
+                <tbody>{kardex.movements.map((movement) => (
+                  <tr key={movement.id}>
+                    <td>{new Date(movement.occurredAt).toLocaleString('es-VE')}</td>
+                    <td>{movement.type}</td><td>{movement.direction}</td>
+                    <td>{movement.quantityScaled / (10 ** movement.quantityScale)}</td>
+                    <td>{movement.reason}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </section>
+          ) : (
+            <section className="panel">
+              <EmptyState>
+                <strong>{consultedProductId}</strong> todavía no tiene existencia registrada. La
+                primera recepción crea su artículo de inventario con la unidad del catálogo.
+              </EmptyState>
+            </section>
+          )}
+          <section className="panel">
+            <p className="eyebrow">Recepción</p>
+            <h3>Registrar compra</h3>
+            <form className="stack-form" onSubmit={receive}>
+              <p className="muted">
+                Recepción de <strong>{consultedProductId}</strong>
+                {kardex ? ` (${kardex.unitCode})` : ''}. La unidad, la escala y el artículo los
+                resuelve el nodo desde el catálogo.
+              </p>
+              <label>Buscar proveedor
+                <input value={supplierQuery} onChange={(event) => setSupplierQuery(event.target.value)}
+                  placeholder="Código, nombre o RIF" />
+              </label>
+              <label>Proveedor
+                <select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} required>
+                  <option value="">Selecciona un proveedor activo</option>
+                  {visibleSuppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.code} — {supplier.tradeName ?? supplier.legalName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>Recibo<input value={receiptId} onChange={(event) => setReceiptId(event.target.value)} required /></label>
+              <label>Cantidad<input inputMode="decimal" pattern="\d+([.,]\d+)?" placeholder="0,000" value={receiveQuantity} onChange={(event) => setReceiveQuantity(event.target.value)} required /></label>
+              <label>Lote (opcional)<input value={lotNumber} onChange={(event) => setLotNumber(event.target.value)} /></label>
+              <label>Vencimiento<input type="date" value={lotExpiresAt} onChange={(event) => setLotExpiresAt(event.target.value)} /></label>
+              <label>Motivo<input value={reason} onChange={(event) => setReason(event.target.value)} required /></label>
+              <ActionButton className="primary-button" type="submit" busy={loading}
+                disabled={loading || !isPermissionGranted(receivePurchaseContract.permission, permissionCodes)}>
+                {loading ? 'Registrando…' : 'Registrar recepción'}
+              </ActionButton>
+            </form>
+            {kardex && (
+            <>
+            <p className="eyebrow">Movimiento autorizado</p>
+            <h3>Ajustar existencia</h3>
+            <form className="stack-form" onSubmit={adjust}>
+              <label>Tipo
+                <select value={type} onChange={(event) => setType(event.target.value as typeof type)}>
+                  <option value="WASTE">Merma</option>
+                  <option value="ADJUSTMENT_IN">Ajuste entrada</option>
+                  <option value="ADJUSTMENT_OUT">Ajuste salida</option>
+                </select>
+              </label>
+              <label>Cantidad escalada<input type="number" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></label>
+              <label>Referencia<input value={referenceId} onChange={(event) => setReferenceId(event.target.value)} required /></label>
+              <label>Motivo<input value={reason} onChange={(event) => setReason(event.target.value)} required /></label>
+              <ActionButton className="primary-button" type="submit" busy={loading}
+                disabled={loading || !isPermissionGranted(registerStockAdjustmentContract.permission, permissionCodes)}>
+                {loading ? 'Registrando…' : 'Registrar ajuste'}
+              </ActionButton>
+            </form>
+            </>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
 };

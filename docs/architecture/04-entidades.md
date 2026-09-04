@@ -12,7 +12,7 @@ Una entidad tiene identidad estable y un ciclo de vida. Sus atributos pueden cam
 | `sales` | `Sale`, `SaleItem`, `Payment`, `Discount`, `Return` |
 | `fiscal` | `FiscalDocument`, `FiscalLine`, `FiscalDay`, `FiscalDevice` |
 | `inventory` | `StockItem`, `Batch`, `StockMovement` |
-| `purchasing` | `Supplier`, `PurchaseOrder`, `PurchaseOrderLine` |
+| `purchasing` | `Supplier`, `PurchaseOrder`, `PurchaseOrderLine`, `PurchaseReceipt` |
 | `customers` | `Customer` |
 | `identity` | `User`, `Role`, `Permission` |
 
@@ -28,7 +28,10 @@ Incluye moneda origen, moneda destino, valor escalado, fuente, vigencia y quién
 
 ### `FiscalId`
 
-Representa RIF o identificación del cliente con tipo y valor normalizado. La validación final debe configurarse según las reglas fiscales vigentes.
+Representa una identidad fiscal sin usarla como ID técnico de la entidad. Para
+proveedores conserva país, tipo, valor capturado y valor normalizado; la unicidad
+usa el país, tipo y valor normalizado. La validación final debe configurarse por
+jurisdicción según las reglas fiscales vigentes.
 
 ### `Quantity`
 
@@ -49,6 +52,10 @@ Admite cantidades enteras y fraccionarias con escala definida por unidad de medi
 - `Permission` usa un código estable normalizado; `Role` agrupa permisos activos y asignables, y `User` deriva sus concesiones de roles activos sin almacenar credenciales.
 - `StockMovement` conserva tipo, cantidad positiva escalada, lote opcional, actor, motivo, referencia y fecha; su dirección se deriva del tipo y nunca de una cantidad con signo.
 - `Batch` pertenece a `StockItem`, normaliza su número de lote y conserva un vencimiento UTC opcional sin exponer fechas mutables.
+- `Supplier` conserva un código humano inmutable separado de su identidad fiscal, estado
+  `ACTIVE`, `BLOCKED` o `INACTIVE` y timestamps UTC. No se elimina para corregir historia.
+- `PurchaseReceipt` se implementa con costos en 9B.04; su número de documento de origen no
+  sustituye su ID técnico.
 
 ## Fases
 

@@ -83,6 +83,68 @@ describe('desktop HTTP client', () => {
     }));
   });
 
+  it('loads only active suppliers for the receipt selector', async () => {
+    const fetcher = vi.fn(async () => new Response('[]', {
+      status: 200, headers: { 'content-type': 'application/json' }
+    }));
+
+    await createDesktopApi(fetcher as typeof fetch).listSuppliers('ACTIVE');
+
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/suppliers?status=ACTIVE', expect.objectContaining({
+      method: 'GET', credentials: 'include'
+    }));
+  });
+
+  it('sends the supplier master commands with their idempotency key', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetcher = async (url: string, init: RequestInit): Promise<Response> => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({ id: 'supplier-1' }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    };
+    const api = createDesktopApi(fetcher as unknown as typeof fetch);
+
+    await api.createSupplier({
+      legalName: 'Distribuidora Los Andes',
+      taxIdentity: { country: 'VE', type: 'RIF', value: 'J-12345678-9' },
+      reason: 'Alta de proveedor'
+    }, 'intent-create');
+    await api.updateSupplier('supplier/1', { tradeName: 'Los Andes', reason: 'Corrección' }, 'intent-update');
+    await api.changeSupplierStatus('supplier-1', { status: 'BLOCKED', reason: 'Suspendido' }, 'intent-status');
+    await api.correctSupplierTaxIdentity('supplier-1', {
+      taxIdentity: { type: 'RIF', value: 'J-12345678-0' }, reason: 'Error de transcripción'
+    }, 'intent-tax');
+
+    expect(calls.map(({ url, init }) => [
+      url, init.method, (init.headers as Record<string, string>)['idempotency-key']
+    ])).toEqual([
+      ['/api/v1/suppliers', 'POST', 'intent-create'],
+      ['/api/v1/suppliers/supplier%2F1', 'PATCH', 'intent-update'],
+      ['/api/v1/suppliers/supplier-1/status', 'PUT', 'intent-status'],
+      ['/api/v1/suppliers/supplier-1/tax-identity', 'PUT', 'intent-tax']
+    ]);
+  });
+
+  it('sends a receipt without technical stock data', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ id: 'stock-1' }), {
+      status: 201, headers: { 'content-type': 'application/json' }
+    }));
+
+    await createDesktopApi(fetcher as typeof fetch).receivePurchase({
+      productId: 'product-1', quantity: '10,5', supplierId: 'supplier-1',
+      receiptId: 'receipt-1', reason: 'Compra recibida'
+    }, 'intent-receipt');
+
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/inventory/receipts', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        productId: 'product-1', quantity: '10,5', supplierId: 'supplier-1',
+        receiptId: 'receipt-1', reason: 'Compra recibida'
+      })
+    }));
+  });
+
   it('parses decimal input into integer minor units without floating point', () => {
     expect(parseMinorUnits('12,30', 2)).toBe(1230);
     expect(parseMinorUnits('12', 2)).toBe(1200);

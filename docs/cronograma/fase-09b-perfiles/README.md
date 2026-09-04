@@ -1,6 +1,6 @@
 # Fase 9B: Perfiles operativos y capacidades faltantes
 
-- **Estado:** Pendiente
+- **Estado:** En progreso
 - **Indice:** [Cronograma](../README.md)
 - **Replanificacion:** [Insercion de Fase 9B antes de Fase 10](../replanificacion-fase-09b.md)
 
@@ -64,6 +64,13 @@ defaults ni se deducen del codigo existente:
 La sub-fase 9B.00 produce ADR-0015 con la decision de permisos efectivos en la sesion; esa
 decision es de ingenieria y no depende del negocio.
 
+9B.03 ya tiene reglas de proveedor aprobadas y su planificación reveló una contradicción
+entre el snapshot de una recepción `COMPLETED` —que debe incluir costos— y la prohibición de
+adelantar el costeo de 9B.04. También faltan las reglas fiscales por país/tipo y la semántica
+de corrección de recepciones. [ADR-0019](../../architecture/adr/0019-proveedores-y-recepciones-de-compra.md)
+acepta separar el maestro de proveedor en 9B.03 del documento completo de 9B.04; los puntos
+documentales pendientes permanecen enumerados en el [plan](./plan-9b.03-proveedores.md).
+
 ## Restriccion
 
 La Fase 8 permanece suspendida. Toda capacidad fiscal nueva de esta fase, incluida la nota
@@ -105,9 +112,10 @@ Las tres sub-fases de fundacion ya tienen su especificacion escrita y sus criter
 aceptacion aprobados antes de implementar, como exige la disciplina spec-driven de AGENTS.md:
 [plan 9B.00](./plan-9b.00-permisos-en-sesion.md),
 [plan 9B.01](./plan-9b.01-reestructuracion-renderer.md) y
-[plan 9B.02](./plan-9b.02-datos-maestros-seleccionables.md). Las demas se escriben cuando su
-sub-fase entre en ejecucion, y las bloqueadas por una decision de negocio no abren plan hasta
-que su ADR este aceptado.
+[plan 9B.02](./plan-9b.02-datos-maestros-seleccionables.md). 9B.03 tiene un
+[plan en ejecución](./plan-9b.03-proveedores.md) y ADR-0019 aceptado para su corte. Las demás
+se escriben cuando su sub-fase entre en ejecución, y las
+bloqueadas por una decisión de negocio no abren plan hasta que su ADR esté aceptado.
 
 ## Criterio de salida
 

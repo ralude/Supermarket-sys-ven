@@ -26,6 +26,7 @@ import {
   DrizzleSaleRepository,
   DrizzleShiftRepository,
   DrizzleStockItemRepository,
+  DrizzleSupplierRepository,
   DrizzleUnitOfMeasureRepository,
   openDatabase,
   SqliteAuthenticationStore,
@@ -53,7 +54,8 @@ export const ADMIN_PERMISSIONS = Object.freeze([
   ...Object.values(application.FISCAL_PERMISSIONS),
   ...Object.values(application.CATALOG_PERMISSIONS),
   ...Object.values(application.CURRENCY_PERMISSIONS),
-  ...Object.values(application.REPORT_PERMISSIONS)
+  ...Object.values(application.REPORT_PERMISSIONS),
+  ...Object.values(application.SUPPLIER_PERMISSIONS)
 ]) as readonly string[];
 
 export type SecurityRuntime = {
@@ -107,6 +109,7 @@ export const createSecurityRuntime = (
   const discountPolicyProvider = new SqliteDiscountPolicyProvider(handle);
   const taxPolicyProvider = new SqliteFinancialTransactionTaxPolicyProvider(handle);
   const stockItemRepository = new DrizzleStockItemRepository(handle);
+  const supplierRepository = new DrizzleSupplierRepository(handle);
   const fiscalPrinter = new FiscalPrinterFake();
   const fiscalDocumentRepository = new DrizzleFiscalDocumentRepository(handle);
   const fiscalArguments = [
@@ -215,14 +218,30 @@ export const createSecurityRuntime = (
       },
       inventory: {
         receivePurchase: new application.ReceivePurchase(
-          stockItemRepository, authorization, ids, ids, ids, ids, clock,
-          unitOfWork, eventStore, auditWriter, idempotencyStore
+          stockItemRepository, supplierRepository, productRepository, authorization,
+          ids, ids, ids, ids, ids, clock, unitOfWork, eventStore, auditWriter, idempotencyStore
         ),
         registerStockAdjustment: new application.RegisterStockAdjustment(
           stockItemRepository, authorization, ids, ids, ids, clock,
           unitOfWork, eventStore, auditWriter, idempotencyStore
         ),
         getKardex: new application.GetKardex(stockItemRepository)
+      },
+      suppliers: {
+        create: new application.CreateSupplier(
+          supplierRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+        ),
+        get: new application.GetSupplier(supplierRepository),
+        list: new application.ListSuppliers(supplierRepository),
+        update: new application.UpdateSupplier(
+          supplierRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+        ),
+        changeStatus: new application.ChangeSupplierStatus(
+          supplierRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+        ),
+        correctTaxIdentity: new application.CorrectSupplierTaxIdentity(
+          supplierRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+        )
       },
       fiscalDocuments: {
         issue: new application.IssueFiscalDocument(

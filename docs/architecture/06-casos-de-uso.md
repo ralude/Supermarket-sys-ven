@@ -94,6 +94,29 @@ La Fase 2 expone únicamente el agregado puro `StockItem`; no crea casos de uso,
 DTO ni repositorios. Recepciones operativas, consumo de `SaleCompleted`, mermas,
 ajustes autorizados y consultas de kardex se implementan en la Fase 6.
 
+### `purchasing`
+
+- `CreateSupplier`
+- `UpdateSupplier`
+- `ChangeSupplierStatus`
+- `CorrectSupplierTaxIdentity`
+- `GetSupplier`
+- `ListSuppliers`
+
+Desde 9B.03, los comandos autorizan `supplier.create`, `supplier.update` o
+`supplier.tax_identity.correct`; las lecturas exigen sesión verificada. La
+identidad fiscal se normaliza en dominio y su unicidad se confirma en la misma
+transacción. La recepción de inventario carga el proveedor mediante puerto y
+solo acepta estado `ACTIVE`. `PurchaseReceipt` y su finalización completa se
+incorporan con el costo en 9B.04, como fija ADR-0019.
+
+`ReceivePurchase` recibe únicamente producto, cantidad escrita como decimal,
+proveedor, recibo, motivo y lote opcional. El artículo de inventario, su ID, su
+unidad y su escala los resuelve la aplicación mediante los puertos de inventario
+y catálogo; ningún transporte los envía. La cantidad se escala con la unidad
+derivada, de modo que más decimales de los admitidos se rechazan antes de crear
+evidencia.
+
 ### `fiscal`
 
 - `IssueFiscalDocument`

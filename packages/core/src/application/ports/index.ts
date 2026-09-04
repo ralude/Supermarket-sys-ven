@@ -19,6 +19,7 @@ export type { SaleRepository } from './sale-repository.js';
 export type { CashRegisterRepository } from './cash-register-repository.js';
 export type { ShiftRepository } from './shift-repository.js';
 export type { StockItemRepository } from './stock-item-repository.js';
+export type { SupplierRepository } from './supplier-repository.js';
 export type { UnitOfWork } from './unit-of-work.js';
 export type { BusinessEventStore } from './business-event-store.js';
 export type { AuditEntry, AuditWriter } from './audit-writer.js';

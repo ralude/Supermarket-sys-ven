@@ -219,6 +219,22 @@ export const products = sqliteTable('products', {
   version: integer('version').notNull()
 });
 
+export const suppliers = sqliteTable('suppliers', {
+  id: text('id').primaryKey(),
+  code: text('code').notNull().unique(),
+  legalName: text('legal_name').notNull(),
+  tradeName: text('trade_name'),
+  fiscalAddress: text('fiscal_address'),
+  taxCountry: text('tax_country').notNull(),
+  taxType: text('tax_type').notNull(),
+  taxValue: text('tax_value').notNull(),
+  taxNormalizedValue: text('tax_normalized_value').notNull(),
+  status: text('status').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  version: integer('version').notNull()
+});
+
 export const productBarcodes = sqliteTable('product_barcodes', {
   id: text('id').primaryKey(),
   productId: text('product_id').notNull(),

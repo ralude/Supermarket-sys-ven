@@ -2,9 +2,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { DesktopApi, OperationApi } from './api-client.js';
 import {
-  SalesScreen, CashScreen, CatalogScreen, InventoryScreen, ReportsScreen, money, saleCompletionBlocker
+  SalesScreen, CashScreen, CatalogScreen, InventoryScreen, ReportsScreen, SuppliersScreen,
+  canManageSuppliers, filterSuppliers, money, saleCompletionBlocker, supplierUpdatePayload,
+  toSupplierForm
 } from './operation-screens.js';
-import type { SaleResponse } from '@supermarket/shared';
+import type { SaleResponse, SupplierResponse } from '@supermarket/shared';
 
 const draftSale = (overrides: Partial<SaleResponse> = {}): SaleResponse => ({
   id: 'sale-1', status: 'DRAFT', currencyCode: 'VES', scale: 2,
@@ -12,6 +14,16 @@ const draftSale = (overrides: Partial<SaleResponse> = {}): SaleResponse => ({
   totalMinorUnits: 11600, paidTotalMinorUnits: 0, balanceMinorUnits: 11600,
   items: [], payments: [], ...overrides
 } as SaleResponse);
+
+const supplier = (): SupplierResponse => ({
+  id: 'supplier-1', code: 'SUP-000001', legalName: 'Distribuidora Los Andes',
+  tradeName: 'Los Andes', fiscalAddress: null,
+  taxIdentity: {
+    country: 'VE', type: 'RIF', value: 'J-12345678-9', normalizedValue: 'J123456789'
+  },
+  status: 'ACTIVE', createdAt: '2026-09-04T00:00:00.000Z',
+  updatedAt: '2026-09-04T00:00:00.000Z', version: 1
+});
 
 const operationApi = (): OperationApi => {
   const base: DesktopApi = {
@@ -28,7 +40,7 @@ const operationApi = (): OperationApi => {
     applySaleDiscount: vi.fn(), registerSalePayments: vi.fn(), completeSale: vi.fn(), voidSale: vi.fn(),
     getOpenShift: vi.fn(), openShift: vi.fn(), registerCashMovement: vi.fn(), closeShift: vi.fn(),
     findProductByBarcode: vi.fn(), listProducts: vi.fn(), getPriceHistory: vi.fn(), createProduct: vi.fn(), updatePrice: vi.fn(), getKardex: vi.fn(),
-    receivePurchase: vi.fn(), registerStockAdjustment: vi.fn(), getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn(), listCategories: vi.fn(), listUnitsOfMeasure: vi.fn(), listPaymentMethods: vi.fn(), listCashRegisters: vi.fn()
+    receivePurchase: vi.fn(), registerStockAdjustment: vi.fn(), listSuppliers: vi.fn(), getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn(), listCategories: vi.fn(), listUnitsOfMeasure: vi.fn(), listPaymentMethods: vi.fn(), listCashRegisters: vi.fn(), createSupplier: vi.fn(), updateSupplier: vi.fn(), changeSupplierStatus: vi.fn(), correctSupplierTaxIdentity: vi.fn()
   }) as OperationApi;
 };
 
@@ -67,5 +79,42 @@ describe('operation screens', () => {
     expect(money(11600, 'VES', 2)).toContain('116');
     expect(money(11600, 'xx', 2)).toContain('XX');
     expect(() => money(11600, '', 2)).not.toThrow();
+  });
+
+  it('searches receipt suppliers by code, name or normalized RIF', () => {
+    expect(filterSuppliers([supplier()], 'andEs')).toHaveLength(1);
+    expect(filterSuppliers([supplier()], 'J123456789')).toHaveLength(1);
+    expect(filterSuppliers([supplier()], 'SUP-999')).toEqual([]);
+  });
+
+  it('only offers the supplier master to who can administer it', () => {
+    expect(canManageSuppliers([])).toBe(false);
+    expect(canManageSuppliers(['inventory.purchase.receive'])).toBe(false);
+    expect(canManageSuppliers(['supplier.create'])).toBe(true);
+    expect(canManageSuppliers(['supplier.update'])).toBe(true);
+    expect(canManageSuppliers(['supplier.tax_identity.correct'])).toBe(true);
+  });
+
+  it('sends only the supplier fields that actually changed', () => {
+    const current = supplier();
+    const form = toSupplierForm(current);
+
+    expect(supplierUpdatePayload(current, { ...form, reason: 'Sin cambios' })).toBeNull();
+    expect(supplierUpdatePayload(current, { ...form, tradeName: '', reason: 'Retiro' }))
+      .toEqual({ tradeName: null, reason: 'Retiro' });
+    expect(supplierUpdatePayload(current, {
+      ...form, legalName: 'Distribuidora Andina', fiscalAddress: ' Av. Bolívar ', reason: 'Mudanza'
+    })).toEqual({
+      legalName: 'Distribuidora Andina', fiscalAddress: 'Av. Bolívar', reason: 'Mudanza'
+    });
+  });
+
+  it('hides the privileged tax correction from a supplier editor', () => {
+    const editor = renderToStaticMarkup(<SuppliersScreen {...props(['supplier.update'])} />);
+    const creator = renderToStaticMarkup(<SuppliersScreen {...props(['supplier.create'])} />);
+
+    expect(editor).not.toContain('Corregir identidad fiscal');
+    expect(editor).not.toContain('Nuevo proveedor');
+    expect(creator).toContain('Nuevo proveedor');
   });
 });

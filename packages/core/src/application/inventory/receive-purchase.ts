@@ -3,7 +3,7 @@ import { StockItem } from '../../domain/inventory/index.js';
 import type { ExecutionContext } from '../execution-context.js';
 import { persistBusinessChange } from '../events/index.js';
 import { executeIdempotentCommand } from '../idempotency/index.js';
-import type { AuditWriter, AuthorizationService, BusinessEventStore, Clock, IdGenerator, IdempotencyStore, StockItemRepository, UnitOfWork } from '../ports/index.js';
+import type { AuditWriter, AuthorizationService, BusinessEventStore, Clock, IdGenerator, IdempotencyStore, ProductRepository, StockItemRepository, SupplierRepository, UnitOfWork } from '../ports/index.js';
 import type { ReceivePurchaseInput, StockItemDto } from './dtos.js';
 import { toStockItemDto } from './mappers.js';
 import { INVENTORY_PERMISSIONS } from './permissions.js';
@@ -12,7 +12,10 @@ import { restoreStockItemDto, serializeStockItemDto } from './stock-idempotency.
 export class ReceivePurchase {
   constructor(
     private readonly repository: StockItemRepository,
+    private readonly supplierRepository: SupplierRepository,
+    private readonly productRepository: ProductRepository,
     private readonly authorization: AuthorizationService,
+    private readonly stockItemIdGenerator: IdGenerator,
     private readonly movementIdGenerator: IdGenerator,
     private readonly batchIdGenerator: IdGenerator,
     private readonly eventIdGenerator: IdGenerator,
@@ -35,17 +38,32 @@ export class ReceivePurchase {
         unitOfWork: this.unitOfWork,
         ...(this.idempotencyStore ? { idempotencyStore: this.idempotencyStore } : {}),
         execute: async () => {
+        const supplier = await this.supplierRepository.findById(input.supplierId);
+        if (!supplier) {
+          return err(new ApplicationError('SUPPLIER_NOT_FOUND', 'Supplier was not found.'));
+        }
+        if (supplier.status !== 'ACTIVE') {
+          return err(new ApplicationError('SUPPLIER_NOT_ACTIVE', 'Supplier is not active for new receipts.'));
+        }
+        /**
+         * La primera recepción crea el artículo: su ID lo genera la aplicación
+         * y su unidad y escala salen del catálogo. Un artículo ya existente
+         * conserva su configuración aunque el catálogo cambie después, porque
+         * su historia de movimientos está escrita en esa escala.
+         */
         let item = await this.repository.findByProductId(input.productId);
-        if (item === null) item = StockItem.create({
-          id: input.stockItemId,
-          productId: input.productId,
-          unitCode: input.unitCode,
-          quantityScale: input.quantityScale,
-          tracksBatches: input.tracksBatches
-        });
-        if (item.id !== input.stockItemId || item.unitCode !== input.unitCode.trim().toUpperCase() ||
-          item.quantityScale !== input.quantityScale || item.tracksBatches !== input.tracksBatches) {
-          return err(new ApplicationError('STOCK_ITEM_CONFIGURATION_MISMATCH', 'Stock item configuration does not match.'));
+        if (item === null) {
+          const product = await this.productRepository.findById(input.productId);
+          if (!product) {
+            return err(new ApplicationError('PRODUCT_NOT_FOUND', 'Product was not found in the catalog.'));
+          }
+          item = StockItem.create({
+            id: this.stockItemIdGenerator.generate(),
+            productId: input.productId,
+            unitCode: product.unitOfMeasure.code,
+            quantityScale: product.unitOfMeasure.quantityScale,
+            tracksBatches: input.lot !== undefined
+          });
         }
         let batchId: string | undefined;
         if (item.tracksBatches) {
@@ -62,7 +80,7 @@ export class ReceivePurchase {
         const previousEventCount = item.domainEvents.length;
         const movement = item.registerMovement({
           id: this.movementIdGenerator.generate(), type: 'PURCHASE_RECEIPT',
-          quantity: Quantity.fromScaled(input.quantityScaled, input.quantityScale),
+          quantity: Quantity.fromDecimal(input.quantity, item.quantityScale),
           ...(batchId ? { batchId } : {}), actorId: context.actorId, reason: input.reason,
           referenceId: input.receiptId, occurredAt, eventId: this.eventIdGenerator.generate()
         });

@@ -36,6 +36,28 @@ describe('Quantity', () => {
     );
   });
 
+  it('scales the decimal text written by the operator', () => {
+    expect(Quantity.fromDecimal('12', 3).scaledValue).toBe(12000);
+    expect(Quantity.fromDecimal(' 12,5 ', 2).scaledValue).toBe(1250);
+    expect(Quantity.fromDecimal('0.750', 3).scaledValue).toBe(750);
+    expect(Quantity.fromDecimal('7', 0).scaledValue).toBe(7);
+  });
+
+  it('rejects decimal text that is not a positive number', () => {
+    expect(() => Quantity.fromDecimal('-1', 0)).toThrowError(
+      'Quantity must be written as a positive decimal number.'
+    );
+    expect(() => Quantity.fromDecimal('dos', 0)).toThrowError(DomainError);
+    expect(() => Quantity.fromDecimal('', 0)).toThrowError(DomainError);
+  });
+
+  it('rejects more decimals than the unit of measure allows', () => {
+    expect(() => Quantity.fromDecimal('1.5', 0)).toThrowError(
+      'Quantity has more decimals than the unit of measure allows.'
+    );
+    expect(() => Quantity.fromDecimal('1.555', 2)).toThrowError(DomainError);
+  });
+
   it('adds and subtracts quantities with the same scale', () => {
     const total = Quantity.fromScaled(15, 1).add(Quantity.fromScaled(5, 1));
     const difference = Quantity.fromScaled(15, 1).subtract(

@@ -101,7 +101,7 @@ describe('reports screen over simulated HTTP transport', () => {
       getPriceHistory: vi.fn(), createProduct: vi.fn(), updatePrice: vi.fn(), getKardex: vi.fn(),
       receivePurchase: vi.fn(), registerStockAdjustment: vi.fn(), getCashClosureReport: vi.fn(),
       getAuditReport: vi.fn(), getFiscalOperationsReport: vi.fn(),
-      getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn(), listCategories: vi.fn(), listUnitsOfMeasure: vi.fn(), listPaymentMethods: vi.fn(), listCashRegisters: vi.fn()
+      getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn(), listCategories: vi.fn(), listUnitsOfMeasure: vi.fn(), listPaymentMethods: vi.fn(), listCashRegisters: vi.fn(), listSuppliers: vi.fn(), createSupplier: vi.fn(), updateSupplier: vi.fn(), changeSupplierStatus: vi.fn(), correctSupplierTaxIdentity: vi.fn()
     }) as OperationApi;
     return api;
   };

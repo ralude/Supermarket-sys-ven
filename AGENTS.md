@@ -14,6 +14,23 @@ For non-trivial features:
 6. Every business invariant must have test coverage.
 7. Do not modify an approved specification merely to make tests pass.
 
+## PRPs y contexto de ejecución
+
+Los archivos bajo `PRPs/` son artefactos de ejecución para agentes de código.
+No son fuente de verdad del producto ni sustituyen especificaciones, ADRs,
+arquitectura o cronograma.
+
+Orden de autoridad:
+
+1. `AGENTS.md`
+2. ADRs aceptados y documentación arquitectónica
+3. cronograma y plan/especificación de la sub-fase
+4. PRP
+
+Si un PRP contradice una fuente superior, se corrige o descarta el PRP.
+Un PRP nunca autoriza adelantar una fase, inventar una decisión pendiente
+ni ampliar el alcance aprobado.
+
 ## 1. Misión del proyecto
 
 Construir una plataforma empresarial para supermercados en Venezuela con operación standalone y LAN, soporte multi-moneda, trazabilidad comercial, estados fiscales recuperables e integración intercambiable con hardware.
