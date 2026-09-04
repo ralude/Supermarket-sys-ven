@@ -36,6 +36,12 @@ las fases correspondientes.
 - `GetCurrentExchangeRate`
 - `CalculateMixedPaymentTotals`
 
+Desde Fase 9, los comandos de catálogo y moneda reciben `ExecutionContext` y
+autorizan `catalog.product.create`, `catalog.product.update`,
+`catalog.price.update` o `currency.rate.update` antes de cualquier efecto. Sus
+lecturas solo requieren la sesión verificada por HTTP. La fuente de políticas
+operativas y el comportamiento fail-closed se fijan en ADR-0012.
+
 ### `cash`
 
 - `OpenShift`
@@ -58,6 +64,7 @@ pagos de venta se incorporan en sus fases correspondientes.
 - `RegisterMixedPayment`
 - `CompleteSale`
 - `VoidSale`
+- `GetSale` para recuperar la venta del terminal/nodo autenticado.
 
 En la Fase 2, `ExecutionContext` identifica al actor y
 `AuthorizationService` es la frontera estable para autorizar descuentos,
@@ -65,6 +72,10 @@ anulaciones y operaciones sensibles de caja. `User`, `Role` y `Permission`
 expresan las concesiones sin autenticar el transporte. `RegisterMixedPayment`
 recibe un lote atómico, exige tasas explícitas para conversiones y conserva el
 snapshot del método y de la tasa utilizada.
+
+En 9.00, todas las mutaciones de venta son idempotentes por nodo y operación;
+las consultas y comandos posteriores a `StartSale` rechazan como inexistente
+una venta que no pertenezca al terminal/nodo del contexto.
 
 ### `inventory`
 
@@ -78,6 +89,20 @@ ajustes autorizados y consultas de kardex se implementan en la Fase 6.
 - `PrintXReport`
 - `PrintZReport`
 - `ReconcileFiscalState`
+
+### `reporting`
+
+- `GetCashClosureReport`
+- `GetAuditReport`
+- `GetFiscalOperationsReport`
+
+Desde 9.06 son lecturas puras: autorizan `reports.cash.read`,
+`reports.audit.read` o `reports.fiscal.read` antes de consultar, proyectan desde
+puertos de lectura propios y no cargan ni modifican agregados. El período UTC y
+los filtros son opcionales; el límite de filas no lo es y se recorta en
+aplicación. La auditoría no proyecta los resúmenes antes/después y la fiscalidad
+se rotula siempre como simulación. ADR-0013 fija permisos, alcance, exportación
+y el origen manual de la jornada de X/Z.
 
 ## Puertos de aplicación
 

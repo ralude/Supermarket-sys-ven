@@ -1,6 +1,7 @@
 import { ApplicationError, DomainError, err, ok, type AppError, type Result } from '@supermarket/shared';
 import type { ExecutionContext } from '../execution-context.js';
-import { toBusinessEvents, type JsonValue } from '../events/index.js';
+import { persistBusinessChange, type JsonValue } from '../events/index.js';
+import { executeIdempotentCommand } from '../idempotency/index.js';
 import type {
   BusinessEventStore,
   Clock,
@@ -25,49 +26,29 @@ export class CompleteSale {
   ) {}
 
   async execute(input: CompleteSaleInput, context: ExecutionContext): Promise<Result<SaleDto, AppError>> {
-    const key = context.idempotencyKey ?? null;
-    const scope = `${context.originNodeId}:CompleteSale`;
-    const fingerprint = JSON.stringify(input);
     try {
-      const execute = async (): Promise<Result<SaleDto, AppError>> => {
-        const now = this.clock.now();
-        if (key !== null && this.idempotencyStore) {
-          const previous = await this.idempotencyStore.find(scope, key, now);
-          if (previous) {
-            if (previous.requestFingerprint !== fingerprint) {
-              return err(new ApplicationError(
-                'IDEMPOTENCY_KEY_CONFLICT',
-                'Idempotency key was already used with another request.'
-              ));
-            }
-            return ok(this.restoreResult(previous.result));
+      return await executeIdempotentCommand({
+        operation: 'CompleteSale', input, context, now: this.clock.now(),
+        ...(this.unitOfWork ? { unitOfWork: this.unitOfWork } : {}),
+        ...(this.idempotencyStore ? { idempotencyStore: this.idempotencyStore } : {}),
+        execute: async () => {
+          const sale = await this.repository.findById(input.saleId);
+          if (sale === null || sale.terminalId !== context.terminalId ||
+            sale.originNodeId !== context.originNodeId) {
+            return err(new ApplicationError('SALE_NOT_FOUND', 'Sale was not found.'));
           }
-        }
-
-        const sale = await this.repository.findById(input.saleId);
-        if (sale === null) return err(new ApplicationError('SALE_NOT_FOUND', 'Sale was not found.'));
-        sale.complete({ completedAt: now, eventId: this.eventIdGenerator.generate() });
-        await this.repository.save(sale);
-        const events = toBusinessEvents(sale.domainEvents, context);
-        if (this.eventStore) await this.eventStore.append(events);
-        if (this.outboxStore) {
-          await this.outboxStore.enqueue(events.filter((event) => event.eventType === 'SaleCompleted'));
-        }
-        const dto = toSaleDto(sale);
-        if (key !== null && this.idempotencyStore) {
-          await this.idempotencyStore.save({
-            scope,
-            key,
-            requestFingerprint: fingerprint,
-            status: 'COMPLETED',
-            result: JSON.parse(JSON.stringify(dto)) as JsonValue,
-            createdAt: now,
-            expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+          sale.complete({
+            completedAt: this.clock.now(), eventId: this.eventIdGenerator.generate()
           });
-        }
-        return ok(dto);
-      };
-      return this.unitOfWork ? await this.unitOfWork.execute(execute) : await execute();
+          await persistBusinessChange(
+            () => this.repository.save(sale), sale.domainEvents, context,
+            undefined, this.eventStore, this.outboxStore, ['SaleCompleted']
+          );
+          return ok(toSaleDto(sale));
+        },
+        serialize: (output) => JSON.parse(JSON.stringify(output)) as JsonValue,
+        restore: (value) => this.restoreResult(value)
+      });
     } catch (error) {
       if (error instanceof DomainError) return err(error);
       throw error;

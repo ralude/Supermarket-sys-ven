@@ -61,6 +61,109 @@ export const idempotencyKeys = sqliteTable('idempotency_key', {
   expiresAt: integer('expires_at').notNull()
 }, (table) => [primaryKey({ columns: [table.scope, table.key] })]);
 
+export const identityUsers = sqliteTable('identity_users', {
+  id: text('id').primaryKey(),
+  operatorCode: text('operator_code').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull(),
+  authorizationVersion: integer('authorization_version').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull()
+});
+
+export const identityRoles = sqliteTable('identity_roles', {
+  id: text('id').primaryKey(),
+  code: text('code').notNull().unique(),
+  name: text('name').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull(),
+  isAssignable: integer('is_assignable', { mode: 'boolean' }).notNull()
+});
+
+export const identityPermissions = sqliteTable('identity_permissions', {
+  code: text('code').primaryKey(),
+  name: text('name').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull()
+});
+
+export const identityUserRoles = sqliteTable('identity_user_roles', {
+  userId: text('user_id').notNull().references(() => identityUsers.id),
+  roleId: text('role_id').notNull().references(() => identityRoles.id)
+}, (table) => [primaryKey({ columns: [table.userId, table.roleId] })]);
+
+export const identityRolePermissions = sqliteTable('identity_role_permissions', {
+  roleId: text('role_id').notNull().references(() => identityRoles.id),
+  permissionCode: text('permission_code').notNull().references(() => identityPermissions.code)
+}, (table) => [primaryKey({ columns: [table.roleId, table.permissionCode] })]);
+
+export const identityCredentials = sqliteTable('identity_credentials', {
+  userId: text('user_id').primaryKey().references(() => identityUsers.id),
+  pinHash: text('pin_hash').notNull(),
+  version: integer('version').notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull()
+});
+
+export const authLockouts = sqliteTable('auth_lockouts', {
+  originNodeId: text('origin_node_id').notNull(),
+  userId: text('user_id').notNull().references(() => identityUsers.id),
+  windowStartedAt: integer('window_started_at', { mode: 'timestamp_ms' }).notNull(),
+  failedCount: integer('failed_count').notNull(),
+  lockedUntil: integer('locked_until', { mode: 'timestamp_ms' })
+}, (table) => [primaryKey({ columns: [table.originNodeId, table.userId] })]);
+
+export const authSessions = sqliteTable('auth_sessions', {
+  tokenHash: text('token_hash').primaryKey(),
+  userId: text('user_id').notNull().references(() => identityUsers.id),
+  originNodeId: text('origin_node_id').notNull(),
+  terminalId: text('terminal_id').notNull(),
+  authorizationVersion: integer('authorization_version').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' }).notNull(),
+  idleExpiresAt: integer('idle_expires_at', { mode: 'timestamp_ms' }).notNull(),
+  absoluteExpiresAt: integer('absolute_expires_at', { mode: 'timestamp_ms' }).notNull(),
+  revokedAt: integer('revoked_at', { mode: 'timestamp_ms' })
+});
+
+export const operationalPolicyVersions = sqliteTable('operational_policy_versions', {
+  id: text('id').primaryKey(),
+  policyType: text('policy_type').notNull(),
+  version: integer('version').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull(),
+  validFrom: integer('valid_from', { mode: 'timestamp_ms' }).notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  reason: text('reason').notNull()
+});
+
+export const discountPolicyConfiguration = sqliteTable('discount_policy_configuration', {
+  policyId: text('policy_id').primaryKey().references(() => operationalPolicyVersions.id),
+  maximumBasisPoints: integer('maximum_basis_points').notNull()
+});
+
+export const financialTransactionTaxPolicyConfiguration = sqliteTable(
+  'financial_transaction_tax_policy_configuration',
+  {
+    policyId: text('policy_id').primaryKey().references(() => operationalPolicyVersions.id),
+    rateBasisPoints: integer('rate_basis_points').notNull()
+  }
+);
+
+export const financialTransactionTaxPaymentMethods = sqliteTable(
+  'financial_transaction_tax_payment_methods',
+  {
+    policyId: text('policy_id').notNull().references(() => operationalPolicyVersions.id),
+    paymentMethodCode: text('payment_method_code').notNull()
+  },
+  (table) => [primaryKey({ columns: [table.policyId, table.paymentMethodCode] })]
+);
+
+export const financialTransactionTaxCurrencies = sqliteTable(
+  'financial_transaction_tax_currencies',
+  {
+    policyId: text('policy_id').notNull().references(() => operationalPolicyVersions.id),
+    currencyCode: text('currency_code').notNull()
+  },
+  (table) => [primaryKey({ columns: [table.policyId, table.currencyCode] })]
+);
+
 export const categories = sqliteTable('categories', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),

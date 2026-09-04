@@ -37,7 +37,7 @@ export type CreateProductInput = {
   priceMinorUnits: number;
   currencyCode: string;
   taxRateBasisPoints: number;
-  recordedBy: string;
+  reason: string;
 };
 
 export type UpdateProductInput = {
@@ -48,13 +48,13 @@ export type UpdateProductInput = {
   unitCode?: string;
   barcodes?: string[];
   isActive?: boolean;
+  reason: string;
 };
 
 export type UpdatePriceInput = {
   productId: string;
   priceMinorUnits: number;
   currencyCode: string;
-  changedBy: string;
   reason: string;
 };
 

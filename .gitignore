@@ -8,6 +8,9 @@ coverage/
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 logs/
 .DS_Store
 Thumbs.db

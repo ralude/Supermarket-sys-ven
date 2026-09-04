@@ -14,9 +14,12 @@ import type {
   IdGenerator,
   SaleRepository,
   ShiftRepository,
-  UnitOfWork
+  UnitOfWork,
+  IdempotencyStore
 } from '../ports/index.js';
 import { persistBusinessChange } from '../events/index.js';
+import type { JsonValue } from '../events/index.js';
+import { executeIdempotentCommand } from '../idempotency/index.js';
 import type { SaleDto, StartSaleInput } from './dtos.js';
 import { toSaleDto } from './mappers.js';
 
@@ -28,12 +31,17 @@ export class StartSale {
     private readonly clock: Clock,
     private readonly shiftRepository: ShiftRepository,
     private readonly unitOfWork?: UnitOfWork,
-    private readonly eventStore?: BusinessEventStore
+    private readonly eventStore?: BusinessEventStore,
+    private readonly idempotencyStore?: IdempotencyStore
   ) {}
 
   async execute(input: StartSaleInput, context: ExecutionContext): Promise<Result<SaleDto, AppError>> {
     try {
-      const execute = async (): Promise<Result<SaleDto, AppError>> => {
+      return await executeIdempotentCommand({
+        operation: 'StartSale', input, context, now: this.clock.now(),
+        ...(this.unitOfWork ? { unitOfWork: this.unitOfWork } : {}),
+        ...(this.idempotencyStore ? { idempotencyStore: this.idempotencyStore } : {}),
+        execute: async (): Promise<Result<SaleDto, AppError>> => {
         const shift = await this.shiftRepository.findById(input.shiftId);
         if (shift === null) return err(new ApplicationError('SHIFT_NOT_FOUND', 'Shift was not found.'));
         if (shift.status !== 'OPEN') {
@@ -60,11 +68,22 @@ export class StartSale {
           undefined, this.eventStore
         );
         return ok(toSaleDto(sale));
-      };
-      return this.unitOfWork ? await this.unitOfWork.execute(execute) : await execute();
+        },
+        serialize: (output) => JSON.parse(JSON.stringify(output)) as JsonValue,
+        restore: restoreSaleDto
+      });
     } catch (error) {
       if (error instanceof DomainError) return err(error);
       throw error;
     }
   }
 }
+
+const restoreSaleDto = (value: JsonValue): SaleDto => {
+  const dto = value as unknown as SaleDto & { completedAt: string | null; voidedAt: string | null };
+  return {
+    ...dto,
+    completedAt: dto.completedAt === null ? null : new Date(dto.completedAt),
+    voidedAt: dto.voidedAt === null ? null : new Date(dto.voidedAt)
+  };
+};

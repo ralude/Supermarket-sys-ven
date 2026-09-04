@@ -10,17 +10,54 @@ export { toBusinessEvents } from './application/events/index.js';
 export type { BusinessEventV1, DomainEventLike, JsonValue } from './application/events/index.js';
 export type { ExecutionContext } from './application/execution-context.js';
 export type {
+  AuditReportEntryDto,
+  AuditReportInput,
+  CashClosureBalanceDto,
+  CashClosureReportEntryDto,
+  CashClosureReportInput,
+  FiscalOperationReportEntryDto,
+  FiscalOperationsReportInput,
+  ResolvedReportQuery
+} from './application/reporting/index.js';
+export type {
+  ExchangeRateDto,
+  ExchangeRateSuggestionDto
+} from './application/currency/index.js';
+export type {
+  FiscalDocumentDto,
+  FiscalReportDto,
+  PrintFiscalReportInput
+} from './application/fiscal/index.js';
+export {
+  AUTH_POLICY,
+  AuthenticateOperator,
+  ProvisionInitialAdmin,
+  RevokeSession,
+  VerifySession
+} from './application/identity/index.js';
+export type {
+  AuthenticationCompletion,
+  AuthenticationRecord,
+  AuthenticationStore,
+  PinHasher,
+  SessionPrincipal,
+  SessionTokenService
+} from './application/identity/index.js';
+export type {
   AuthorizationService,
   AuditEntry,
   AuditWriter,
   BusinessEventStore,
   CashRegisterRepository,
+  CatalogReadRepository,
   CategoryRepository,
   Clock,
   EventPublisher,
   DiscountPolicy,
   DiscountPolicyProvider,
   ExchangeRateRepository,
+  ExchangeRateHistoryRepository,
+  ExchangeRateProvider,
   FinancialTransactionTaxPolicy,
   FinancialTransactionTaxPolicyProvider,
   FiscalDocumentLinePayload,
@@ -47,5 +84,8 @@ export type {
   ShiftRepository,
   StockItemRepository,
   UnitOfWork,
-  UnitOfMeasureRepository
+  UnitOfMeasureRepository,
+  AuditReportRepository,
+  CashClosureReportRepository,
+  FiscalOperationsReportRepository
 } from './application/ports/index.js';

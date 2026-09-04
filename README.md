@@ -10,7 +10,7 @@ Las fases 0 a 7 estan completadas. La Fase 8 esta en curso y comienza por la sub
 
 La documentación arquitectónica está organizada por responsabilidad en [`docs/architecture/README.md`](./docs/architecture/README.md).
 El alcance del MVP, piloto, producción y plataforma empresarial se separa en [`docs/producto/alcance-entregas.md`](./docs/producto/alcance-entregas.md).
-La licencia source-available y su regla de participación por facturación están en [`LICENSE`](./LICENSE) y [`docs/producto/licencia.md`](./docs/producto/licencia.md). No se presenta como licencia Open Source aprobada por OSI.
+Este proyecto se distribuye bajo la [Licencia Apache 2.0](./LICENSE).
 
 ## Estructura del monorepo
 

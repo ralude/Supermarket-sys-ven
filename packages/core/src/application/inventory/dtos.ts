@@ -57,5 +57,6 @@ export type KardexDto = {
   unitCode: string;
   quantityScale: number;
   currentBalanceScaled: number;
+  batches: { id: string; lotNumber: string; expiresAt: Date | null }[];
   movements: StockMovementDto[];
 };

@@ -19,6 +19,7 @@ import {
   UnitOfMeasure,
   type CashRegisterRepository,
   type CategoryRepository,
+  type ExchangeRateHistoryRepository,
   type ExchangeRateRepository,
   type PaymentMethodKind,
   type PaymentMethodRepository,
@@ -155,7 +156,7 @@ export class DrizzleCashRegisterRepository implements CashRegisterRepository {
   }
 }
 
-export class DrizzleExchangeRateRepository implements ExchangeRateRepository {
+export class DrizzleExchangeRateRepository implements ExchangeRateRepository, ExchangeRateHistoryRepository {
   constructor(private readonly handle: DatabaseHandle) {}
 
   async save(rate: ExchangeRate): Promise<void> {
@@ -185,6 +186,13 @@ export class DrizzleExchangeRateRepository implements ExchangeRateRepository {
       lte(exchangeRates.validFrom, at.getTime()),
       or(isNull(exchangeRates.validUntil), gt(exchangeRates.validUntil, at.getTime()))
     )).orderBy(desc(exchangeRates.validFrom)).get()));
+  }
+
+  findHistoryByPair(base: string, quote: string, limit = 100): Promise<readonly ExchangeRate[]> {
+    return read(() => this.handle.db.select().from(exchangeRates).where(and(
+      eq(exchangeRates.baseCurrency, base), eq(exchangeRates.quoteCurrency, quote)
+    )).orderBy(desc(exchangeRates.validFrom), desc(exchangeRates.id)).limit(limit).all()
+      .map((row) => this.restore(row) as ExchangeRate));
   }
 
   private restore(row: typeof exchangeRates.$inferSelect | undefined): ExchangeRate | null {

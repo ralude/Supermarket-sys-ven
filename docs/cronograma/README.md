@@ -21,8 +21,9 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 12 | Optimizacion | Pendiente |
 
 **Fase actual:** Fase 9 - UI
-**Paso de entrada actual:** Gate de seguridad pre-UI (corte minimo de
-11.01–11.03), obligatorio antes de 9.00
+**Sub-fase actual:** 9.07 - Tasas de cambio. Las sub-fases 9.00–9.06 y el gate
+de seguridad pre-UI están completados; 9.07 conserva abierta la aprobación de la
+fuente externa y la pantalla de tasas.
 
 ## Fases
 
@@ -84,6 +85,19 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
   del fabricante ni el laboratorio requerido. La Fase 8 no se considera
   completada: la UI avanza con `FiscalPrinterFake` identificado como simulación
   y el piloto continúa bloqueado hasta reanudar y cerrar los dos perfiles.
+- El 2026-09-02 se cerró 9.00 y se trasladaron las lecturas especializadas a su
+  consumidor dueño: catálogo 9.04, reportes 9.06 y tasas 9.07. La
+  sincronización pendiente conserva su implementación en Fase 10; no se
+  publican respuestas ficticias para adelantarla.
+- El 2026-09-03 se completó 9.01 con recuperación de sesión, acceso por PIN,
+  cliente HTTP basado en contratos compartidos, navegación hash y estados de
+  carga/error. Ponytail se aplicó solo al shell visual; no se agregó router,
+  design system ni IPC de negocio.
+- El 2026-09-03 se cerró 9.06 con ADR-0013: permisos propios de lectura para
+  caja, auditoría y fiscalidad, límite de filas obligatorio recortado en
+  aplicación, exportación CSV local sin permiso ni auditoría adicionales y
+  captura manual de la jornada de X/Z. La auditoría no proyecta los resúmenes
+  antes/después y la sincronización sigue como estado estático de Fase 10.
 - La planificacion regulatoria de Fase 8 reconoce que SNAT/2026/00084 derogo la SNAT/2024/000121 el 2026-08-12. La autorizacion por modelo y el registro del desarrollador ante el fabricante de SNAT/2018/0141 se verifican nuevamente antes del piloto.
 - La Fase 1 se completó con Electron, React, Fastify, SQLite, Drizzle y ESLint instalados y verificados mediante smoke tests.
 - ADR-0008 establece terminales POS autonomas con Fastify y SQLite local; el nodo coordinador sincroniza eventos y datos de referencia.

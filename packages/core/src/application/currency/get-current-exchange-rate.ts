@@ -12,7 +12,8 @@ function toDto(rate: import('../../domain/currency/index.js').ExchangeRate): Exc
     rateScale: rate.rateScale,
     source: rate.source,
     validFrom: rate.validFrom,
-    validUntil: rate.validUntil
+    validUntil: rate.validUntil,
+    registeredBy: rate.registeredBy
   };
 }
 

@@ -1,10 +1,236 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import { randomUUID } from 'node:crypto';
+import Fastify, {
+  LogController,
+  type FastifyError,
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest
+} from 'fastify';
+import type {
+  application,
+  AuthenticateOperator,
+  ExecutionContext,
+  FiscalReportDto,
+  PrintFiscalReportInput,
+  RevokeSession,
+  SessionPrincipal,
+  VerifySession
+} from '@supermarket/core';
+import { AppError, type ProblemDetails, type Result } from '@supermarket/shared';
 import healthRoute from './routes/health.ts';
+import { registerAuthRoutes } from './routes/auth.ts';
+import { registerSystemRoutes } from './routes/system.ts';
+import { registerFiscalReportRoutes } from './routes/fiscal-reports.ts';
+import { registerCatalogRoutes } from './routes/catalog.ts';
+import { registerCurrencyRoutes } from './routes/currency.ts';
+import { registerSalesRoutes } from './routes/sales.ts';
+import { registerCashRoutes } from './routes/cash.ts';
+import { registerInventoryRoutes } from './routes/inventory.ts';
+import { registerFiscalDocumentRoutes } from './routes/fiscal-documents.ts';
+import { registerReportRoutes } from './routes/reports.ts';
 
-export const buildApp = (): FastifyInstance => {
-  const app = Fastify({ logger: true });
+type FiscalReportUseCase = {
+  execute(
+    input: PrintFiscalReportInput,
+    context: ExecutionContext
+  ): Promise<Result<FiscalReportDto, AppError>>;
+};
+
+export type ServerDependencies = {
+  readonly authenticateOperator: AuthenticateOperator;
+  readonly verifySession: VerifySession;
+  readonly revokeSession: RevokeSession;
+  readonly nodeIdentity: { readonly terminalId: string; readonly originNodeId: string };
+  readonly simulatedReportsEnabled: boolean;
+  readonly catalog: {
+    readonly createProduct: application.CreateProduct;
+    readonly updateProduct: application.UpdateProduct;
+    readonly updatePrice: application.UpdatePrice;
+    readonly findProductByBarcode: application.FindProductByBarcode;
+  };
+  readonly catalogReads?: {
+    readonly listProducts: application.ListProducts;
+    readonly getPriceHistory: application.GetPriceHistory;
+  };
+  readonly currency: {
+    readonly updateExchangeRate: application.UpdateExchangeRate;
+    readonly getCurrentExchangeRate: application.GetCurrentExchangeRate;
+    readonly getExchangeRateHistory: application.GetExchangeRateHistory;
+    readonly getSuggestedExchangeRate: application.GetSuggestedExchangeRate;
+    readonly calculateMixedPaymentTotals: application.CalculateMixedPaymentTotals;
+  };
+  readonly sales: {
+    readonly startSale: application.StartSale;
+    readonly getSale: application.GetSale;
+    readonly addItemToSale: application.AddItemToSale;
+    readonly removeItemFromSale: application.RemoveItemFromSale;
+    readonly applyDiscountToSale: application.ApplyDiscountToSale;
+    readonly registerMixedPayment: application.RegisterMixedPayment;
+    readonly completeSale: application.CompleteSale;
+    readonly voidSale: application.VoidSale;
+  };
+  readonly cash: {
+    readonly openShift: application.OpenShift;
+    readonly getOpenShift: application.GetOpenShift;
+    readonly registerCashMovement: application.RegisterCashMovement;
+    readonly closeShift: application.CloseShift;
+  };
+  readonly inventory: {
+    readonly receivePurchase: application.ReceivePurchase;
+    readonly registerStockAdjustment: application.RegisterStockAdjustment;
+    readonly getKardex: application.GetKardex;
+  };
+  readonly fiscalDocuments: {
+    readonly issue: application.IssueFiscalDocument;
+    readonly get: application.GetFiscalDocument;
+    readonly reconcile: application.ReconcileFiscalState;
+  };
+  readonly reports?: {
+    readonly getCashClosureReport: application.GetCashClosureReport;
+    readonly getAuditReport: application.GetAuditReport;
+    readonly getFiscalOperationsReport: application.GetFiscalOperationsReport;
+  };
+  readonly fiscalReports?: {
+    readonly printX: FiscalReportUseCase;
+    readonly printZ: FiscalReportUseCase;
+  };
+  readonly close?: () => void | Promise<void>;
+};
+
+const principals = new WeakMap<FastifyRequest, SessionPrincipal>();
+const correlations = new WeakMap<FastifyRequest, string>();
+const publicErrorCodes = new WeakMap<FastifyRequest, string>();
+
+const correlationId = (request: FastifyRequest): string => correlations.get(request) ?? request.id;
+
+const statusFor = (code: string): number => {
+  if (code === 'UNAUTHORIZED' || code === 'AUTHENTICATION_FAILED') return 401;
+  if (code === 'FORBIDDEN') return 403;
+  if (code.endsWith('_NOT_FOUND') || code === 'RESOURCE_NOT_FOUND') return 404;
+  if (code.includes('CONFLICT') || code.includes('ALREADY_') || code.endsWith('_INVALID_STATE')) {
+    return 409;
+  }
+  if (code === 'POLICY_NOT_CONFIGURED') return 409;
+  if (code === 'DATABASE_BUSY' || code === 'NETWORK_UNAVAILABLE') return 503;
+  return 400;
+};
+
+export const sendProblem = (
+  reply: FastifyReply,
+  request: FastifyRequest,
+  code: string,
+  title: string,
+  status = statusFor(code)
+): FastifyReply => {
+  publicErrorCodes.set(request, code);
+  const body: ProblemDetails = {
+    type: `urn:supermarket:problem:${code.toLowerCase()}`,
+    title,
+    status,
+    code,
+    correlationId: correlationId(request)
+  };
+  return reply.code(status).type('application/problem+json').send(body);
+};
+
+export const requirePrincipal = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ServerDependencies
+): Promise<SessionPrincipal | null> => {
+  const cookie = request.headers.cookie?.split(';').map((part) => part.trim())
+    .find((part) => part.startsWith('pos_session='));
+  const rawToken = cookie ? decodeURIComponent(cookie.slice('pos_session='.length)) : '';
+  const result = await dependencies.verifySession.execute(rawToken);
+  if (!result.ok) {
+    sendProblem(reply, request, 'UNAUTHORIZED', 'Session is invalid.', 401);
+    return null;
+  }
+  principals.set(request, result.value);
+  return result.value;
+};
+
+export const createExecutionContext = (
+  request: FastifyRequest,
+  principal: SessionPrincipal,
+  dependencies: ServerDependencies
+): ExecutionContext => {
+  const idempotencyKey = request.headers['idempotency-key'];
+  return {
+    actorId: principal.actorId,
+    actorRoleCodes: principal.roleCodes,
+    terminalId: dependencies.nodeIdentity.terminalId,
+    originNodeId: dependencies.nodeIdentity.originNodeId,
+    correlationId: correlationId(request),
+    ...(typeof idempotencyKey === 'string' ? { idempotencyKey } : {})
+  };
+};
+
+export const buildApp = (dependencies?: ServerDependencies): FastifyInstance => {
+  const app = Fastify({
+    ajv: { customOptions: { removeAdditional: false } },
+    logController: new LogController({ disableRequestLogging: true }),
+    logger: {
+      redact: {
+        paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie'],
+        censor: '[REDACTED]'
+      }
+    }
+  });
+
+  app.addHook('onRequest', async (request, reply) => {
+    const supplied = request.headers['x-correlation-id'];
+    const value = typeof supplied === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(supplied)
+      ? supplied
+      : randomUUID();
+    correlations.set(request, value);
+    reply.header('x-correlation-id', value);
+  });
+
+  app.addHook('onResponse', async (request, reply) => {
+    const principal = principals.get(request);
+    const errorCode = publicErrorCodes.get(request);
+    request.log.info({
+      service: 'supermarket-server',
+      module: 'http',
+      correlationId: correlationId(request),
+      ...(dependencies ? { terminalId: dependencies.nodeIdentity.terminalId } : {}),
+      ...(principal ? { userId: principal.actorId } : {}),
+      operation: `${request.method} ${request.routeOptions.url ?? 'unmatched'}`,
+      statusCode: reply.statusCode,
+      ...(errorCode ? { errorCode } : {})
+    }, 'HTTP request completed');
+  });
+
+  app.setErrorHandler((error: FastifyError | AppError, request, reply) => {
+    if ('validation' in error && error.validation) {
+      sendProblem(reply, request, 'HTTP_VALIDATION_FAILED', 'Request validation failed.', 400);
+      return;
+    }
+    if (error instanceof AppError) {
+      sendProblem(reply, request, error.code, error.message);
+      return;
+    }
+    request.log.error({ err: error, correlationId: correlationId(request) }, 'Unhandled request error');
+    sendProblem(reply, request, 'INTERNAL_ERROR', 'Unexpected server error.', 500);
+  });
 
   app.register(healthRoute);
+  if (dependencies) {
+    registerAuthRoutes(app, dependencies);
+    registerSystemRoutes(app, dependencies);
+    registerCatalogRoutes(app, dependencies);
+    registerCurrencyRoutes(app, dependencies);
+    registerSalesRoutes(app, dependencies);
+    registerCashRoutes(app, dependencies);
+    registerInventoryRoutes(app, dependencies);
+    registerFiscalDocumentRoutes(app, dependencies);
+    registerReportRoutes(app, dependencies);
+    if (dependencies.simulatedReportsEnabled && dependencies.fiscalReports) {
+      registerFiscalReportRoutes(app, dependencies);
+    }
+    if (dependencies.close) app.addHook('onClose', dependencies.close);
+  }
 
   return app;
 };

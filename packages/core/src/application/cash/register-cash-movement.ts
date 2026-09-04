@@ -15,6 +15,7 @@ import type {
   BusinessEventStore,
   Clock,
   IdGenerator,
+  IdempotencyStore,
   OutboxStore,
   PaymentMethodRepository,
   ShiftRepository,
@@ -24,6 +25,8 @@ import type { RegisterCashMovementInput, ShiftDto } from './dtos.js';
 import { toShiftDto } from './mappers.js';
 import { resolveCashPaymentMethod } from './payment-method-validation.js';
 import { CASH_PERMISSIONS } from './permissions.js';
+import { executeIdempotentCommand } from '../idempotency/index.js';
+import { restoreShiftDto, serializeShiftDto } from './shift-idempotency.js';
 
 export class RegisterCashMovement {
   constructor(
@@ -37,7 +40,8 @@ export class RegisterCashMovement {
     private readonly eventStore: BusinessEventStore,
     private readonly outboxStore: OutboxStore,
     private readonly auditWriter: AuditWriter,
-    private readonly auditIdGenerator: IdGenerator
+    private readonly auditIdGenerator: IdGenerator,
+    private readonly idempotencyStore?: IdempotencyStore
   ) {}
 
   async execute(
@@ -51,7 +55,12 @@ export class RegisterCashMovement {
       return err(new ApplicationError('FORBIDDEN', 'Actor is not authorized for this cash movement.'));
     }
     try {
-      return await this.unitOfWork.execute(async () => {
+      const occurredAt = this.clock.now();
+      return await executeIdempotentCommand({
+        operation: 'RegisterCashMovement', input, context, now: occurredAt,
+        unitOfWork: this.unitOfWork,
+        ...(this.idempotencyStore ? { idempotencyStore: this.idempotencyStore } : {}),
+        execute: async () => {
         const shift = await this.shiftRepository.findById(input.shiftId);
         if (shift === null) return err(new ApplicationError('SHIFT_NOT_FOUND', 'Shift was not found.'));
         const methodResult = await resolveCashPaymentMethod(
@@ -66,7 +75,6 @@ export class RegisterCashMovement {
           minorUnits: balance.amount.minorUnits
         }));
         const previousEventCount = shift.domainEvents.length;
-        const occurredAt = this.clock.now();
         const movement = shift.registerMovement({
           id: this.movementIdGenerator.generate(),
           type: input.type,
@@ -116,7 +124,10 @@ export class RegisterCashMovement {
             correlationId: context.correlationId
           }]
         );
-        return ok(toShiftDto(shift));
+          return ok(toShiftDto(shift));
+        },
+        serialize: serializeShiftDto,
+        restore: restoreShiftDto
       });
     } catch (error) {
       if (error instanceof DomainError) return err(error);

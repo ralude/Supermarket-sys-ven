@@ -6,6 +6,8 @@ export { RegisterMixedPayment } from './register-mixed-payment.js';
 export { StartSale } from './start-sale.js';
 export { VoidSale } from './void-sale.js';
 export { GetSaleHistory, type SaleHistoryVersion } from './get-sale-history.js';
+export { GetSale } from './get-sale.js';
+export { SALE_PERMISSIONS } from './permissions.js';
 export type {
   AddItemToSaleInput,
   ApplyDiscountToSaleInput,

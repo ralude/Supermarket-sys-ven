@@ -41,7 +41,29 @@ Campos mínimos:
 
 ## Protección de datos
 
-Nunca se registran PINs, contraseñas, tokens, claves, números completos de tarjeta ni credenciales de hardware. Los errores se redactan antes de persistirse.
+Los logs técnicos usan una lista permitida de metadatos. No registran bodies
+HTTP completos ni objetos de dominio serializados.
+
+Nunca se registran PINs, contraseñas, tokens, cookies, headers de autorización,
+claves, números de tarjeta ni credenciales de hardware. Tampoco se registran
+RIF, cédula, pasaporte, nombre, dirección, teléfono o correo del cliente;
+contenido de documentos fiscales; líneas o medios de pago; ni montos de venta o
+pago. Para correlación se usan IDs técnicos de entidad, operación y documento.
+
+Un requisito diagnóstico que necesite un dato excluido debe aprobar finalidad,
+acceso, retención y representación mínima antes de cambiar la lista permitida.
+Cuando baste, se usa un identificador pseudonimizado o valor agregado. Los
+errores se redactan antes de registrarse o persistirse.
+
+La auditoría conserva la evidencia de negocio exigida por su contrato, pero no
+duplica PII del cliente si `entityId`, acción y motivo bastan. Registrar acceso
+a PII no implica copiar el valor consultado dentro de la auditoría.
+
+Desde 9.06, la lectura operativa de auditoría exige el permiso
+`reports.audit.read` y proyecta actor, roles, acción, entidad, motivo, terminal,
+nodo, UTC y correlación. No proyecta los resúmenes antes/después, que pueden
+contener datos excluidos por esta lista permitida; ADR-0013 fija ese alcance, el
+límite de filas y la exportación.
 
 ## Integridad
 

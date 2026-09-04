@@ -1,0 +1,14 @@
+{
+  "name": "@supermarket/driver-exchange-rate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Proveedor HTTP configurable de sugerencias de tasas.",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@supermarket/core": "workspace:*",
+    "@supermarket/shared": "workspace:*"
+  },
+  "devDependencies": { "typescript": "^5.9.2", "vitest": "^3.2.7" }
+}

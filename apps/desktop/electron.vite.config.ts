@@ -1,6 +1,8 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 
+const localApiProxy = { '/api': 'http://127.0.0.1:3000' };
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()]
@@ -17,6 +19,12 @@ export default defineConfig({
     }
   },
   renderer: {
-    plugins: [react()]
+    plugins: [react()],
+    server: {
+      proxy: localApiProxy
+    },
+    preview: {
+      proxy: localApiProxy
+    }
   }
 });

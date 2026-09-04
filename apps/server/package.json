@@ -5,17 +5,27 @@
   "type": "module",
   "description": "Servidor Fastify local o LAN.",
   "scripts": {
-    "dev": "node --watch src/index.ts",
-    "start": "node src/index.ts",
+    "dev": "node --env-file=config/development.env --import tsx --watch src/index.ts",
+    "start": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bootstrap-admin": "tsx src/bootstrap-admin.ts",
+    "bootstrap-admin:dev": "tsx --env-file=config/development.env src/bootstrap-admin.ts",
+    "seed:products": "tsx src/seed-products.ts"
   },
   "dependencies": {
+    "@supermarket/core": "workspace:*",
+    "@supermarket/driver-db": "workspace:*",
+    "@supermarket/driver-exchange-rate": "workspace:*",
+    "@supermarket/driver-fiscal": "workspace:*",
+    "@supermarket/driver-security": "workspace:*",
+    "@supermarket/shared": "workspace:*",
     "fastify": "^5.6.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "tsx": "4.23.13",
     "typescript": "^5.9.2",
     "vitest": "^3.2.7"
   }

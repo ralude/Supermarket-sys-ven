@@ -150,13 +150,15 @@ export default tseslint.config(
                 'node:*',
                 'electron',
                 'electron/**',
+                '@supermarket/core',
+                '@supermarket/core/**',
                 'drizzle-orm',
                 'drizzle-orm/**',
                 'better-sqlite3',
                 '@supermarket/driver-*',
                 '@supermarket/driver-*/**'
               ],
-              message: 'El renderer no puede importar Node.js, Electron, base de datos ni drivers.'
+              message: 'El renderer no puede importar core, Node.js, Electron, base de datos ni drivers.'
             }
           ]
         }

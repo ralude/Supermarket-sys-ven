@@ -16,6 +16,7 @@ import type {
   BusinessEventStore,
   Clock,
   IdGenerator,
+  IdempotencyStore,
   OutboxStore,
   PaymentMethodRepository,
   ShiftRepository,
@@ -25,6 +26,8 @@ import type { CloseShiftInput, ShiftDto } from './dtos.js';
 import { toShiftDto } from './mappers.js';
 import { resolvePaymentMethod } from './payment-method-validation.js';
 import { CASH_PERMISSIONS } from './permissions.js';
+import { executeIdempotentCommand } from '../idempotency/index.js';
+import { restoreShiftDto, serializeShiftDto } from './shift-idempotency.js';
 
 export class CloseShift {
   constructor(
@@ -37,7 +40,8 @@ export class CloseShift {
     private readonly eventStore: BusinessEventStore,
     private readonly outboxStore: OutboxStore,
     private readonly auditWriter: AuditWriter,
-    private readonly auditIdGenerator: IdGenerator
+    private readonly auditIdGenerator: IdGenerator,
+    private readonly idempotencyStore?: IdempotencyStore
   ) {}
 
   async execute(input: CloseShiftInput, context: ExecutionContext): Promise<Result<ShiftDto, AppError>> {
@@ -45,7 +49,12 @@ export class CloseShift {
       return err(new ApplicationError('FORBIDDEN', 'Actor is not authorized to close shifts.'));
     }
     try {
-      return await this.unitOfWork.execute(async () => {
+      const closedAt = this.clock.now();
+      return await executeIdempotentCommand({
+        operation: 'CloseShift', input, context, now: closedAt,
+        unitOfWork: this.unitOfWork,
+        ...(this.idempotencyStore ? { idempotencyStore: this.idempotencyStore } : {}),
+        execute: async () => {
         const shift = await this.shiftRepository.findById(input.shiftId);
         if (shift === null) return err(new ApplicationError('SHIFT_NOT_FOUND', 'Shift was not found.'));
         const declaredBalances: CloseShiftProps['declaredBalances'] = [];
@@ -81,7 +90,6 @@ export class CloseShift {
           ));
         }
         const previousEventCount = shift.domainEvents.length;
-        const closedAt = this.clock.now();
         shift.close({
           declaredBalances,
           closedBy: context.actorId,
@@ -124,7 +132,10 @@ export class CloseShift {
             correlationId: context.correlationId
           }]
         );
-        return ok(toShiftDto(shift));
+          return ok(toShiftDto(shift));
+        },
+        serialize: serializeShiftDto,
+        restore: restoreShiftDto
       });
     } catch (error) {
       if (error instanceof DomainError) return err(error);

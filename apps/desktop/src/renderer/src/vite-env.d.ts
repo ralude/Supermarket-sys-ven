@@ -1,5 +1,5 @@
 interface Window {
   desktop?: {
-    platform: string;
+    readonly platform: string;
   };
 }

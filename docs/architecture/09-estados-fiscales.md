@@ -105,6 +105,15 @@ estados de un proveedor. Las suites comunes se ejecutan solo contra simuladores;
 X/Z están separados detrás de consentimiento simulado explícito. HIL y cualquier
 Z real tienen autorización, presupuesto y runbook propios.
 
+En Fase 9, una ruta HTTP X/Z simulada requiere dos puertas de arranque
+confiables: `FISCAL_EXECUTION_TARGET=SIMULATOR` y
+`FISCAL_SIMULATED_REPORT_CONSENT=ALLOW_SIMULATED_X_AND_Z`. Además, cada request
+incluye `simulationConsent: "ALLOW_SIMULATED_X_AND_Z"` y pasa autenticación y
+autorización. Sin las dos opciones de arranque la ruta no se registra; sin el
+consentimiento del request no se invoca el caso de uso. Toda respuesta se
+identifica como `fiscalMode: "SIMULATION"`. Estas puertas nunca habilitan HIL ni
+un X/Z real.
+
 ## Frontera de genericidad de la integración
 
 El contrato semantico puede ser comun, pero el protocolo o runtime fiscal no se

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ExchangeRate } from '../../domain/currency/index.js';
-import type { ExchangeRateRepository, IdGenerator } from '../ports/index.js';
+import type { AuthorizationService, ExchangeRateRepository, IdGenerator } from '../ports/index.js';
+import type { ExecutionContext } from '../execution-context.js';
 import { UpdateExchangeRate } from './update-exchange-rate.js';
 
 class FakeIdGenerator implements IdGenerator {
@@ -26,11 +27,18 @@ class FakeExchangeRateRepository implements ExchangeRateRepository {
   }
 }
 
+const context: ExecutionContext = {
+  actorId: 'user-001', terminalId: 'terminal-001', originNodeId: 'node-001',
+  correlationId: 'correlation-001', actorRoleCodes: ['ADMIN']
+};
+const authorization = (allowed = true): AuthorizationService => ({ authorize: async () => allowed });
+const clock = { now: () => new Date('2026-08-01T00:00:00Z') };
+
 describe('UpdateExchangeRate', () => {
   it('registers a new exchange rate', async () => {
     const idGenerator = new FakeIdGenerator();
     const repository = new FakeExchangeRateRepository();
-    const useCase = new UpdateExchangeRate(idGenerator, repository);
+    const useCase = new UpdateExchangeRate(idGenerator, repository, authorization(), clock);
 
     const result = await useCase.execute({
       baseCurrency: 'USD',
@@ -39,8 +47,8 @@ describe('UpdateExchangeRate', () => {
       rateScale: 3,
       source: 'BCV',
       validFrom: new Date('2026-08-01T00:00:00Z'),
-      registeredBy: 'user-001'
-    });
+      reason: 'Official daily rate'
+    }, context);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -55,7 +63,7 @@ describe('UpdateExchangeRate', () => {
   it('returns a domain error for invalid input', async () => {
     const idGenerator = new FakeIdGenerator();
     const repository = new FakeExchangeRateRepository();
-    const useCase = new UpdateExchangeRate(idGenerator, repository);
+    const useCase = new UpdateExchangeRate(idGenerator, repository, authorization(), clock);
 
     const result = await useCase.execute({
       baseCurrency: 'USD',
@@ -64,13 +72,30 @@ describe('UpdateExchangeRate', () => {
       rateScale: 3,
       source: 'BCV',
       validFrom: new Date('2026-08-01T00:00:00Z'),
-      registeredBy: 'user-001'
-    });
+      reason: 'Official daily rate'
+    }, context);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
     expect(result.error.code).toBe('EXCHANGE_RATE_INVALID_PAIR');
+    expect(repository.rates).toHaveLength(0);
+  });
+
+  it('does not persist a rate when permission is denied', async () => {
+    const repository = new FakeExchangeRateRepository();
+    const useCase = new UpdateExchangeRate(
+      new FakeIdGenerator(), repository, authorization(false), clock
+    );
+
+    const result = await useCase.execute({
+      baseCurrency: 'USD', quoteCurrency: 'VES', rateValue: 36500, rateScale: 3,
+      source: 'BCV', validFrom: new Date('2026-08-01T00:00:00Z'), reason: 'Daily rate'
+    }, context);
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false, error: expect.objectContaining({ code: 'FORBIDDEN' })
+    }));
     expect(repository.rates).toHaveLength(0);
   });
 });

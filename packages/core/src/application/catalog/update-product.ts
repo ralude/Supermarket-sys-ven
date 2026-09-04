@@ -10,29 +10,53 @@ import {
   Barcode,
   type ProductDetailsChanges
 } from '../../domain/catalog/index.js';
+import type { ExecutionContext } from '../execution-context.js';
+import type { JsonValue } from '../events/index.js';
+import { executeIdempotentCommand } from '../idempotency/index.js';
 import type {
+  AuditWriter,
+  AuthorizationService,
+  Clock,
   CategoryRepository,
   IdGenerator,
+  IdempotencyStore,
   ProductRepository,
+  UnitOfWork,
   UnitOfMeasureRepository
 } from '../ports/index.js';
 import type { ProductDto, UpdateProductInput } from './dtos.js';
 import { toProductDto } from './mappers.js';
+import { CATALOG_PERMISSIONS } from './permissions.js';
 
 export class UpdateProduct {
   constructor(
     private readonly repository: ProductRepository,
     private readonly categoryRepository: CategoryRepository,
     private readonly unitRepository: UnitOfMeasureRepository,
-    private readonly idGenerator: IdGenerator
+    private readonly idGenerator: IdGenerator,
+    private readonly clock: Clock,
+    private readonly authorization: AuthorizationService,
+    private readonly unitOfWork?: UnitOfWork,
+    private readonly idempotencyStore?: IdempotencyStore,
+    private readonly auditWriter?: AuditWriter
   ) {}
 
-  async execute(input: UpdateProductInput): Promise<Result<ProductDto, AppError>> {
+  async execute(input: UpdateProductInput, context: ExecutionContext): Promise<Result<ProductDto, AppError>> {
+    if (!(await this.authorization.authorize(context, CATALOG_PERMISSIONS.UPDATE_PRODUCT))) {
+      return err(new ApplicationError('FORBIDDEN', 'Actor is not authorized to update products.'));
+    }
+    const now = this.clock.now();
     try {
+      return await executeIdempotentCommand({
+        operation: 'UpdateProduct', input, context, now,
+        ...(this.unitOfWork ? { unitOfWork: this.unitOfWork } : {}),
+        ...(this.idempotencyStore ? { idempotencyStore: this.idempotencyStore } : {}),
+        execute: async () => {
       const product = await this.repository.findById(input.productId);
       if (product === null) {
         return err(new ApplicationError('PRODUCT_NOT_FOUND', 'Product was not found.'));
       }
+      const before = toProductDto(product);
 
       const categoryId = input.categoryId;
       if (categoryId !== undefined) {
@@ -78,7 +102,21 @@ export class UpdateProduct {
       if (input.isActive !== undefined) changes.isActive = input.isActive;
       product.updateDetails(changes);
       await this.repository.save(product);
-      return ok(toProductDto(product));
+      const dto = toProductDto(product);
+      if (this.auditWriter) await this.auditWriter.append([{
+        auditId: this.idGenerator.generate(), actorId: context.actorId,
+        actorRoleCodes: context.actorRoleCodes ?? [], action: 'CATALOG_PRODUCT_UPDATED',
+        entityType: 'Product', entityId: product.id,
+        before: JSON.parse(JSON.stringify(before)) as JsonValue,
+        after: JSON.parse(JSON.stringify(dto)) as JsonValue, reason: input.reason,
+        terminalId: context.terminalId, originNodeId: context.originNodeId,
+        occurredAt: now, correlationId: context.correlationId
+      }]);
+      return ok(dto);
+        },
+        serialize: (output) => JSON.parse(JSON.stringify(output)) as JsonValue,
+        restore: (output) => output as unknown as ProductDto
+      });
     } catch (error) {
       if (error instanceof DomainError) return err(error);
       throw error;

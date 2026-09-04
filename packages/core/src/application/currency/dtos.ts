@@ -6,7 +6,7 @@ export type UpdateExchangeRateInput = {
   source: string;
   validFrom: Date;
   validUntil?: Date | null;
-  registeredBy: string;
+  reason: string;
 };
 
 export type ExchangeRateDto = {
@@ -17,6 +17,18 @@ export type ExchangeRateDto = {
   rateScale: number;
   source: string;
   validFrom: Date;
+  validUntil: Date | null;
+  registeredBy: string;
+};
+
+export type ExchangeRateSuggestionDto = {
+  baseCurrency: string;
+  quoteCurrency: string;
+  rateValue: number;
+  rateScale: number;
+  source: string;
+  observedAt: Date;
+  validFrom: Date | null;
   validUntil: Date | null;
 };
 

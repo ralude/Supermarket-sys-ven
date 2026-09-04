@@ -39,6 +39,9 @@ La configuración se ejecuta y verifica al abrir la conexión.
 - `outbox_event`: eventos pendientes, intentos, estado y error de publicación.
 - `audit_log`: actor, acción, entidad, cambios, terminal y timestamp.
 - `idempotency_key`: resultado asociado a una solicitud repetible.
+- `operational_policy_versions` y sus tablas de detalle: versiones locales
+  explícitas de descuento e IGTF, con una sola versión activa por tipo, actor,
+  motivo y vigencia; no contienen defaults.
 - `schema_migrations`: administrada por la herramienta de migración.
 
 ## Transacciones
@@ -46,6 +49,11 @@ La configuración se ejecuta y verifica al abrir la conexión.
 Los cambios de un caso de uso se ejecutan dentro de una transacción. El agregado, los hechos de ledger, la auditoría, la idempotencia y el outbox que correspondan se confirman juntos.
 
 En Fase 4, los comandos de venta componen `UnitOfWork` con los escritores transversales. `CompleteSale` confirma venta, ledger, outbox y resultado idempotente en un solo commit. Las anulaciones y overrides confirman auditoria junto al cambio de venta.
+
+En 9.00, todas las mutaciones HTTP de venta conservan su resultado idempotente
+en el mismo commit. Los proveedores de descuento e IGTF leen únicamente la
+versión activa de SQLite y fallan con `POLICY_NOT_CONFIGURED` cuando no existe;
+la API nunca completa esa ausencia con valores recibidos del cliente.
 
 `business_event` y `audit_log` usan triggers que rechazan `UPDATE` y `DELETE`. `outbox_event` permite cambios de estado para entrega y `idempotency_key` conserva solo resultados completados hasta su expiracion.
 

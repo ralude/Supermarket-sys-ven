@@ -53,6 +53,9 @@ Incluye:
 - [ADR-0008: Topología offline por nodo](./adr/0008-topologia-offline-por-nodo.md)
 - [ADR-0009: Estado relacional, ledger y outbox](./adr/0009-estado-relacional-ledger-outbox.md)
 - [ADR-0010: Transporte serial común e integraciones fiscales por proveedor](./adr/0010-transporte-serial-y-protocolos-fiscales.md)
+- [ADR-0011: Autenticación por PIN y sesiones locales revocables](./adr/0011-autenticacion-pin-y-sesiones-locales.md)
+- [ADR-0012: Permisos de catálogo/moneda y políticas operativas versionadas](./adr/0012-permisos-catalogo-moneda-y-politicas-operativas.md)
+- [ADR-0013: Reportes operativos de lectura, permisos y exportación](./adr/0013-reportes-operativos-de-lectura.md)
 
 ## Alcance del producto
 

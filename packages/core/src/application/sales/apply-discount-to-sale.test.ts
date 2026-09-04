@@ -87,4 +87,25 @@ describe('ApplyDiscountToSale', () => {
       action: 'SALE_DISCOUNT_OVERRIDE_APPLIED', actorRoleCodes: ['MANAGER'], reason: 'Promotion'
     }]);
   });
+
+  it('checks permission before loading the sale or policy', async () => {
+    const repository = new FakeSaleRepository();
+    let saleReads = 0;
+    let policyReads = 0;
+    repository.findById = async () => { saleReads += 1; return repository.stored; };
+    const useCase = new ApplyDiscountToSale(
+      repository, { generate: () => 'discount-001' }, { generate: () => 'event-003' },
+      { now: () => new Date('2026-08-15T10:01:00.000Z') },
+      { getPolicy: async () => { policyReads += 1; return { id: 'policy', maximumBasisPoints: 1000 }; } },
+      { authorize: async () => false }
+    );
+
+    const result = await useCase.execute({
+      saleId: 'sale-001', itemId: 'item-001', basisPoints: 1000, reason: 'Promotion'
+    }, context);
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(saleReads).toBe(0);
+    expect(policyReads).toBe(0);
+  });
 });

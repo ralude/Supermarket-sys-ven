@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Product, UnitOfMeasure } from '../../domain/catalog/index.js';
 import { Money, TaxRate } from '@supermarket/shared';
-import type { ProductRepository } from '../ports/index.js';
+import type { AuthorizationService, ProductRepository } from '../ports/index.js';
+import type { ExecutionContext } from '../execution-context.js';
 import { UpdatePrice } from './update-price.js';
 
 function product(): Product {
@@ -23,8 +24,10 @@ function product(): Product {
 
 class FakeProductRepository implements ProductRepository {
   stored = product();
+  saves = 0;
 
   async save(value: Product): Promise<void> {
+    this.saves += 1;
     this.stored = value;
   }
 
@@ -37,6 +40,12 @@ class FakeProductRepository implements ProductRepository {
   }
 }
 
+const context: ExecutionContext = {
+  actorId: 'user-002', terminalId: 'terminal-001', originNodeId: 'node-001',
+  correlationId: 'correlation-001', actorRoleCodes: ['ADMIN']
+};
+const authorization = (allowed = true): AuthorizationService => ({ authorize: async () => allowed });
+
 describe('UpdatePrice', () => {
   it('changes the current price and appends price history', async () => {
     const repository = new FakeProductRepository();
@@ -44,19 +53,40 @@ describe('UpdatePrice', () => {
       repository,
       { generate: () => 'price-002' },
       { generate: () => 'event-002' },
-      { now: () => new Date('2026-08-16T10:00:00.000Z') }
+      { now: () => new Date('2026-08-16T10:00:00.000Z') },
+      authorization()
     );
 
     const result = await useCase.execute({
       productId: 'product-001',
       priceMinorUnits: 1500,
       currencyCode: 'USD',
-      changedBy: 'user-002',
       reason: 'Supplier update'
-    });
+    }, context);
 
     expect(result.ok).toBe(true);
     expect(repository.stored.price.minorUnits).toBe(1500);
     expect(repository.stored.priceHistory).toHaveLength(2);
+  });
+
+  it('does not load or save a product when permission is denied', async () => {
+    const repository = new FakeProductRepository();
+    let reads = 0;
+    repository.findById = async () => { reads += 1; return repository.stored; };
+    const useCase = new UpdatePrice(
+      repository, { generate: () => 'price-002' }, { generate: () => 'event-002' },
+      { now: () => new Date('2026-08-16T10:00:00.000Z') }, authorization(false)
+    );
+
+    const result = await useCase.execute({
+      productId: 'product-001', priceMinorUnits: 1500,
+      currencyCode: 'USD', reason: 'Supplier update'
+    }, context);
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false, error: expect.objectContaining({ code: 'FORBIDDEN' })
+    }));
+    expect(reads).toBe(0);
+    expect(repository.saves).toBe(0);
   });
 });

@@ -1,0 +1,237 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  CashRegister,
+  Barcode,
+  Category,
+  PaymentMethod,
+  Product,
+  Shift,
+  UnitOfMeasure
+} from '@supermarket/core';
+import { Money, TaxRate, type StartSaleRequest } from '@supermarket/shared';
+import {
+  DrizzleCashRegisterRepository,
+  DrizzleCategoryRepository,
+  DrizzlePaymentMethodRepository,
+  DrizzleProductRepository,
+  DrizzleShiftRepository,
+  DrizzleUnitOfMeasureRepository,
+  SqliteUnitOfWork
+} from '@supermarket/driver-db';
+import { buildApp } from '../app.ts';
+import { ADMIN_PERMISSIONS, createSecurityRuntime, type SecurityRuntime } from '../runtime.ts';
+
+describe('sales HTTP contracts', () => {
+  const runtimes: SecurityRuntime[] = [];
+  const apps: ReturnType<typeof buildApp>[] = [];
+
+  afterEach(async () => {
+    await Promise.all(apps.splice(0).map((app) => app.close()));
+    for (const runtime of runtimes.splice(0)) {
+      if (runtime.handle.sqlite.open) runtime.handle.close();
+    }
+  });
+
+  const setup = async (seedPolicies = true) => {
+    const runtime = createSecurityRuntime(':memory:', {
+      terminalId: 'terminal-001', originNodeId: 'node-001'
+    });
+    runtimes.push(runtime);
+    const provisioned = await runtime.provisionInitialAdmin.execute({
+      operatorCode: 'OP001', displayName: 'Operador', pin: '123456',
+      permissions: ADMIN_PERMISSIONS
+    });
+    expect(provisioned.ok).toBe(true);
+
+    const category = Category.create({ id: 'category-grocery', name: 'Víveres' });
+    const unit = UnitOfMeasure.create({
+      id: 'unit-each', code: 'UNIT', name: 'Unidad', quantityScale: 0
+    });
+    const cash = PaymentMethod.create({
+      code: 'CASH_USD', name: 'Efectivo USD', kind: 'CASH', currencyCode: 'USD'
+    });
+    const register = CashRegister.create({
+      id: 'register-001', name: 'Caja 1', terminalId: 'terminal-001', originNodeId: 'node-001'
+    });
+    const shift = Shift.open({
+      id: 'shift-001', cashRegister: register, openingFunds: [], openedBy: 'seed-user',
+      openedAt: new Date('2026-09-01T08:00:00.000Z'), eventId: 'shift-event-001'
+    });
+    const product = Product.create({
+      id: 'product-coffee', name: 'Café', description: 'Café molido',
+      categoryId: category.id, unitOfMeasure: unit,
+      barcodes: [], price: Money.fromMinorUnits(1250, 'USD'),
+      taxRate: TaxRate.fromBasisPoints(1600), priceHistoryId: 'price-coffee-001',
+      recordedBy: 'seed-user', occurredAt: new Date('2026-09-01T08:00:00.000Z'),
+      eventId: 'product-event-001'
+    });
+    product.updateDetails({
+      barcodes: [Barcode.create({ id: 'barcode-coffee', value: '759000000001' })]
+    });
+
+    const unitOfWork = new SqliteUnitOfWork(runtime.handle.sqlite);
+    await unitOfWork.execute(async () => {
+      await new DrizzleCategoryRepository(runtime.handle).save(category);
+      await new DrizzleUnitOfMeasureRepository(runtime.handle).save(unit);
+      await new DrizzlePaymentMethodRepository(runtime.handle).save(cash);
+      await new DrizzleCashRegisterRepository(runtime.handle).save(register);
+      await new DrizzleShiftRepository(runtime.handle).save(shift);
+      await new DrizzleProductRepository(runtime.handle).save(product);
+    });
+    if (seedPolicies) runtime.handle.sqlite.exec(`
+      insert into operational_policy_versions
+        (id, policy_type, version, is_active, valid_from, created_by, created_at, reason)
+      values
+        ('discount-v1', 'DISCOUNT', 1, 1, 1, 'seed-user', 1, 'Test fixture'),
+        ('igtf-v1', 'FINANCIAL_TRANSACTION_TAX', 1, 1, 1, 'seed-user', 1, 'Test fixture');
+      insert into discount_policy_configuration (policy_id, maximum_basis_points)
+        values ('discount-v1', 1000);
+      insert into financial_transaction_tax_policy_configuration (policy_id, rate_basis_points)
+        values ('igtf-v1', 0);
+    `);
+
+    const app = buildApp(runtime.dependencies);
+    apps.push(app);
+    const login = await app.inject({
+      method: 'POST', url: '/api/v1/auth/session',
+      payload: { operatorCode: 'OP001', pin: '123456' }
+    });
+    expect(login.statusCode).toBe(200);
+    return { app, runtime, cookie: String(login.headers['set-cookie']).split(';')[0]! };
+  };
+
+  it('starts, recovers and adds an item to a sale through SQLite', async () => {
+    const { app, cookie } = await setup();
+    const payload: StartSaleRequest = { currencyCode: 'USD', shiftId: 'shift-001' };
+    const started = await app.inject({
+      method: 'POST', url: '/api/v1/sales',
+      headers: { cookie, 'idempotency-key': 'sale-start-001' }, payload
+    });
+    expect(started.statusCode).toBe(201);
+    const saleId = started.json<{ id: string }>().id;
+
+    const recovered = await app.inject({
+      method: 'GET', url: `/api/v1/sales/${saleId}`, headers: { cookie }
+    });
+    expect(recovered.statusCode).toBe(200);
+    expect(recovered.json()).toMatchObject({ id: saleId, status: 'DRAFT', items: [] });
+
+    const item = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/items`,
+      headers: { cookie, 'idempotency-key': 'sale-item-001' },
+      payload: { barcode: '759000000001', quantityScaled: 2, quantityScale: 0 }
+    });
+    expect(item.statusCode).toBe(200);
+    const itemBody = item.json<{ totalMinorUnits: number }>();
+    expect(itemBody).toMatchObject({
+      id: saleId,
+      items: [{ productId: 'product-coffee', quantityScaled: 2 }]
+    });
+
+    const paid = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/payments`,
+      headers: { cookie, 'idempotency-key': 'sale-payment-001' },
+      payload: {
+        payments: [{
+          methodCode: 'CASH_USD', amountMinorUnits: itemBody.totalMinorUnits,
+          currencyCode: 'USD'
+        }]
+      }
+    });
+    expect(paid.statusCode).toBe(200);
+    expect(paid.json()).toMatchObject({ balanceMinorUnits: 0, payments: [{ methodCode: 'CASH_USD' }] });
+
+    const completionHeaders = { cookie, 'idempotency-key': 'sale-complete-001' };
+    const completed = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/complete`, headers: completionHeaders
+    });
+    expect(completed.statusCode).toBe(200);
+    expect(completed.json()).toMatchObject({ id: saleId, status: 'COMPLETED' });
+    const replay = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/complete`, headers: completionHeaders
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toEqual(completed.json());
+  });
+
+  it('does not expose sale recovery without a session', async () => {
+    const { app } = await setup();
+    const response = await app.inject({ method: 'GET', url: '/api/v1/sales/sale-unknown' });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  it('fails closed when the IGTF policy is not configured', async () => {
+    const { app, cookie } = await setup(false);
+    const started = await app.inject({
+      method: 'POST', url: '/api/v1/sales',
+      headers: { cookie, 'idempotency-key': 'sale-start-no-policy' },
+      payload: { currencyCode: 'USD', shiftId: 'shift-001' }
+    });
+    const saleId = started.json<{ id: string }>().id;
+    const item = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/items`,
+      headers: { cookie, 'idempotency-key': 'sale-item-no-policy' },
+      payload: { barcode: '759000000001', quantityScaled: 1, quantityScale: 0 }
+    });
+    const payment = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/payments`,
+      headers: { cookie, 'idempotency-key': 'sale-payment-no-policy' },
+      payload: {
+        payments: [{
+          methodCode: 'CASH_USD',
+          amountMinorUnits: item.json<{ totalMinorUnits: number }>().totalMinorUnits,
+          currencyCode: 'USD'
+        }]
+      }
+    });
+    expect(payment.statusCode).toBe(409);
+    expect(payment.json()).toMatchObject({ code: 'POLICY_NOT_CONFIGURED' });
+  });
+
+  it('applies an authorized discount, removes another item and audits a void', async () => {
+    const { app, cookie, runtime } = await setup();
+    const started = await app.inject({
+      method: 'POST', url: '/api/v1/sales',
+      headers: { cookie, 'idempotency-key': 'sale-start-edits' },
+      payload: { currencyCode: 'USD', shiftId: 'shift-001' }
+    });
+    const saleId = started.json<{ id: string }>().id;
+    const add = async (key: string) => app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/items`,
+      headers: { cookie, 'idempotency-key': key },
+      payload: { barcode: '759000000001', quantityScaled: 1, quantityScale: 0 }
+    });
+    const first = await add('sale-edit-item-1');
+    const firstItemId = first.json<{ items: Array<{ id: string }> }>().items[0]!.id;
+    const second = await add('sale-edit-item-2');
+    const secondItemId = second.json<{ items: Array<{ id: string }> }>().items[1]!.id;
+
+    const discounted = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/discounts`,
+      headers: { cookie, 'idempotency-key': 'sale-discount-001' },
+      payload: { itemId: firstItemId, basisPoints: 500, reason: 'Promoción aprobada' }
+    });
+    expect(discounted.statusCode).toBe(200);
+    expect(discounted.json<{ discountTotalMinorUnits: number }>().discountTotalMinorUnits)
+      .toBeGreaterThan(0);
+
+    const removed = await app.inject({
+      method: 'DELETE', url: `/api/v1/sales/${saleId}/items/${secondItemId}`,
+      headers: { cookie, 'idempotency-key': 'sale-remove-001' }
+    });
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json<{ items: unknown[] }>().items).toHaveLength(1);
+
+    const voided = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/void`,
+      headers: { cookie, 'idempotency-key': 'sale-void-001' },
+      payload: { reason: 'Cliente canceló la operación' }
+    });
+    expect(voided.statusCode).toBe(200);
+    expect(voided.json()).toMatchObject({ status: 'VOIDED' });
+    expect(runtime.handle.sqlite.prepare(
+      'select action from audit_log order by occurred_at'
+    ).pluck().all()).toEqual(['SALE_DISCOUNT_OVERRIDE_APPLIED', 'SALE_VOIDED']);
+  });
+});

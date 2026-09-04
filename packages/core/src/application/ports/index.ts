@@ -1,8 +1,11 @@
 export type { Clock } from './clock.js';
 export type { IdGenerator } from './id-generator.js';
 export type { ExchangeRateRepository } from './exchange-rate-repository.js';
+export type { ExchangeRateHistoryRepository } from './exchange-rate-history-repository.js';
+export type { ExchangeRateProvider } from './exchange-rate-provider.js';
 export type { CategoryRepository } from './category-repository.js';
 export type { ProductRepository } from './product-repository.js';
+export type { CatalogReadRepository } from './catalog-read-repository.js';
 export type { UnitOfMeasureRepository } from './unit-of-measure-repository.js';
 export type { AuthorizationService } from './authorization-service.js';
 export type { DiscountPolicy, DiscountPolicyProvider } from './discount-policy-provider.js';
@@ -24,6 +27,11 @@ export type { OutboxEvent, OutboxStore } from './outbox-store.js';
 export type { IdempotencyRecord, IdempotencyStore } from './idempotency-store.js';
 export type { FiscalDocumentRepository } from './fiscal-document-repository.js';
 export type { FiscalDayRepository } from './fiscal-day-repository.js';
+export type {
+  AuditReportRepository,
+  CashClosureReportRepository,
+  FiscalOperationsReportRepository
+} from './reporting-repositories.js';
 export type {
   FiscalDocumentLinePayload,
   FiscalDocumentPaymentPayload,

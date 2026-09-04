@@ -18,6 +18,7 @@ import type {
   Clock,
   IdGenerator,
   OutboxStore,
+  IdempotencyStore,
   PaymentMethodRepository,
   ShiftRepository,
   UnitOfWork
@@ -26,6 +27,8 @@ import type { OpenShiftInput, ShiftDto } from './dtos.js';
 import { toShiftDto } from './mappers.js';
 import { resolveCashPaymentMethod } from './payment-method-validation.js';
 import { CASH_PERMISSIONS } from './permissions.js';
+import { executeIdempotentCommand } from '../idempotency/index.js';
+import { restoreShiftDto, serializeShiftDto } from './shift-idempotency.js';
 
 export class OpenShift {
   constructor(
@@ -41,7 +44,8 @@ export class OpenShift {
     private readonly eventStore: BusinessEventStore,
     private readonly outboxStore: OutboxStore,
     private readonly auditWriter: AuditWriter,
-    private readonly auditIdGenerator: IdGenerator
+    private readonly auditIdGenerator: IdGenerator,
+    private readonly idempotencyStore?: IdempotencyStore
   ) {}
 
   async execute(input: OpenShiftInput, context: ExecutionContext): Promise<Result<ShiftDto, AppError>> {
@@ -49,7 +53,12 @@ export class OpenShift {
       return err(new ApplicationError('FORBIDDEN', 'Actor is not authorized to open shifts.'));
     }
     try {
-      return await this.unitOfWork.execute(async () => {
+      const openedAt = this.clock.now();
+      return await executeIdempotentCommand({
+        operation: 'OpenShift', input, context, now: openedAt,
+        unitOfWork: this.unitOfWork,
+        ...(this.idempotencyStore ? { idempotencyStore: this.idempotencyStore } : {}),
+        execute: async () => {
         const cashRegister = await this.cashRegisterRepository.findById(input.cashRegisterId);
         if (cashRegister === null) {
           return err(new ApplicationError('CASH_REGISTER_NOT_FOUND', 'Cash register was not found.'));
@@ -74,7 +83,6 @@ export class OpenShift {
           });
         }
 
-        const openedAt = this.clock.now();
         const shift = Shift.open({
           id: this.shiftIdGenerator.generate(),
           cashRegister,
@@ -116,7 +124,10 @@ export class OpenShift {
             correlationId: context.correlationId
           }]
         );
-        return ok(toShiftDto(shift));
+          return ok(toShiftDto(shift));
+        },
+        serialize: serializeShiftDto,
+        restore: restoreShiftDto
       });
     } catch (error) {
       if (error instanceof DomainError) return err(error);

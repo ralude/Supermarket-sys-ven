@@ -45,4 +45,21 @@ describe('VoidSale', () => {
       reason: 'Customer cancelled', before: { status: 'DRAFT' }, after: { status: 'VOIDED' }
     }]);
   });
+
+  it('checks permission before loading the sale', async () => {
+    const repository = new FakeSaleRepository();
+    let reads = 0;
+    repository.findById = async () => { reads += 1; return repository.stored; };
+    const useCase = new VoidSale(
+      repository, { authorize: async () => false }, { generate: () => 'event-002' },
+      { now: () => new Date('2026-08-15T10:01:00.000Z') }
+    );
+
+    const result = await useCase.execute(
+      { saleId: 'sale-001', reason: 'Customer cancelled' }, context
+    );
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(reads).toBe(0);
+  });
 });

@@ -9,4 +9,11 @@ Aplicacion Electron con renderer React y preload seguro.
 - `pnpm --filter @supermarket/desktop start`: abre el resultado compilado; requiere ejecutar `build` antes.
 - `pnpm --filter @supermarket/desktop test`: ejecuta el smoke test del renderer sin hardware.
 
-El preload solo expone una informacion diagnostica minima mediante `contextBridge`. El negocio continua transportandose por HTTP/Fastify; no se agregan handlers IPC de negocio en esta fase.
+Durante desarrollo y preview, el servidor Fastify debe estar disponible en
+`127.0.0.1:3000`; Vite reenvía `/api` al mismo origen para conservar la cookie
+de sesión segura. El renderer recupera la sesión, muestra el acceso por PIN y
+presenta el shell navegable con estados de carga y conexión.
+
+El preload solo expone información diagnóstica mínima mediante
+`contextBridge`. El negocio continúa transportándose por HTTP/Fastify; no se
+agregan handlers IPC de negocio.
