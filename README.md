@@ -1,4 +1,4 @@
-# Supermarket Platform
+# Cullen
 
 Plataforma empresarial para supermercados en Venezuela, basada en Electron, React, Fastify, SQLite, Drizzle, TypeScript y Vitest.
 
