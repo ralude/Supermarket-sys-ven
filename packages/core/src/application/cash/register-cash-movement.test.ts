@@ -43,6 +43,7 @@ class FakeShiftRepository implements ShiftRepository {
 
 class FakePaymentMethodRepository implements PaymentMethodRepository {
   async findByCode(): Promise<PaymentMethod | null> { return method; }
+  async findAll(): Promise<readonly PaymentMethod[]> { return [method]; }
 }
 
 function useCase(

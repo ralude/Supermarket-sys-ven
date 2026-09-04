@@ -40,6 +40,7 @@ El cronograma oficial y el estado actual viven en [`docs/cronograma/README.md`](
 - Fase 7: driver fiscal fake.
 - Fase 8: integración serial.
 - Fase 9: UI.
+- Fase 9B: perfiles operativos y capacidades faltantes.
 - Fase 10: sincronización offline-first.
 - Fase 11: seguridad.
 - Fase 12: optimización.

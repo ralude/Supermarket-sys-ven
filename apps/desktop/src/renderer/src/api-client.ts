@@ -23,6 +23,10 @@ import {
   registerSalePaymentsContract,
   registerStockAdjustmentContract,
   removeSaleItemContract,
+  listCashRegistersContract,
+  listCategoriesContract,
+  listPaymentMethodsContract,
+  listUnitsOfMeasureContract,
   loginContract,
   listProductsContract,
   logoutContract,
@@ -59,7 +63,11 @@ import {
   type SimulatedFiscalReportResponse,
   type LoginRequest,
   type ProblemDetails,
-  type SessionResponse
+  type SessionResponse,
+  type CashRegisterResponse,
+  type CategoryResponse,
+  type PaymentMethodResponse,
+  type UnitOfMeasureResponse
 } from '@supermarket/shared';
 
 export class ApiProblemError extends Error {
@@ -276,6 +284,18 @@ export const createDesktopApi = (fetcher: typeof fetch = globalThis.fetch) => ({
   printZReport: (input: SimulatedFiscalReportRequest, idempotencyKey: string): Promise<SimulatedFiscalReportResponse> => requestJson(
     fetcher, printSimulatedZReportContract.path,
     { method: printSimulatedZReportContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  listCategories: (): Promise<readonly CategoryResponse[]> => requestJson(
+    fetcher, listCategoriesContract.path, { method: listCategoriesContract.method }
+  ),
+  listUnitsOfMeasure: (): Promise<readonly UnitOfMeasureResponse[]> => requestJson(
+    fetcher, listUnitsOfMeasureContract.path, { method: listUnitsOfMeasureContract.method }
+  ),
+  listPaymentMethods: (): Promise<readonly PaymentMethodResponse[]> => requestJson(
+    fetcher, listPaymentMethodsContract.path, { method: listPaymentMethodsContract.method }
+  ),
+  listCashRegisters: (): Promise<readonly CashRegisterResponse[]> => requestJson(
+    fetcher, listCashRegistersContract.path, { method: listCashRegistersContract.method }
   )
 });
 

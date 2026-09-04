@@ -74,6 +74,10 @@ describe('Drizzle repositories', () => {
     expect(await units.findByCode(unit.code)).toEqual(unit);
     expect(await paymentMethods.findByCode(method.code)).toEqual(method);
     expect(await registers.findById(register.id)).toEqual(register);
+    expect(await categories.findAll()).toEqual([category]);
+    expect(await units.findAll()).toEqual([unit]);
+    expect(await paymentMethods.findAll()).toEqual([method]);
+    expect(await registers.findAll()).toEqual([register]);
     expect((await rates.findCurrentByPair('USD', 'VES', date('2026-08-29T12:00:00Z')))?.id)
       .toBe(rate.id);
     const restored = await products.findByActiveBarcode('1234');
@@ -110,6 +114,25 @@ describe('Drizzle repositories', () => {
     expect(restored).toMatchObject({ id: shift.id, status: 'OPEN', version: 1 });
     expect(restored?.balanceFor('USD_CASH', 'USD').minorUnits).toBe(1000);
     expect(restored?.domainEvents).toEqual([]);
+    handle.close();
+  });
+
+  it('lists reference data including inactive rows; filtering active-only is an application decision', async () => {
+    const handle = openDatabase(':memory:');
+    applyMigrations(handle.sqlite);
+    const unitOfWork = new SqliteUnitOfWork(handle.sqlite);
+    const categories = new DrizzleCategoryRepository(handle);
+    const active = Category.create({ id: 'category-001', name: 'Food' });
+    const inactive = Category.create({ id: 'category-002', name: 'Discontinued', isActive: false });
+
+    await unitOfWork.execute(async () => {
+      await categories.save(active);
+      await categories.save(inactive);
+    });
+
+    const listed = await categories.findAll();
+    expect(listed).toHaveLength(2);
+    expect(listed.map((category) => category.id).sort()).toEqual(['category-001', 'category-002']);
     handle.close();
   });
 

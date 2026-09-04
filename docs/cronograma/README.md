@@ -16,16 +16,25 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 7 | Driver fiscal fake | ~~Completada~~ |
 | 8 | Integracion serial | Suspendida por dependencia externa |
 | 9 | UI | ~~Completada~~ |
+| 9B | Perfiles operativos | Pendiente |
 | 10 | Sincronizacion | Pendiente |
 | 11 | Seguridad | Pendiente (corte minimo pre-UI adelantado) |
 | 12 | Optimizacion | Pendiente |
 
-**Fase actual:** Fase 10 - Sincronizacion
-**Sub-fase actual:** 10.01 - Sync queue. La Fase 9 cerró sus ocho sub-fases el
-2026-09-04; la Fase 8 permanece suspendida por dependencia externa y no bloquea
+**Fase actual:** Fase 9B - Perfiles operativos y capacidades faltantes
+**Sub-fase actual:** 9B.03 - Proveedores, no iniciada. La fundación de la fase
+(9B.00 permisos efectivos en la sesión, 9B.01 reestructuración del renderer,
+9B.02 datos maestros seleccionables) se completó el 2026-09-04; el detalle de
+cada una vive en sus archivos de sub-fase. Las siguientes capacidades de
+negocio bloqueadas por una decisión pendiente (9B.04, 9B.05, 9B.06) no se
+inician hasta que su ADR esté aceptado. La Fase 9 cerró sus ocho sub-fases el
+2026-09-04 y recibió el mismo día la sub-fase correctiva 9.08 sobre pantallas ya
+entregadas; la Fase 8 permanece suspendida por dependencia externa y no bloquea
 el avance porque así lo aprobó la
-[replanificación del 2026-09-01](./replanificacion-fase-08-a-09.md). Ningún
-trabajo de Fase 10 se ha iniciado todavía.
+[replanificación del 2026-09-01](./replanificacion-fase-08-a-09.md). La Fase 9B
+se insertó antes de la Fase 10 por la
+[replanificación del 2026-09-04](./replanificacion-fase-09b.md); la Fase 10
+conserva sus cuatro sub-fases intactas y ninguna ha iniciado.
 
 ## Fases
 
@@ -39,6 +48,7 @@ trabajo de Fase 10 se ha iniciado todavía.
 - [~~Fase 7 - Driver fiscal fake~~](./fase-07-driver-fiscal-fake/README.md)
 - [Fase 8 - Integracion serial](./fase-08-integracion-serial/README.md)
 - [~~Fase 9 - UI~~](./fase-09-ui/README.md)
+- [Fase 9B - Perfiles operativos](./fase-09b-perfiles/README.md)
 - [Fase 10 - Sincronizacion](./fase-10-sincronizacion/README.md)
 - [Fase 11 - Seguridad](./fase-11-seguridad/README.md)
 - [Fase 12 - Optimizacion](./fase-12-optimizacion/README.md)
@@ -100,6 +110,57 @@ trabajo de Fase 10 se ha iniciado todavía.
   aplicación, exportación CSV local sin permiso ni auditoría adicionales y
   captura manual de la jornada de X/Z. La auditoría no proyecta los resúmenes
   antes/después y la sincronización sigue como estado estático de Fase 10.
+- El 2026-09-04 se aprobó la
+  [inserción de la Fase 9B antes de la Fase 10](./replanificacion-fase-09b.md).
+  La interfaz de Fase 9 está organizada por módulo técnico y no por trabajo real:
+  la sesión entrega `roleCodes` que el renderer nunca lee, `permissionCodes` se
+  calcula en aplicación y se descarta en el mapper HTTP, el campo `permission`
+  que declara cada contrato no lo lee ningún código, y varias pantallas exigen
+  escribir identificadores internos a mano. Además, cinco perfiles operativos
+  dependen de capacidades inexistentes: clientes con RIF, proveedores como
+  entidad, costo de compra, devoluciones, conteos, transferencias, alta de
+  usuarios y roles, configuración de datos maestros y KPIs. La Fase 9B agrega
+  esas diecinueve sub-fases sin renumerar ninguna fase y adelanta la
+  administración de identidad de 11.02. No ejecuta trabajo de Fase 10: la
+  sucursal es solo dato maestro y la transferencia se limita a un mismo nodo.
+  Tres sub-fases quedan bloqueadas hasta que el negocio decida método de costeo
+  (ADR-0016), política de devolución (ADR-0017) y datos obligatorios del cliente
+  (ADR-0018). La Fase 8 sigue suspendida: la nota de crédito se rotula
+  `SIMULACIÓN`. La Fase 12 conserva su alcance de optimización medida.
+- El 2026-09-04 se completó la fundación de la Fase 9B (9B.00-9B.02). 9B.00
+  agregó `permissionCodes` a la sesión (ADR-0015) y derivó de ahí la navegación
+  y doce botones de comando del renderer. 9B.01 dividió `operation-screens.tsx`
+  (561 líneas) en módulos por pantalla, sin cambio de comportamiento salvo
+  reemplazar `window.confirm` de la anulación por confirmación en pantalla; el
+  indicador de conexión de la barra superior se limitó a derivarse del ciclo de
+  vida de sesión ya existente, no de un nuevo `/health` (no versionado, no
+  proxiado en Vite) ni de sondeo periódico. 9B.02 publicó cuatro lecturas de
+  datos maestros (categorías, unidades, métodos de pago, cajas) de extremo a
+  extremo y las usó para reemplazar selectores de texto libre en catálogo, caja
+  y venta; la venta deriva la escala de cantidad del producto escaneado y ya no
+  puede producir `SALE_ITEM_QUANTITY_SCALE_MISMATCH`. Al implementar se encontró
+  que `KardexDto` no exponía el `id` del stock item: se agregó, y con eso
+  inventario dejó de pedirlo a mano y de enviar `unitCode`/`quantityScale`
+  codificados en la recepción, cerrando una fuente silenciosa de
+  `STOCK_ITEM_CONFIGURATION_MISMATCH`. Quedan reportadas, sin resolver: la
+  recepción de un producto nunca antes recibido (el `stockItemId` de un
+  agregado nuevo no es derivable sin decidir generación de id desde el
+  renderer) y la cobertura de interacción DOM, que sigue sin entorno de
+  pruebas (`jsdom`) en el monorepo.
+- El 2026-09-04 se agregó la sub-fase correctiva 9.08 tras una auditoría de
+  `apps/desktop`. Corrige el defecto reportado en la venta (barcode aceptado y
+  pantalla en blanco), cuya causa raíz es del renderer: `Intl.NumberFormat` con
+  un código de moneda desconocido lanzaba `RangeError` sin `ErrorBoundary` que
+  lo contuviera, el campo de barcode se limpiaba aunque el nodo rechazara la
+  línea y "Completar venta" se deshabilitaba sin declarar su causa. El servidor
+  no participa del defecto. La misma sub-fase publica **Cullen** como nombre
+  comercial visible del sistema, agrega retroalimentación visible por acción y
+  retira el rótulo de sub-fase de las pantallas. No se agregaron dependencias:
+  al no haber `jsdom` en el monorepo, la lógica corregida se extrajo a funciones
+  puras probadas y la interacción DOM queda sin cobertura automatizada. Queda
+  reportado y sin corregir que en un empaquetado real (`loadFile`) `fetch('/api/…')`
+  resolvería a `file:///api/…`, porque el origen del nodo en producción es
+  alcance de empaquetado. Fase 10 sigue sin iniciar.
 - El 2026-09-04 se cerró 9.07 con ADR-0014, y con ello la Fase 9 completa:
   vigencia por `validFrom` más reciente sin cerrar ventanas solapadas, límite
   de histórico acotado (1-500, 100 por defecto), lecturas de moneda con solo
@@ -119,6 +180,7 @@ trabajo de Fase 10 se ha iniciado todavía.
 ## Documentos transversales
 
 - [Replanificación de Fase 8 a Fase 9](./replanificacion-fase-08-a-09.md)
+- [Replanificación: inserción de Fase 9B](./replanificacion-fase-09b.md)
 - [Estrategia de testing](./testing.md)
 - [CI/CD local](./ci-cd.md)
 - [Hito de cierre arquitectonico](./hito-cierre-arquitectonico.md)

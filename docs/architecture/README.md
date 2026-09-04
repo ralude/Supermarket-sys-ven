@@ -57,6 +57,7 @@ Incluye:
 - [ADR-0012: Permisos de catálogo/moneda y políticas operativas versionadas](./adr/0012-permisos-catalogo-moneda-y-politicas-operativas.md)
 - [ADR-0013: Reportes operativos de lectura, permisos y exportación](./adr/0013-reportes-operativos-de-lectura.md)
 - [ADR-0014: Tasas de cambio — histórico, sugerencia externa y confirmación humana](./adr/0014-tasas-de-cambio-sugerencia-y-confirmacion.md)
+- [ADR-0015: Permisos efectivos en la sesión y navegación derivada en el renderer](./adr/0015-permisos-efectivos-en-la-sesion.md)
 
 ## Alcance del producto
 

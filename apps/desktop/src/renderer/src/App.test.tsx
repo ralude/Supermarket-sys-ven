@@ -1,11 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ApiProblemError, type DesktopApi } from './api-client.js';
-import { AppView, loadInitialState, resolveRoute, type AppViewState } from './App.js';
+import {
+  AppView, PRODUCT_NAME, isRouteReachable, loadInitialState, resolveRoute, shortcutHash,
+  type AppViewState, type NodeConnection
+} from './App.js';
 
-const render = (state: AppViewState, route = '#/'): string => renderToStaticMarkup(
+const render = (state: AppViewState, route = '#/', connection: NodeConnection = 'online'): string => renderToStaticMarkup(
   <AppView
     state={state}
+    connection={connection}
     route={resolveRoute(route)}
     platform="win32"
     operatorCode=""
@@ -33,9 +37,23 @@ describe('desktop renderer base states', () => {
     });
 
     await expect(loadInitialState(apiWith(async () => { throw unauthorized; })))
-      .resolves.toEqual({ kind: 'signed-out', message: null });
+      .resolves.toEqual({ state: { kind: 'signed-out', message: null }, connection: 'online' });
     await expect(loadInitialState(apiWith(async () => { throw new TypeError('network'); })))
-      .resolves.toEqual({ kind: 'error' });
+      .resolves.toEqual({ state: { kind: 'error' }, connection: 'offline' });
+  });
+
+  it('distinguishes a server response from a genuine transport failure', async () => {
+    const forbidden = new ApiProblemError({
+      type: 'urn:supermarket:problem:forbidden', title: 'Forbidden.',
+      status: 403, code: 'FORBIDDEN', correlationId: 'correlation-2'
+    });
+
+    // El servidor respondió (aunque con un error de negocio): la conexión es real.
+    await expect(loadInitialState(apiWith(async () => { throw forbidden; })))
+      .resolves.toMatchObject({ connection: 'online' });
+    // El fetch nunca llegó a completarse: no hay conexión con el nodo.
+    await expect(loadInitialState(apiWith(async () => { throw new Error('ECONNREFUSED'); })))
+      .resolves.toMatchObject({ connection: 'offline' });
   });
 
   it('renders an explicit startup state', () => {
@@ -45,7 +63,7 @@ describe('desktop renderer base states', () => {
   it('renders the native login form without a token field', () => {
     const markup = render({ kind: 'signed-out', message: null });
 
-    expect(markup).toContain('Ingresar a la estación');
+    expect(markup).toContain(`Ingresar a ${PRODUCT_NAME}`);
     expect(markup).toContain('type="password"');
     expect(markup).toContain('autoComplete="current-password"');
     expect(markup).not.toContain('name="token"');
@@ -64,6 +82,7 @@ describe('desktop renderer base states', () => {
       kind: 'ready',
       session: {
         actorId: 'user-1', displayName: 'Operador Uno', roleCodes: ['cashier'],
+        permissionCodes: [],
         idleExpiresAt: '2026-09-02T18:00:00.000Z',
         absoluteExpiresAt: '2026-09-03T00:00:00.000Z'
       },
@@ -78,5 +97,92 @@ describe('desktop renderer base states', () => {
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('win32');
     expect(resolveRoute('#/unknown').id).toBe('home');
+  });
+
+  it('publishes the product name and drops the sub-phase label from the shell', () => {
+    const state: AppViewState = {
+      kind: 'ready',
+      session: {
+        actorId: 'user-1', displayName: 'Operador Uno', roleCodes: ['cashier'],
+        permissionCodes: [],
+        idleExpiresAt: '2026-09-02T18:00:00.000Z',
+        absoluteExpiresAt: '2026-09-03T00:00:00.000Z'
+      },
+      capabilities: { fiscalMode: 'SIMULATION', simulatedReportsEnabled: false }
+    };
+    const markup = render(state, '#/sales');
+
+    expect(PRODUCT_NAME).toBe('Cullen');
+    expect(markup).toContain(PRODUCT_NAME);
+    expect(markup).not.toContain('Subfase');
+    expect(markup).not.toMatch(/9.0d/u);
+  });
+
+  it('maps the numeric shortcuts to their routes', () => {
+    expect(shortcutHash('2')).toBe('#/sales');
+    expect(resolveRoute(shortcutHash('2') ?? '#/').id).toBe('sales');
+    expect(shortcutHash('9')).toBeNull();
+  });
+
+  it('reaches every screen but Reportes with no permission at all, since every other screen has a read open to any valid session', () => {
+    const noPermission: readonly string[] = [];
+    expect(isRouteReachable(resolveRoute('#/sales'), noPermission)).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/cash'), noPermission)).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/catalog'), noPermission)).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/inventory'), noPermission)).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/rates'), noPermission)).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/reports'), noPermission)).toBe(false);
+    expect(isRouteReachable(resolveRoute('#/reports'), ['reports.audit.read'])).toBe(true);
+  });
+
+  it('hides the Reportes entry and blocks the hash without a report permission, without touching the server', () => {
+    const state: AppViewState = {
+      kind: 'ready',
+      session: {
+        actorId: 'user-1', displayName: 'Operador Uno', roleCodes: ['cashier'],
+        permissionCodes: [],
+        idleExpiresAt: '2026-09-02T18:00:00.000Z',
+        absoluteExpiresAt: '2026-09-03T00:00:00.000Z'
+      },
+      capabilities: { fiscalMode: 'SIMULATION', simulatedReportsEnabled: false }
+    };
+    const markup = render(state, '#/reports');
+
+    expect(markup).not.toContain('>Reportes<');
+    expect(markup).toContain('No tienes autorización para esta pantalla');
+  });
+
+  it('shows the Reportes entry and the screen once the session holds any one report permission', () => {
+    const state: AppViewState = {
+      kind: 'ready',
+      session: {
+        actorId: 'user-1', displayName: 'Operador Uno', roleCodes: ['supervisor'],
+        permissionCodes: ['reports.cash.read'],
+        idleExpiresAt: '2026-09-02T18:00:00.000Z',
+        absoluteExpiresAt: '2026-09-03T00:00:00.000Z'
+      },
+      capabilities: { fiscalMode: 'SIMULATION', simulatedReportsEnabled: false }
+    };
+    const markup = render(state, '#/reports');
+
+    expect(markup).toContain('>Reportes<');
+    expect(markup).not.toContain('No tienes autorización para esta pantalla');
+  });
+
+  it('shows the connection badge derived from state, not as fixed markup', () => {
+    const state: AppViewState = {
+      kind: 'ready',
+      session: {
+        actorId: 'user-1', displayName: 'Operador Uno', roleCodes: ['cashier'],
+        permissionCodes: [],
+        idleExpiresAt: '2026-09-02T18:00:00.000Z',
+        absoluteExpiresAt: '2026-09-03T00:00:00.000Z'
+      },
+      capabilities: { fiscalMode: 'SIMULATION', simulatedReportsEnabled: false }
+    };
+
+    expect(render(state, '#/', 'online')).toContain('Servidor conectado');
+    expect(render(state, '#/', 'offline')).toContain('Sin conexión con el nodo');
+    expect(render(state, '#/', 'offline')).not.toContain('Servidor conectado');
   });
 });

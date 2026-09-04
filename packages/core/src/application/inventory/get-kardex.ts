@@ -17,7 +17,7 @@ export class GetKardex {
       (!reason || movement.reason.toLowerCase().includes(reason))
     ).sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime());
     const currentBalance = input.batchId === undefined ? item.balance : item.balanceForBatch(input.batchId);
-    return ok({ productId: item.productId, unitCode: item.unitCode, quantityScale: item.quantityScale,
+    return ok({ id: item.id, productId: item.productId, unitCode: item.unitCode, quantityScale: item.quantityScale,
       currentBalanceScaled: currentBalance.scaledValue,
       batches: item.batches.map((batch) => ({
         id: batch.id, lotNumber: batch.lotNumber, expiresAt: batch.expiresAt

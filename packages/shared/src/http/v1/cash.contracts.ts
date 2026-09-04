@@ -175,3 +175,21 @@ export const closeShiftContract = {
     'SHIFT_INVALID_STATE', 'IDEMPOTENCY_KEY_CONFLICT'
   ]
 } as const satisfies HttpContractV1;
+
+export type CashRegisterResponse = { readonly id: string; readonly name: string };
+
+const cashRegisterResponseSchema = {
+  type: 'object', additionalProperties: false, required: ['id', 'name'],
+  properties: { id: { type: 'string' }, name: { type: 'string' } }
+} as const;
+
+export const listCashRegistersContract = {
+  method: 'GET', path: '/api/v1/cash-registers', permission: null, idempotency: 'NONE',
+  schema: {
+    response: {
+      200: { type: 'array', items: cashRegisterResponseSchema },
+      401: problemDetailsSchema
+    }
+  },
+  errorCodes: ['UNAUTHORIZED']
+} as const satisfies HttpContractV1;

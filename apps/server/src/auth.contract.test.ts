@@ -53,6 +53,31 @@ describe('authenticated HTTP foundation', () => {
     expect(response.headers['set-cookie']).toContain('SameSite=Strict');
   });
 
+  it('reports the effective permission codes of the session, ordered and without duplicates', async () => {
+    const { app } = await setup();
+    const login = await app.inject({
+      method: 'POST', url: '/api/v1/auth/session',
+      payload: { operatorCode: 'OP001', pin: '123456' }
+    });
+    const expected = [...new Set(ADMIN_PERMISSIONS)].sort();
+    expect(login.json().permissionCodes).toEqual(expected);
+
+    const recovered = await app.inject({
+      method: 'GET', url: '/api/v1/auth/session',
+      headers: { cookie: String(login.headers['set-cookie']).split(';')[0]! }
+    });
+    expect(recovered.json().permissionCodes).toEqual(expected);
+  });
+
+  it('reports an empty permission list rather than omitting the field when the actor has none', async () => {
+    const { app } = await setup(false, []);
+    const login = await app.inject({
+      method: 'POST', url: '/api/v1/auth/session',
+      payload: { operatorCode: 'OP001', pin: '123456' }
+    });
+    expect(login.json()).toHaveProperty('permissionCodes', []);
+  });
+
   it('returns the same public problem for unknown operator and wrong PIN', async () => {
     const { app } = await setup();
     const responses = await Promise.all([

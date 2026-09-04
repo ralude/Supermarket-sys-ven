@@ -5,6 +5,7 @@ export type SessionResponse = {
   readonly actorId: string;
   readonly displayName: string;
   readonly roleCodes: readonly string[];
+  readonly permissionCodes: readonly string[];
   readonly idleExpiresAt: string;
   readonly absoluteExpiresAt: string;
 };
@@ -22,10 +23,14 @@ export const loginContract = {
     response: {
       200: {
         type: 'object', additionalProperties: false,
-        required: ['actorId', 'displayName', 'roleCodes', 'idleExpiresAt', 'absoluteExpiresAt'],
+        required: [
+          'actorId', 'displayName', 'roleCodes', 'permissionCodes',
+          'idleExpiresAt', 'absoluteExpiresAt'
+        ],
         properties: {
           actorId: { type: 'string' }, displayName: { type: 'string' },
           roleCodes: { type: 'array', items: { type: 'string' } },
+          permissionCodes: { type: 'array', items: { type: 'string' } },
           idleExpiresAt: { type: 'string' }, absoluteExpiresAt: { type: 'string' }
         }
       },

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifySchema } from 'fastify';
 import {
   closeShiftContract,
   getOpenShiftContract,
+  listCashRegistersContract,
   openShiftContract,
   registerCashMovementContract,
   type CloseShiftRequest,
@@ -30,6 +31,16 @@ export const registerCashRoutes = (
   app: FastifyInstance,
   dependencies: ServerDependencies
 ): void => {
+  if (dependencies.masterData) {
+    app.get(listCashRegistersContract.path, {
+      schema: listCashRegistersContract.schema as FastifySchema
+    }, async (request, reply) => {
+      if (!await requirePrincipal(request, reply, dependencies)) return;
+      const result = await dependencies.masterData!.listCashRegisters.execute();
+      return result.ok ? reply.send(result.value) : sendProblem(reply, request, result.error.code, result.error.message);
+    });
+  }
+
   app.post<{ Body: OpenShiftRequest }>(openShiftContract.path, {
     schema: openShiftContract.schema as FastifySchema
   }, async (request, reply) => {

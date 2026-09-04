@@ -14,11 +14,13 @@ import {
 
 const responseFrom = (principal: {
   actorId: string; displayName: string; roleCodes: readonly string[];
+  permissionCodes: readonly string[];
   idleExpiresAt: Date; absoluteExpiresAt: Date;
 }): SessionResponse => ({
   actorId: principal.actorId,
   displayName: principal.displayName,
   roleCodes: principal.roleCodes,
+  permissionCodes: principal.permissionCodes,
   idleExpiresAt: principal.idleExpiresAt.toISOString(),
   absoluteExpiresAt: principal.absoluteExpiresAt.toISOString()
 });

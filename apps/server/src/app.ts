@@ -52,6 +52,12 @@ export type ServerDependencies = {
     readonly listProducts: application.ListProducts;
     readonly getPriceHistory: application.GetPriceHistory;
   };
+  readonly masterData?: {
+    readonly listCategories: application.ListCategories;
+    readonly listUnitsOfMeasure: application.ListUnitsOfMeasure;
+    readonly listPaymentMethods: application.ListPaymentMethods;
+    readonly listCashRegisters: application.ListCashRegisters;
+  };
   readonly currency: {
     readonly updateExchangeRate: application.UpdateExchangeRate;
     readonly getCurrentExchangeRate: application.GetCurrentExchangeRate;

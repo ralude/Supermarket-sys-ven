@@ -101,14 +101,19 @@ describe('reports screen over simulated HTTP transport', () => {
       getPriceHistory: vi.fn(), createProduct: vi.fn(), updatePrice: vi.fn(), getKardex: vi.fn(),
       receivePurchase: vi.fn(), registerStockAdjustment: vi.fn(), getCashClosureReport: vi.fn(),
       getAuditReport: vi.fn(), getFiscalOperationsReport: vi.fn(),
-      getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn()
+      getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn(), listCategories: vi.fn(), listUnitsOfMeasure: vi.fn(), listPaymentMethods: vi.fn(), listCashRegisters: vi.fn()
     }) as OperationApi;
     return api;
   };
 
+  const fiscalReportPermissions = ['fiscal.report.x', 'fiscal.report.z'];
+
   it('hides the simulated X and Z action while the capability is disabled', () => {
     const markup = renderToStaticMarkup(
-      <ReportsScreen api={screenApi()} capabilities={{ fiscalMode: 'SIMULATION', simulatedReportsEnabled: false }} />
+      <ReportsScreen
+        api={screenApi()} capabilities={{ fiscalMode: 'SIMULATION', simulatedReportsEnabled: false }}
+        permissionCodes={fiscalReportPermissions}
+      />
     );
 
     expect(markup).toContain('Acciones fiscales simuladas');
@@ -120,12 +125,27 @@ describe('reports screen over simulated HTTP transport', () => {
 
   it('requires an explicit simulation consent before enabling X and Z', () => {
     const markup = renderToStaticMarkup(
-      <ReportsScreen api={screenApi()} capabilities={{ fiscalMode: 'SIMULATION', simulatedReportsEnabled: true }} />
+      <ReportsScreen
+        api={screenApi()} capabilities={{ fiscalMode: 'SIMULATION', simulatedReportsEnabled: true }}
+        permissionCodes={fiscalReportPermissions}
+      />
     );
 
     expect(markup).toContain('Confirmo que ejecutaré una simulación');
     expect(markup).toContain('<button type="button" disabled="">Solicitar X simulado</button>');
     expect(markup).toContain('<button class="primary-button" type="button" disabled="">Solicitar Z simulado</button>');
     expect(markup).not.toContain('cierre fiscal real');
+  });
+
+  it('keeps X and Z disabled without their permission, even with consent and the capability enabled', () => {
+    const markup = renderToStaticMarkup(
+      <ReportsScreen
+        api={screenApi()} capabilities={{ fiscalMode: 'SIMULATION', simulatedReportsEnabled: true }}
+        permissionCodes={[]}
+      />
+    );
+
+    expect(markup).toContain('<button type="button" disabled="">Solicitar X simulado</button>');
+    expect(markup).toContain('<button class="primary-button" type="button" disabled="">Solicitar Z simulado</button>');
   });
 });

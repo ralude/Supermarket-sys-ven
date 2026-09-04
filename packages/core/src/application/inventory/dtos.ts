@@ -53,6 +53,7 @@ export type GetKardexInput = {
 };
 
 export type KardexDto = {
+  id: string;
   productId: string;
   unitCode: string;
   quantityScale: number;

@@ -70,7 +70,7 @@ describe('inventory HTTP contracts', () => {
     });
     expect(kardex.statusCode).toBe(200);
     expect(kardex.json()).toMatchObject({
-      productId: 'product-coffee', currentBalanceScaled: 8,
+      id: 'stock-coffee', productId: 'product-coffee', currentBalanceScaled: 8,
       movements: [{ type: 'PURCHASE_RECEIPT' }, { type: 'WASTE' }]
     });
     expect(runtime.handle.sqlite.prepare('select count(*) from stock_movements').pluck().get()).toBe(2);

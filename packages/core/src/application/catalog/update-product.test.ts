@@ -58,11 +58,19 @@ class FakeCategoryRepository implements CategoryRepository {
   async findById(): Promise<Category | null> {
     return category;
   }
+
+  async findAll(): Promise<readonly Category[]> {
+    return [category];
+  }
 }
 
 class FakeUnitRepository implements UnitOfMeasureRepository {
   async findByCode(): Promise<UnitOfMeasure | null> {
     return unit;
+  }
+
+  async findAll(): Promise<readonly UnitOfMeasure[]> {
+    return [unit];
   }
 }
 

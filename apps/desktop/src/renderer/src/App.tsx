@@ -1,5 +1,12 @@
 import { Component, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import type { CapabilitiesResponse, SessionResponse } from '@supermarket/shared';
+import {
+  getAuditReportContract,
+  getCashClosureReportContract,
+  getFiscalOperationsReportContract,
+  isPermissionGranted,
+  type CapabilitiesResponse,
+  type SessionResponse
+} from '@supermarket/shared';
 import { ApiProblemError, createDesktopApi, type DesktopApi, type OperationApi } from './api-client.js';
 import { routeScreen } from './operation-screens.js';
 
@@ -12,7 +19,19 @@ type AppRoute = {
   readonly title: string;
   readonly shortcut: string;
   readonly description: string;
+  /**
+   * Cuándo la sesión puede alcanzar esta pantalla. Ausente = alcanzable con
+   * cualquier sesión válida. La mayoría de las pantallas mezclan lecturas sin
+   * permiso con comandos que sí lo exigen, así que ocultar la pantalla entera
+   * solo es correcto cuando ninguna de sus acciones es de solo sesión — hoy
+   * únicamente ocurre en Reportes.
+   */
+  readonly isReachable?: (permissionCodes: readonly string[]) => boolean;
 };
+
+const REPORTS_READ_CONTRACTS = [
+  getCashClosureReportContract, getAuditReportContract, getFiscalOperationsReportContract
+] as const;
 
 const ROUTES: readonly AppRoute[] = [
   {
@@ -37,7 +56,10 @@ const ROUTES: readonly AppRoute[] = [
   },
   {
     id: 'reports', hash: '#/reports', label: 'Reportes', title: 'Reportes y cierres', shortcut: '6',
-    description: 'Cierres de caja, auditoría y estados fiscales del período.'
+    description: 'Cierres de caja, auditoría y estados fiscales del período.',
+    isReachable: (permissionCodes) => REPORTS_READ_CONTRACTS.some(
+      (contract) => isPermissionGranted(contract.permission, permissionCodes)
+    )
   },
   {
     id: 'rates', hash: '#/rates', label: 'Tasas', title: 'Tasas de cambio', shortcut: '7',
@@ -47,6 +69,14 @@ const ROUTES: readonly AppRoute[] = [
 
 export const resolveRoute = (hash: string): AppRoute =>
   ROUTES.find((route) => route.hash === hash) ?? ROUTES[0]!;
+
+/**
+ * El servidor sigue siendo la autoridad: esto solo decide qué ofrece la
+ * interfaz. Ocultar una ruta nunca sustituye la autorización que el caso de
+ * uso vuelve a exigir en cada intento.
+ */
+export const isRouteReachable = (route: AppRoute, permissionCodes: readonly string[]): boolean =>
+  route.isReachable === undefined || route.isReachable(permissionCodes);
 
 /** Atajo de teclado del POS: Alt + dígito lleva a la pantalla correspondiente. */
 export const shortcutHash = (key: string): string | null =>
@@ -62,15 +92,28 @@ export type AppViewState =
     readonly capabilities: CapabilitiesResponse;
   };
 
-export const loadInitialState = async (api: DesktopApi): Promise<AppViewState> => {
+/**
+ * Distingue una respuesta del servidor (aunque sea un error de negocio) de una
+ * falla de transporte genuina: `fetch` solo lanza un `ApiProblemError` una vez
+ * que la respuesta llegó. Todo lo demás — el nodo apagado, la red caída — no
+ * pasó de ahí.
+ */
+export type NodeConnection = 'checking' | 'online' | 'offline';
+const connectionFrom = (error: unknown): NodeConnection =>
+  error instanceof ApiProblemError ? 'online' : 'offline';
+
+export type SessionLoadResult = { readonly state: AppViewState; readonly connection: NodeConnection };
+
+export const loadInitialState = async (api: DesktopApi): Promise<SessionLoadResult> => {
   try {
     const session = await api.currentSession();
     const capabilities = await api.capabilities();
-    return { kind: 'ready', session, capabilities };
+    return { state: { kind: 'ready', session, capabilities }, connection: 'online' };
   } catch (error) {
-    return error instanceof ApiProblemError && error.problem.status === 401
+    const state: AppViewState = error instanceof ApiProblemError && error.problem.status === 401
       ? { kind: 'signed-out', message: null }
       : { kind: 'error' };
+    return { state, connection: connectionFrom(error) };
   }
 };
 
@@ -112,6 +155,7 @@ export class ScreenErrorBoundary extends Component<
 
 type AppViewProps = {
   readonly state: AppViewState;
+  readonly connection: NodeConnection;
   readonly route: AppRoute;
   readonly platform: string;
   readonly operatorCode: string;
@@ -131,15 +175,16 @@ const Brand = (): React.JSX.Element => (
   </div>
 );
 
-const HomeScreen = ({ capabilities }: {
+const HomeScreen = ({ capabilities, permissionCodes }: {
   readonly capabilities: CapabilitiesResponse;
+  readonly permissionCodes: readonly string[];
 }): React.JSX.Element => (
   <div className="operation-screen">
     <p className="screen-note">
       {PRODUCT_NAME} está conectado al nodo local. Elige una operación para comenzar.
     </p>
     <nav className="quick-actions" aria-label="Accesos directos">
-      {ROUTES.filter((item) => item.id !== 'home').map((item) => (
+      {ROUTES.filter((item) => item.id !== 'home' && isRouteReachable(item, permissionCodes)).map((item) => (
         <a key={item.id} className="quick-action" href={item.hash}>
           <span className="quick-action-key" aria-hidden="true">Alt+{item.shortcut}</span>
           <strong>{item.label}</strong>
@@ -164,6 +209,7 @@ const HomeScreen = ({ capabilities }: {
 
 export const AppView = ({
   state,
+  connection,
   route,
   platform,
   operatorCode,
@@ -252,7 +298,7 @@ export const AppView = ({
       <aside className="sidebar">
         <Brand />
         <nav aria-label="Navegación principal">
-          {ROUTES.map((item) => (
+          {ROUTES.filter((item) => isRouteReachable(item, state.session.permissionCodes)).map((item) => (
             <a
               key={item.id}
               href={item.hash}
@@ -276,7 +322,10 @@ export const AppView = ({
             <p className="topbar-hint">{route.description}</p>
           </div>
           <div className="topbar-actions">
-            <span className="status-label"><i aria-hidden="true" />Servidor conectado</span>
+            <span className={connection === 'offline' ? 'simulation-label' : 'status-label'}>
+              <i aria-hidden="true" />
+              {connection === 'offline' ? 'Sin conexión con el nodo' : 'Servidor conectado'}
+            </span>
             <span className="simulation-label">Fiscal · SIMULACIÓN</span>
             <div className="account">
               <span><small>Operador</small><strong>{state.session.displayName}</strong></span>
@@ -286,9 +335,24 @@ export const AppView = ({
         </header>
         <section className="workspace-content" aria-labelledby="workspace-title">
           <ScreenErrorBoundary key={route.id}>
-            {(api
-              ? routeScreen(route.id, { api: api as OperationApi, capabilities: state.capabilities })
-              : null) ?? <HomeScreen capabilities={state.capabilities} />}
+            {isRouteReachable(route, state.session.permissionCodes)
+              ? (api
+                ? routeScreen(route.id, {
+                  api: api as OperationApi, capabilities: state.capabilities,
+                  permissionCodes: state.session.permissionCodes
+                })
+                : null) ?? (
+                <HomeScreen capabilities={state.capabilities} permissionCodes={state.session.permissionCodes} />
+              )
+              : (
+                <div className="panel" role="alert">
+                  <h2>No tienes autorización para esta pantalla</h2>
+                  <p className="muted">
+                    Tu perfil no incluye los permisos necesarios. Cambia de pantalla o solicita
+                    acceso al administrador.
+                  </p>
+                </div>
+              )}
           </ScreenErrorBoundary>
         </section>
       </main>
@@ -300,6 +364,7 @@ const defaultApi = createDesktopApi();
 
 export const App = ({ api = defaultApi }: { readonly api?: DesktopApi }): React.JSX.Element => {
   const [state, setState] = useState<AppViewState>({ kind: 'loading' });
+  const [connection, setConnection] = useState<NodeConnection>('checking');
   const [operatorCode, setOperatorCode] = useState('');
   const [pin, setPin] = useState('');
   const [route, setRoute] = useState(() => resolveRoute(
@@ -309,7 +374,9 @@ export const App = ({ api = defaultApi }: { readonly api?: DesktopApi }): React.
 
   const loadSession = useCallback(async (): Promise<void> => {
     setState({ kind: 'loading' });
-    setState(await loadInitialState(api));
+    const result = await loadInitialState(api);
+    setConnection(result.connection);
+    setState(result.state);
   }, [api]);
 
   useEffect(() => { void loadSession(); }, [loadSession]);
@@ -337,9 +404,11 @@ export const App = ({ api = defaultApi }: { readonly api?: DesktopApi }): React.
       const session = await api.login({ operatorCode, pin });
       setPin('');
       const capabilities = await api.capabilities();
+      setConnection('online');
       setState({ kind: 'ready', session, capabilities });
     } catch (error) {
       setPin('');
+      setConnection(connectionFrom(error));
       setState(error instanceof ApiProblemError && error.problem.code === 'AUTHENTICATION_FAILED'
         ? { kind: 'signed-out', message: 'Código de operador o PIN incorrecto.' }
         : { kind: 'error' });
@@ -351,8 +420,10 @@ export const App = ({ api = defaultApi }: { readonly api?: DesktopApi }): React.
       await api.logout();
       setOperatorCode('');
       setPin('');
+      setConnection('online');
       setState({ kind: 'signed-out', message: null });
-    } catch {
+    } catch (error) {
+      setConnection(connectionFrom(error));
       setState({ kind: 'error' });
     }
   };
@@ -360,6 +431,7 @@ export const App = ({ api = defaultApi }: { readonly api?: DesktopApi }): React.
   return (
     <AppView
       state={state}
+      connection={connection}
       route={route}
       platform={platform}
       operatorCode={operatorCode}

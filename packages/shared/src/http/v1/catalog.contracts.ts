@@ -122,6 +122,44 @@ export const listProductsContract = {
   errorCodes: ['UNAUTHORIZED']
 } as const satisfies HttpContractV1;
 
+export type CategoryResponse = { readonly id: string; readonly name: string };
+
+const categoryResponseSchema = {
+  type: 'object', additionalProperties: false, required: ['id', 'name'],
+  properties: { id: { type: 'string' }, name: { type: 'string' } }
+} as const;
+
+export const listCategoriesContract = {
+  method: 'GET', path: '/api/v1/catalog/categories', permission: null, idempotency: 'NONE',
+  schema: {
+    response: {
+      200: { type: 'array', items: categoryResponseSchema },
+      401: problemDetailsSchema
+    }
+  },
+  errorCodes: ['UNAUTHORIZED']
+} as const satisfies HttpContractV1;
+
+export type UnitOfMeasureResponse = { readonly code: string; readonly name: string; readonly quantityScale: number };
+
+const unitOfMeasureResponseSchema = {
+  type: 'object', additionalProperties: false, required: ['code', 'name', 'quantityScale'],
+  properties: {
+    code: { type: 'string' }, name: { type: 'string' }, quantityScale: { type: 'integer' }
+  }
+} as const;
+
+export const listUnitsOfMeasureContract = {
+  method: 'GET', path: '/api/v1/catalog/units', permission: null, idempotency: 'NONE',
+  schema: {
+    response: {
+      200: { type: 'array', items: unitOfMeasureResponseSchema },
+      401: problemDetailsSchema
+    }
+  },
+  errorCodes: ['UNAUTHORIZED']
+} as const satisfies HttpContractV1;
+
 export const getPriceHistoryContract = {
   method: 'GET', path: '/api/v1/catalog/products/:productId/price-history',
   permission: null, idempotency: 'NONE',

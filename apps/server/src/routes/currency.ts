@@ -4,6 +4,7 @@ import {
   getExchangeRateHistoryContract,
   getCurrentExchangeRateContract,
   getSuggestedExchangeRateContract,
+  listPaymentMethodsContract,
   updateExchangeRateContract,
   type MixedPaymentRequest,
   type UpdateExchangeRateRequest
@@ -101,6 +102,16 @@ export const registerCurrencyRoutes = (
         : sendProblem(reply, request, result.error.code, result.error.message);
     }
   );
+
+  if (dependencies.masterData) {
+    app.get(listPaymentMethodsContract.path, {
+      schema: listPaymentMethodsContract.schema as FastifySchema
+    }, async (request, reply) => {
+      if (!await requirePrincipal(request, reply, dependencies)) return;
+      const result = await dependencies.masterData!.listPaymentMethods.execute();
+      return result.ok ? reply.send(result.value) : sendProblem(reply, request, result.error.code, result.error.message);
+    });
+  }
 
   app.post<{ Body: MixedPaymentRequest }>(calculateMixedPaymentTotalsContract.path, {
     schema: calculateMixedPaymentTotalsContract.schema as FastifySchema

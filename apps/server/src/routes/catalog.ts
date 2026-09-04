@@ -3,7 +3,9 @@ import {
   createProductContract,
   findProductByBarcodeContract,
   getPriceHistoryContract,
+  listCategoriesContract,
   listProductsContract,
+  listUnitsOfMeasureContract,
   updatePriceContract,
   updateProductContract,
   type CreateProductRequest,
@@ -48,6 +50,22 @@ export const registerCatalogRoutes = (
       return result.ok
         ? reply.send(result.value.map((entry) => ({ ...entry, recordedAt: entry.recordedAt.toISOString() })))
         : sendProblem(reply, request, result.error.code, result.error.message);
+    });
+  }
+  if (dependencies.masterData) {
+    app.get(listCategoriesContract.path, {
+      schema: listCategoriesContract.schema as FastifySchema
+    }, async (request, reply) => {
+      if (!await requirePrincipal(request, reply, dependencies)) return;
+      const result = await dependencies.masterData!.listCategories.execute();
+      return result.ok ? reply.send(result.value) : sendProblem(reply, request, result.error.code, result.error.message);
+    });
+    app.get(listUnitsOfMeasureContract.path, {
+      schema: listUnitsOfMeasureContract.schema as FastifySchema
+    }, async (request, reply) => {
+      if (!await requirePrincipal(request, reply, dependencies)) return;
+      const result = await dependencies.masterData!.listUnitsOfMeasure.execute();
+      return result.ok ? reply.send(result.value) : sendProblem(reply, request, result.error.code, result.error.message);
     });
   }
   app.post<{ Body: CreateProductRequest }>(createProductContract.path, {

@@ -2,8 +2,9 @@
   "name": "@supermarket/desktop",
   "version": "0.1.0",
   "private": true,
+  "productName": "Cullen",
   "type": "module",
-  "description": "Aplicacion Electron y React para la estacion de supermercado.",
+  "description": "Cullen: aplicacion Electron y React para la estacion de supermercado.",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

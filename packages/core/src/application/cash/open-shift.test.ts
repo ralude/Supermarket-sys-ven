@@ -35,11 +35,19 @@ class FakeCashRegisterRepository implements CashRegisterRepository {
   async findById(): Promise<CashRegister | null> {
     return this.cashRegister;
   }
+
+  async findAll(): Promise<readonly CashRegister[]> {
+    return this.cashRegister ? [this.cashRegister] : [];
+  }
 }
 
 class FakePaymentMethodRepository implements PaymentMethodRepository {
   async findByCode(code: string): Promise<PaymentMethod | null> {
     return code === cashMethod.code ? cashMethod : null;
+  }
+
+  async findAll(): Promise<readonly PaymentMethod[]> {
+    return [cashMethod];
   }
 }
 

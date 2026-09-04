@@ -204,3 +204,30 @@ export const calculateMixedPaymentTotalsContract = {
   },
   errorCodes: ['HTTP_VALIDATION_FAILED', 'UNAUTHORIZED', 'CURRENCY_RATE_MISSING']
 } as const satisfies HttpContractV1;
+
+export type PaymentMethodResponse = {
+  readonly code: string;
+  readonly name: string;
+  readonly kind: 'CASH' | 'CARD' | 'MOBILE_PAYMENT' | 'BANK_TRANSFER' | 'OTHER';
+  readonly currencyCode: string;
+};
+
+const paymentMethodResponseSchema = {
+  type: 'object', additionalProperties: false, required: ['code', 'name', 'kind', 'currencyCode'],
+  properties: {
+    code: { type: 'string' }, name: { type: 'string' },
+    kind: { type: 'string', enum: ['CASH', 'CARD', 'MOBILE_PAYMENT', 'BANK_TRANSFER', 'OTHER'] },
+    currencyCode
+  }
+} as const;
+
+export const listPaymentMethodsContract = {
+  method: 'GET', path: '/api/v1/currency/payment-methods', permission: null, idempotency: 'NONE',
+  schema: {
+    response: {
+      200: { type: 'array', items: paymentMethodResponseSchema },
+      401: problemDetailsSchema
+    }
+  },
+  errorCodes: ['UNAUTHORIZED']
+} as const satisfies HttpContractV1;

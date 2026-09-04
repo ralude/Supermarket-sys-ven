@@ -12,6 +12,7 @@ export type RegisterStockAdjustmentRequest = {
   readonly batchId?: string; readonly reason: string; readonly referenceId: string;
 };
 export type KardexDto = {
+  readonly id: string;
   readonly productId: string; readonly unitCode: string; readonly quantityScale: number;
   readonly currentBalanceScaled: number;
   readonly batches: readonly { readonly id: string; readonly lotNumber: string; readonly expiresAt: string | null }[];
@@ -136,9 +137,9 @@ export const getKardexContract = {
     response: {
       200: {
         type: 'object', additionalProperties: false,
-        required: ['productId', 'unitCode', 'quantityScale', 'currentBalanceScaled', 'movements'],
+        required: ['id', 'productId', 'unitCode', 'quantityScale', 'currentBalanceScaled', 'movements'],
         properties: {
-          productId: id, unitCode: { type: 'string' }, quantityScale: { type: 'integer' },
+          id, productId: id, unitCode: { type: 'string' }, quantityScale: { type: 'integer' },
           currentBalanceScaled: { type: 'integer' },
           batches: { type: 'array', items: {
             type: 'object', additionalProperties: false, required: ['id', 'lotNumber', 'expiresAt'],

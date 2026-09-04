@@ -136,7 +136,11 @@ describe('currency screen data flow', () => {
 });
 
 describe('currency screen static rendering', () => {
-  const props = { api: {} as OperationApi, capabilities: { fiscalMode: 'SIMULATION' as const, simulatedReportsEnabled: false } };
+  const props = {
+    api: {} as OperationApi,
+    capabilities: { fiscalMode: 'SIMULATION' as const, simulatedReportsEnabled: false },
+    permissionCodes: ['currency.rate.update']
+  };
 
   it('shows the four separated sections with honest empty states before any query', () => {
     const markup = renderToStaticMarkup(<CurrencyScreen {...props} />);
@@ -156,5 +160,13 @@ describe('currency screen static rendering', () => {
 
     expect(markup).not.toContain('tasa vigente confirmada automáticamente');
     expect(markup).toContain('Una sugerencia externa es una propuesta efímera');
+  });
+
+  it('disables confirming a rate without currency.rate.update, and enables it once granted', () => {
+    const withoutPermission = renderToStaticMarkup(<CurrencyScreen {...props} permissionCodes={[]} />);
+    expect(withoutPermission).toContain('<button class="primary-button" type="submit" disabled="">Confirmar tasa</button>');
+
+    const withPermission = renderToStaticMarkup(<CurrencyScreen {...props} />);
+    expect(withPermission).toContain('<button class="primary-button" type="submit">Confirmar tasa</button>');
   });
 });

@@ -1,8 +1,12 @@
 import { app, BrowserWindow } from 'electron';
 import { join } from 'node:path';
 
+/** Nombre comercial del sistema, visible en la ventana nativa. */
+const PRODUCT_NAME = 'Cullen';
+
 const createWindow = (): void => {
   const window = new BrowserWindow({
+    title: PRODUCT_NAME,
     width: 1200,
     height: 800,
     minWidth: 960,

@@ -7,6 +7,7 @@ describe('desktop HTTP client', () => {
       actorId: 'user-1',
       displayName: 'Operador Uno',
       roleCodes: ['cashier'],
+      permissionCodes: [],
       idleExpiresAt: '2026-09-02T18:00:00.000Z',
       absoluteExpiresAt: '2026-09-03T00:00:00.000Z'
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -27,6 +28,7 @@ describe('desktop HTTP client', () => {
       actorId: 'user-1',
       displayName: 'Operador Uno',
       roleCodes: ['cashier'],
+      permissionCodes: [],
       idleExpiresAt: '2026-09-02T18:00:00.000Z',
       absoluteExpiresAt: '2026-09-03T00:00:00.000Z'
     }), { status: 200, headers: { 'content-type': 'application/json' } }));

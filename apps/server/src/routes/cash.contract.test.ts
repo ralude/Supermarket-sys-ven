@@ -127,4 +127,21 @@ describe('cash HTTP contracts', () => {
       'SHIFT_OPENED', 'CASH_INCOME_REGISTERED', 'CASH_WITHDRAWAL_REGISTERED', 'SHIFT_CLOSED'
     ]);
   });
+
+  it('lists active cash registers for a selector, requiring a session', async () => {
+    const { app, runtime, cookie } = await setup();
+    await new SqliteUnitOfWork(runtime.handle.sqlite).execute(async () => {
+      await new DrizzleCashRegisterRepository(runtime.handle).save(CashRegister.create({
+        id: 'register-002', name: 'Caja 2 (cerrada)',
+        terminalId: 'terminal-001', originNodeId: 'node-001', isActive: false
+      }));
+    });
+
+    const listed = await app.inject({ method: 'GET', url: '/api/v1/cash-registers', headers: { cookie } });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual([{ id: 'register-001', name: 'Caja 1' }]);
+
+    const anonymous = await app.inject({ method: 'GET', url: '/api/v1/cash-registers' });
+    expect(anonymous.statusCode).toBe(401);
+  });
 });

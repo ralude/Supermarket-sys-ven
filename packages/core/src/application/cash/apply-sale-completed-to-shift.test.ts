@@ -41,7 +41,7 @@ describe('ApplySaleCompletedToShift', () => {
       save: async () => { saves += 1; }, findById: async () => shift,
       findOpenByCashRegisterId: async () => shift
     };
-    const methods: PaymentMethodRepository = { findByCode: async () => card };
+    const methods: PaymentMethodRepository = { findByCode: async () => card, findAll: async () => [card] };
     const evidence = { ledger: [] as string[], outbox: [] as string[], audit: [] as AuditEntry[] };
     const service = new ApplySaleCompletedToShift(
       shifts, methods,

@@ -172,6 +172,7 @@ describe('inventory application', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    expect(result.value.id).toBe('stock-001');
     expect(result.value.currentBalanceScaled).toBe(2);
     expect(result.value.movements).toMatchObject([{
       id: 'receipt-first', batchId: 'batch-first', reason: 'Purchase'

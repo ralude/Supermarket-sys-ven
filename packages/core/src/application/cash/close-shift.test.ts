@@ -47,6 +47,10 @@ class FakePaymentMethodRepository implements PaymentMethodRepository {
   async findByCode(code: string): Promise<PaymentMethod | null> {
     return code === usdCash.code ? usdCash : null;
   }
+
+  async findAll(): Promise<readonly PaymentMethod[]> {
+    return [usdCash];
+  }
 }
 
 function useCase(

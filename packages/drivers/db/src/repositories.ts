@@ -79,6 +79,10 @@ export class DrizzleCategoryRepository implements CategoryRepository {
       return row ? Category.create(row) : null;
     });
   }
+
+  findAll(): Promise<readonly Category[]> {
+    return read(() => this.handle.db.select().from(categories).all().map((row) => Category.create(row)));
+  }
 }
 
 export class DrizzleUnitOfMeasureRepository implements UnitOfMeasureRepository {
@@ -103,6 +107,10 @@ export class DrizzleUnitOfMeasureRepository implements UnitOfMeasureRepository {
         .where(eq(unitsOfMeasure.code, code)).get();
       return row ? UnitOfMeasure.create(row) : null;
     });
+  }
+
+  findAll(): Promise<readonly UnitOfMeasure[]> {
+    return read(() => this.handle.db.select().from(unitsOfMeasure).all().map((row) => UnitOfMeasure.create(row)));
   }
 }
 
@@ -129,6 +137,11 @@ export class DrizzlePaymentMethodRepository implements PaymentMethodRepository {
       return row ? PaymentMethod.create({ ...row, kind: row.kind as PaymentMethodKind }) : null;
     });
   }
+
+  findAll(): Promise<readonly PaymentMethod[]> {
+    return read(() => this.handle.db.select().from(paymentMethods).all()
+      .map((row) => PaymentMethod.create({ ...row, kind: row.kind as PaymentMethodKind })));
+  }
 }
 
 export class DrizzleCashRegisterRepository implements CashRegisterRepository {
@@ -153,6 +166,10 @@ export class DrizzleCashRegisterRepository implements CashRegisterRepository {
         .where(eq(cashRegisters.id, id)).get();
       return row ? CashRegister.create(row) : null;
     });
+  }
+
+  findAll(): Promise<readonly CashRegister[]> {
+    return read(() => this.handle.db.select().from(cashRegisters).all().map((row) => CashRegister.create(row)));
   }
 }
 

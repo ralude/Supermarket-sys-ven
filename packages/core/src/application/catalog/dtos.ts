@@ -1,3 +1,14 @@
+export type CategoryDto = {
+  id: string;
+  name: string;
+};
+
+export type UnitOfMeasureDto = {
+  code: string;
+  name: string;
+  quantityScale: number;
+};
+
 export type ProductMoneyDto = {
   amountMinorUnits: number;
   currencyCode: string;

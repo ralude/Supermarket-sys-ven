@@ -18,6 +18,7 @@ Construir la interfaz React y su integracion con el negocio a traves de HTTP.
 - [~~9.05 Pantalla de inventario~~](./9.05-pantalla-inventario.md)
 - [~~9.06 Reportes y cierres~~](./9.06-pantalla-reportes.md)
 - [~~9.07 Tasas de cambio~~](./9.07-tasas-de-cambio.md)
+- [~~9.08 Correccion de UX operativa y nombre del sistema~~](./9.08-correccion-ux-venta.md)
 
 ## Restriccion
 
@@ -67,3 +68,9 @@ queda diferida (ADR-0014); el mecanismo es agnóstico de proveedor y falla
 cerrado sin bloquear la tasa vigente, el histórico ni la carga manual. Esa
 brecha, junto con la sincronización entre nodos (Fase 10) y el hardware fiscal
 real (Fase 8 suspendida), no impide operar la UI descrita en este README.
+
+El 2026-09-04 se agregó la sub-fase correctiva 9.08 sobre las pantallas ya
+entregadas: corrige la pantalla en blanco de la venta, publica el nombre
+comercial **Cullen**, agrega retroalimentación visible a cada acción y retira el
+rótulo de sub-fase de las pantallas. No abre contratos ni alcance nuevo y deja
+reportado, sin corregir, el origen de `/api` en un empaquetado real.

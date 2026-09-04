@@ -1,6 +1,8 @@
 # @supermarket/desktop
 
-Aplicacion Electron con renderer React y preload seguro.
+Aplicacion Electron con renderer React y preload seguro. El sistema se presenta
+al usuario con el nombre comercial **Cullen**: la marca aparece en el titulo de
+la ventana, en el acceso por PIN y en la barra lateral del shell.
 
 ## Comandos
 

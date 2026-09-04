@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Category, UnitOfMeasure } from '@supermarket/core';
+import { Category, PaymentMethod, UnitOfMeasure } from '@supermarket/core';
 import {
   DrizzleCategoryRepository,
+  DrizzlePaymentMethodRepository,
   DrizzleUnitOfMeasureRepository,
   SqliteUnitOfWork
 } from '@supermarket/driver-db';
@@ -202,5 +203,37 @@ describe('catalog and currency HTTP contracts', () => {
     });
     expect(response.statusCode).toBe(403);
     expect(runtime.handle.sqlite.prepare('select count(*) from products').pluck().get()).toBe(0);
+  });
+
+  it('lists reference data for selectors, requiring a session and hiding inactive rows', async () => {
+    const { app, cookie, runtime } = await setup();
+    await new SqliteUnitOfWork(runtime.handle.sqlite).execute(async () => {
+      await new DrizzlePaymentMethodRepository(runtime.handle).save(PaymentMethod.create({
+        code: 'CASH_USD', name: 'Efectivo USD', kind: 'CASH', currencyCode: 'USD'
+      }));
+      await new DrizzlePaymentMethodRepository(runtime.handle).save(PaymentMethod.create({
+        code: 'RETIRED', name: 'Retirado', kind: 'OTHER', currencyCode: 'USD', isActive: false
+      }));
+      await new DrizzleCategoryRepository(runtime.handle).save(Category.create({
+        id: 'category-retired', name: 'Retirada', isActive: false
+      }));
+    });
+
+    const categories = await app.inject({ method: 'GET', url: '/api/v1/catalog/categories', headers: { cookie } });
+    expect(categories.statusCode).toBe(200);
+    expect(categories.json()).toEqual([{ id: 'category-grocery', name: 'Víveres' }]);
+
+    const units = await app.inject({ method: 'GET', url: '/api/v1/catalog/units', headers: { cookie } });
+    expect(units.statusCode).toBe(200);
+    expect(units.json()).toEqual([{ code: 'UNIT', name: 'Unidad', quantityScale: 0 }]);
+
+    const methods = await app.inject({ method: 'GET', url: '/api/v1/currency/payment-methods', headers: { cookie } });
+    expect(methods.statusCode).toBe(200);
+    expect(methods.json()).toEqual([
+      { code: 'CASH_USD', name: 'Efectivo USD', kind: 'CASH', currencyCode: 'USD' }
+    ]);
+
+    const anonymous = await app.inject({ method: 'GET', url: '/api/v1/catalog/categories' });
+    expect(anonymous.statusCode).toBe(401);
   });
 });

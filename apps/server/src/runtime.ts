@@ -103,6 +103,7 @@ export const createSecurityRuntime = (
   const shiftRepository = new DrizzleShiftRepository(handle);
   const productSnapshotProvider = new DrizzleProductSnapshotProvider(handle);
   const paymentMethodRepository = new DrizzlePaymentMethodRepository(handle);
+  const cashRegisterRepository = new DrizzleCashRegisterRepository(handle);
   const discountPolicyProvider = new SqliteDiscountPolicyProvider(handle);
   const taxPolicyProvider = new SqliteFinancialTransactionTaxPolicyProvider(handle);
   const stockItemRepository = new DrizzleStockItemRepository(handle);
@@ -149,6 +150,12 @@ export const createSecurityRuntime = (
         listProducts: new application.ListProducts(catalogReadRepository),
         getPriceHistory: new application.GetPriceHistory(catalogReadRepository)
       },
+      masterData: {
+        listCategories: new application.ListCategories(categoryRepository),
+        listUnitsOfMeasure: new application.ListUnitsOfMeasure(unitRepository),
+        listPaymentMethods: new application.ListPaymentMethods(paymentMethodRepository),
+        listCashRegisters: new application.ListCashRegisters(cashRegisterRepository)
+      },
       currency: {
         updateExchangeRate: new application.UpdateExchangeRate(
           ids, exchangeRateRepository, authorization, clock,
@@ -192,7 +199,7 @@ export const createSecurityRuntime = (
       },
       cash: {
         openShift: new application.OpenShift(
-          new DrizzleCashRegisterRepository(handle), shiftRepository,
+          cashRegisterRepository, shiftRepository,
           paymentMethodRepository, authorization, ids, ids, ids, clock,
           unitOfWork, eventStore, outboxStore, auditWriter, ids, idempotencyStore
         ),

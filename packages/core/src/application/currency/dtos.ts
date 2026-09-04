@@ -1,3 +1,10 @@
+export type PaymentMethodDto = {
+  code: string;
+  name: string;
+  kind: 'CASH' | 'CARD' | 'MOBILE_PAYMENT' | 'BANK_TRANSFER' | 'OTHER';
+  currencyCode: string;
+};
+
 export type UpdateExchangeRateInput = {
   baseCurrency: string;
   quoteCurrency: string;

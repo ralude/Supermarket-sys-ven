@@ -1,3 +1,8 @@
+export type CashRegisterDto = {
+  id: string;
+  name: string;
+};
+
 export type CashBalanceInput = {
   paymentMethodCode: string;
   currencyCode: string;

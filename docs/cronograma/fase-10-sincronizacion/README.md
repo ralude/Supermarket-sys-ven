@@ -2,6 +2,7 @@
 
 - **Estado:** Pendiente
 - **Indice:** [Cronograma](../README.md)
+- **Precedida por:** [Fase 9B - Perfiles operativos](../fase-09b-perfiles/README.md), insertada por la [replanificacion del 2026-09-04](../replanificacion-fase-09b.md)
 
 ## Proposito
 
