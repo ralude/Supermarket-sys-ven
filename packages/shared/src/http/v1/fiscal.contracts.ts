@@ -33,6 +33,11 @@ export type IssueSimulatedFiscalDocumentRequest = {
     }[];
     readonly payments: readonly { readonly methodCode: string; readonly amountMinorUnits: number }[];
     readonly totalMinorUnits: number;
+    readonly recipient?: {
+      readonly country: string; readonly type: string; readonly value: string;
+      readonly normalizedValue: string; readonly name: string | null;
+      readonly address: string | null;
+    } | null;
   };
   readonly reason: string;
 };
@@ -116,7 +121,25 @@ export const issueSimulatedFiscalDocumentContract = {
                   amountMinorUnits: { type: 'integer', minimum: 0 }
                 }
               }
-            }, totalMinorUnits: { type: 'integer', minimum: 0 }
+            }, totalMinorUnits: { type: 'integer', minimum: 0 },
+            /**
+             * Copia opcional del receptor capturado en la venta. Ausente o
+             * `null` en una venta anónima, que sigue siendo válida (ADR-0018).
+             */
+            recipient: {
+              anyOf: [{
+                type: 'object', additionalProperties: false,
+                required: ['country', 'type', 'value', 'normalizedValue', 'name', 'address'],
+                properties: {
+                  country: { type: 'string', pattern: '^[A-Z]{2}$' },
+                  type: { type: 'string', minLength: 1, maxLength: 32 },
+                  value: { type: 'string', minLength: 1, maxLength: 64 },
+                  normalizedValue: { type: 'string', minLength: 1, maxLength: 64 },
+                  name: { anyOf: [{ type: 'string', minLength: 1, maxLength: 200 }, { type: 'null' }] },
+                  address: { anyOf: [{ type: 'string', minLength: 1, maxLength: 200 }, { type: 'null' }] }
+                }
+              }, { type: 'null' }]
+            }
           }
         }, reason: { type: 'string', minLength: 1, maxLength: 500 }
       }

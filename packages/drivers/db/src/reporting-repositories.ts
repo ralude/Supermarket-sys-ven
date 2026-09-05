@@ -9,8 +9,12 @@ import type {
   FiscalOperationReportEntryDto,
   FiscalOperationsReportInput,
   FiscalOperationsReportRepository,
+  MarginReportEntryDto,
+  MarginReportInput,
+  MarginReportRepository,
   ResolvedReportQuery
 } from '@supermarket/core';
+import { Money, Quantity } from '@supermarket/shared';
 import { and, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
 import type { DatabaseHandle } from './connection.js';
 import {
@@ -18,8 +22,12 @@ import {
   cashMovements,
   fiscalDocuments,
   fiscalReports,
+  saleItems,
+  sales,
   shiftClosingBalances,
-  shifts
+  shifts,
+  stockItems,
+  stockMovements
 } from './schema.js';
 
 const EVIDENCE_AXES = [
@@ -168,5 +176,99 @@ export class DrizzleFiscalOperationsReportRepository implements FiscalOperations
       .sort((left, right) => right.requestedAt.getTime() - left.requestedAt.getTime()
         || left.id.localeCompare(right.id))
       .slice(0, query.limit);
+  }
+}
+
+type MarginAggregate = {
+  productId: string;
+  currencyCode: string;
+  quantityScaled: number;
+  quantityScale: number;
+  revenue: Money | null;
+  cost: Money | null;
+};
+
+/**
+ * Margen agregado por producto, moneda y período (ADR-0016). El costo se
+ * toma de las salidas de venta (`SALE_ISSUE`) con costo congelado; el
+ * ingreso, de las líneas de venta completadas. No se convierte moneda: un
+ * producto vendido en más de una moneda produce una fila por moneda y solo
+ * se resta cuando ambos lados coinciden en esa moneda.
+ */
+export class DrizzleMarginReportRepository implements MarginReportRepository {
+  constructor(private readonly handle: DatabaseHandle) {}
+
+  async findMargins(query: ResolvedReportQuery<MarginReportInput>): Promise<readonly MarginReportEntryDto[]> {
+    const costRows = this.handle.db.select({
+      productId: stockItems.productId,
+      quantityScaled: stockMovements.quantityScaled,
+      quantityScale: stockMovements.quantityScale,
+      unitCostMinorUnits: stockMovements.unitCostMinorUnits,
+      costCurrencyCode: stockMovements.costCurrencyCode
+    }).from(stockMovements).innerJoin(stockItems, eq(stockMovements.stockItemId, stockItems.id))
+      .where(every([
+        eq(stockMovements.type, 'SALE_ISSUE'),
+        query.from === undefined ? undefined : gte(stockMovements.occurredAt, query.from),
+        query.to === undefined ? undefined : lte(stockMovements.occurredAt, query.to)
+      ])).all();
+
+    const revenueRows = this.handle.db.select({
+      productId: saleItems.productId,
+      priceMinorUnits: saleItems.priceMinorUnits,
+      currencyCode: saleItems.currencyCode,
+      quantityScaled: saleItems.quantityScaled,
+      quantityScale: saleItems.quantityScale
+    }).from(saleItems).innerJoin(sales, eq(saleItems.saleId, sales.id))
+      .where(every([
+        eq(sales.status, 'COMPLETED'),
+        query.from === undefined ? undefined : gte(sales.completedAt, query.from.getTime()),
+        query.to === undefined ? undefined : lte(sales.completedAt, query.to.getTime())
+      ])).all();
+
+    const aggregates = new Map<string, MarginAggregate>();
+    const keyOf = (productId: string, currencyCode: string): string => `${productId}:${currencyCode}`;
+
+    for (const row of costRows) {
+      if (row.unitCostMinorUnits === null || row.costCurrencyCode === null) continue;
+      const key = keyOf(row.productId, row.costCurrencyCode);
+      const entry = aggregates.get(key) ?? {
+        productId: row.productId, currencyCode: row.costCurrencyCode,
+        quantityScaled: 0, quantityScale: row.quantityScale, revenue: null, cost: null
+      };
+      const lineCost = Money.fromMinorUnits(row.unitCostMinorUnits, row.costCurrencyCode)
+        .multiplyByQuantity(Quantity.fromScaled(row.quantityScaled, row.quantityScale));
+      entry.cost = (entry.cost ?? Money.zero(row.costCurrencyCode)).add(lineCost);
+      entry.quantityScaled += row.quantityScaled;
+      aggregates.set(key, entry);
+    }
+    for (const row of revenueRows) {
+      const key = keyOf(row.productId, row.currencyCode);
+      const entry = aggregates.get(key) ?? {
+        productId: row.productId, currencyCode: row.currencyCode,
+        quantityScaled: 0, quantityScale: row.quantityScale, revenue: null, cost: null
+      };
+      const lineRevenue = Money.fromMinorUnits(row.priceMinorUnits, row.currencyCode)
+        .multiplyByQuantity(Quantity.fromScaled(row.quantityScaled, row.quantityScale));
+      entry.revenue = (entry.revenue ?? Money.zero(row.currencyCode)).add(lineRevenue);
+      aggregates.set(key, entry);
+    }
+
+    const entries: MarginReportEntryDto[] = [...aggregates.values()]
+      .filter((entry) => query.currencyCode === undefined || entry.currencyCode === query.currencyCode)
+      .map((entry) => ({
+        productId: entry.productId,
+        currencyCode: entry.currencyCode,
+        quantitySoldScaled: entry.quantityScaled,
+        quantityScale: entry.quantityScale,
+        revenueMinorUnits: entry.revenue?.minorUnits ?? null,
+        costMinorUnits: entry.cost?.minorUnits ?? null,
+        marginMinorUnits: entry.revenue !== null && entry.cost !== null
+          ? entry.revenue.subtract(entry.cost).minorUnits
+          : null
+      }))
+      .sort((left, right) => left.productId.localeCompare(right.productId)
+        || left.currencyCode.localeCompare(right.currencyCode));
+
+    return entries.slice(0, query.limit);
   }
 }

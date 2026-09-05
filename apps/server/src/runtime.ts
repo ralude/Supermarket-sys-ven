@@ -22,11 +22,17 @@ import {
   DrizzleAuditReportRepository,
   DrizzleCashClosureReportRepository,
   DrizzleFiscalOperationsReportRepository,
+  DrizzleMarginReportRepository,
   DrizzleProductSnapshotProvider,
   DrizzleSaleRepository,
   DrizzleShiftRepository,
   DrizzleStockItemRepository,
+  DrizzleStockCountRepository,
+  DrizzleBranchRepository,
+  DrizzleDeviceRepository,
   DrizzleSupplierRepository,
+  DrizzlePurchaseReceiptRepository,
+  DrizzleSaleReturnRepository,
   DrizzleUnitOfMeasureRepository,
   openDatabase,
   SqliteAuthenticationStore,
@@ -55,7 +61,9 @@ export const ADMIN_PERMISSIONS = Object.freeze([
   ...Object.values(application.CATALOG_PERMISSIONS),
   ...Object.values(application.CURRENCY_PERMISSIONS),
   ...Object.values(application.REPORT_PERMISSIONS),
-  ...Object.values(application.SUPPLIER_PERMISSIONS)
+  ...Object.values(application.SUPPLIER_PERMISSIONS),
+  ...Object.values(application.PURCHASE_RECEIPT_PERMISSIONS),
+  ...Object.values(application.CONFIG_PERMISSIONS)
 ]) as readonly string[];
 
 export type SecurityRuntime = {
@@ -109,7 +117,12 @@ export const createSecurityRuntime = (
   const discountPolicyProvider = new SqliteDiscountPolicyProvider(handle);
   const taxPolicyProvider = new SqliteFinancialTransactionTaxPolicyProvider(handle);
   const stockItemRepository = new DrizzleStockItemRepository(handle);
+  const stockCountRepository = new DrizzleStockCountRepository(handle);
+  const branchRepository = new DrizzleBranchRepository(handle);
+  const deviceRepository = new DrizzleDeviceRepository(handle);
   const supplierRepository = new DrizzleSupplierRepository(handle);
+  const purchaseReceiptRepository = new DrizzlePurchaseReceiptRepository(handle);
+  const saleReturnRepository = new DrizzleSaleReturnRepository(handle);
   const fiscalPrinter = new FiscalPrinterFake();
   const fiscalDocumentRepository = new DrizzleFiscalDocumentRepository(handle);
   const fiscalArguments = [
@@ -198,6 +211,14 @@ export const createSecurityRuntime = (
         voidSale: new application.VoidSale(
           saleRepository, authorization, ids, clock, unitOfWork,
           eventStore, auditWriter, idempotencyStore
+        ),
+        returnSale: new application.ReturnSale(
+          saleRepository, saleReturnRepository, fiscalDocumentRepository, shiftRepository,
+          stockItemRepository, fiscalPrinter, authorization, ids, ids, ids, ids, ids, clock,
+          unitOfWork, eventStore, outboxStore, auditWriter, idempotencyStore
+        ),
+        setSaleRecipient: new application.SetSaleRecipient(
+          saleRepository, ids, clock, unitOfWork, eventStore, idempotencyStore
         )
       },
       cash: {
@@ -227,6 +248,55 @@ export const createSecurityRuntime = (
         ),
         getKardex: new application.GetKardex(stockItemRepository)
       },
+      stockCounts: {
+        open: new application.OpenStockCount(
+          stockCountRepository, authorization, ids, ids, clock, unitOfWork, auditWriter, idempotencyStore
+        ),
+        recordLine: new application.RecordStockCountLine(
+          stockCountRepository, stockItemRepository, authorization, ids, ids,
+          clock, unitOfWork, auditWriter, idempotencyStore
+        ),
+        close: new application.CloseStockCount(
+          stockCountRepository, stockItemRepository, authorization, ids,
+          clock, unitOfWork, auditWriter, idempotencyStore
+        ),
+        approve: new application.ApproveStockCount(
+          stockCountRepository, stockItemRepository, authorization, ids, ids, ids,
+          clock, unitOfWork, eventStore, auditWriter, idempotencyStore
+        ),
+        reject: new application.RejectStockCount(
+          stockCountRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+        ),
+        get: new application.GetStockCount(stockCountRepository),
+        list: new application.ListStockCounts(stockCountRepository)
+      },
+      config: {
+        branches: {
+          create: new application.CreateBranch(
+            branchRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+          ),
+          update: new application.UpdateBranch(
+            branchRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+          ),
+          changeStatus: new application.ChangeBranchStatus(
+            branchRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+          ),
+          get: new application.GetBranch(branchRepository),
+          list: new application.ListBranches(branchRepository)
+        },
+        devices: {
+          declare: new application.DeclareDevice(
+            deviceRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+          ),
+          update: new application.UpdateDevice(
+            deviceRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+          ),
+          changeStatus: new application.ChangeDeviceStatus(
+            deviceRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
+          ),
+          list: new application.ListDevices(deviceRepository)
+        }
+      },
       suppliers: {
         create: new application.CreateSupplier(
           supplierRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
@@ -242,6 +312,22 @@ export const createSecurityRuntime = (
         correctTaxIdentity: new application.CorrectSupplierTaxIdentity(
           supplierRepository, authorization, ids, clock, unitOfWork, auditWriter, idempotencyStore
         )
+      },
+      purchaseReceipts: {
+        start: new application.StartPurchaseReceipt(
+          purchaseReceiptRepository, supplierRepository, productRepository, stockItemRepository,
+          exchangeRateRepository, authorization, ids, ids, ids, ids, ids, clock, unitOfWork,
+          auditWriter, idempotencyStore
+        ),
+        complete: new application.CompletePurchaseReceipt(
+          purchaseReceiptRepository, supplierRepository, stockItemRepository, authorization,
+          ids, ids, ids, clock, unitOfWork, eventStore, auditWriter, idempotencyStore
+        ),
+        reverse: new application.ReversePurchaseReceipt(
+          purchaseReceiptRepository, stockItemRepository, authorization,
+          ids, ids, ids, clock, unitOfWork, eventStore, auditWriter, idempotencyStore
+        ),
+        get: new application.GetPurchaseReceipt(purchaseReceiptRepository)
       },
       fiscalDocuments: {
         issue: new application.IssueFiscalDocument(
@@ -263,6 +349,9 @@ export const createSecurityRuntime = (
         ),
         getFiscalOperationsReport: new application.GetFiscalOperationsReport(
           new DrizzleFiscalOperationsReportRepository(handle), authorization
+        ),
+        getMarginReport: new application.GetMarginReport(
+          new DrizzleMarginReportRepository(handle), authorization
         )
       },
       ...(simulatedReportsEnabled ? {

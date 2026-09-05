@@ -5,8 +5,12 @@ export const CASH_MOVEMENT_TYPES = [
   'OPENING_FLOAT',
   'INCOME',
   'WITHDRAWAL',
-  'SALE_PAYMENT'
+  'SALE_PAYMENT',
+  'SALE_REFUND'
 ] as const;
+
+/** Movimientos que devuelven dinero por el mismo medio en que se cobró. */
+const SALE_LINKED_TYPES = ['SALE_PAYMENT', 'SALE_REFUND'] as const;
 export type CashMovementType = (typeof CASH_MOVEMENT_TYPES)[number];
 
 export type CashMovementReference = {
@@ -55,7 +59,13 @@ export class CashMovement {
     if (!props.method.isActive) {
       throw new DomainError('PAYMENT_METHOD_INACTIVE', 'Payment method is inactive.');
     }
-    if (props.type !== 'SALE_PAYMENT' && props.method.kind !== 'CASH') {
+    /**
+     * Un reintegro devuelve el dinero por el mismo medio en que se cobró, así
+     * que acepta tarjeta igual que el cobro original (ADR-0017). Un ingreso o
+     * un retiro manual siguen exigiendo efectivo.
+     */
+    if (!SALE_LINKED_TYPES.includes(props.type as (typeof SALE_LINKED_TYPES)[number]) &&
+      props.method.kind !== 'CASH') {
       throw new DomainError('CASH_PAYMENT_METHOD_REQUIRED', 'Cash movements require a cash payment method.');
     }
     if (props.method.currencyCode !== props.amount.currency) {
@@ -81,7 +91,7 @@ export class CashMovement {
           sourceEventId: props.reference.sourceEventId.trim()
         }
       : null;
-    if (props.type === 'SALE_PAYMENT' && (
+    if (SALE_LINKED_TYPES.includes(props.type as (typeof SALE_LINKED_TYPES)[number]) && (
       reference === null || reference.sourceId.length === 0 || reference.sourceEventId.length === 0
     )) {
       throw new DomainError(

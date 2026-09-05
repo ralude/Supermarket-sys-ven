@@ -11,10 +11,11 @@ Una entidad tiene identidad estable y un ciclo de vida. Sus atributos pueden cam
 | `cash` | `CashRegister`, `Shift`, `CashMovement` |
 | `sales` | `Sale`, `SaleItem`, `Payment`, `Discount`, `Return` |
 | `fiscal` | `FiscalDocument`, `FiscalLine`, `FiscalDay`, `FiscalDevice` |
-| `inventory` | `StockItem`, `Batch`, `StockMovement` |
+| `inventory` | `StockItem`, `Batch`, `StockMovement`, `StockCount` |
 | `purchasing` | `Supplier`, `PurchaseOrder`, `PurchaseOrderLine`, `PurchaseReceipt` |
 | `customers` | `Customer` |
 | `identity` | `User`, `Role`, `Permission` |
+| `config` | `Branch`, `Device` |
 
 ## Value objects obligatorios
 
@@ -59,6 +60,19 @@ Admite cantidades enteras y fraccionarias con escala definida por unidad de medi
 - `PurchaseReceipt` se implementa con costos en 9B.04; su número de documento de origen no
   sustituye su ID técnico. Su documento de origen es `INVOICE` o `DELIVERY_NOTE`, nunca
   `PURCHASE_ORDER`, y su ciclo de vida es `DRAFT -> COMPLETED -> REVERSED` según ADR-0019.
+- `StockCount` (9B.07) es raíz independiente de `StockItem`; su ciclo de vida es
+  `OPEN -> COUNTED -> APPROVED` o `OPEN -> COUNTED -> REJECTED`. Sus líneas se pueden
+  corregir mientras está `OPEN`; las diferencias se congelan al cerrar y no se borran ni se
+  reescriben después.
+- `Branch` (9B.11) tiene código humano inmutable elegido por el administrador (no
+  generado por secuencia, a diferencia de `Supplier`), nombre editable, estado
+  `ACTIVE`/`INACTIVE` y timestamps UTC. Es dato maestro y etiqueta de pertenencia; no
+  gobierna autoridad de escritura ni sincronización. No se elimina para corregir historia.
+- `Device` (9B.11) declara un aparato asignado a una estación: tipo inmutable (uno de
+  `FISCAL_PRINTER`, `BARCODE_SCANNER`, `SCALE`, `CASH_DRAWER`), identificador editable,
+  `terminalId` inmutable y una `branchId` opcional que puede reasignarse o retirarse.
+  Declarar un dispositivo, incluida una impresora fiscal, no habilita ninguna capacidad
+  real.
 
 ## Fases
 

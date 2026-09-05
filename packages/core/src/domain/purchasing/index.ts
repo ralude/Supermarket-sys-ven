@@ -9,3 +9,4 @@ export type {
   SupplierStatus,
   TaxIdentity
 } from './supplier.js';
+export * from './purchase-receipt.js';

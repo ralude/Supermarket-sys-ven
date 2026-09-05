@@ -4,6 +4,7 @@ export * from './domain/cash/index.js';
 export * from './domain/identity/index.js';
 export * from './domain/inventory/index.js';
 export * from './domain/purchasing/index.js';
+export * from './domain/config/index.js';
 export * from './domain/fiscal/index.js';
 export * from './domain/sales/index.js';
 export * as application from './application/index.js';
@@ -18,6 +19,8 @@ export type {
   CashClosureReportInput,
   FiscalOperationReportEntryDto,
   FiscalOperationsReportInput,
+  MarginReportEntryDto,
+  MarginReportInput,
   ResolvedReportQuery
 } from './application/reporting/index.js';
 export type {
@@ -82,12 +85,23 @@ export type {
   ProductSnapshotProvider,
   ProductRepository,
   SaleRepository,
+  SaleReturnRepository,
   ShiftRepository,
   StockItemRepository,
+  StockCountRepository,
+  BranchRepository,
+  DeviceRepository,
   SupplierRepository,
+  PurchaseReceiptRepository,
+  DiscountPolicyInput,
+  FinancialTransactionTaxPolicyInput,
+  OperationalPolicyMetadata,
+  OperationalPolicyWriter,
+  PolicyActivation,
   UnitOfWork,
   UnitOfMeasureRepository,
   AuditReportRepository,
   CashClosureReportRepository,
-  FiscalOperationsReportRepository
+  FiscalOperationsReportRepository,
+  MarginReportRepository
 } from './application/ports/index.js';

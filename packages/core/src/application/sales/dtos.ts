@@ -23,6 +23,15 @@ export type SalePaymentDto = {
   exchangeRateId: string | null;
 };
 
+export type SaleRecipientDto = {
+  country: string;
+  type: string;
+  value: string;
+  normalizedValue: string;
+  name: string | null;
+  address: string | null;
+};
+
 export type SaleDto = {
   id: string;
   shiftId: string;
@@ -44,6 +53,7 @@ export type SaleDto = {
   completedAt: Date | null;
   voidedAt: Date | null;
   voidReason: string | null;
+  recipient: SaleRecipientDto | null;
 };
 
 export type StartSaleInput = {
@@ -87,4 +97,56 @@ export type CompleteSaleInput = {
 export type VoidSaleInput = {
   saleId: string;
   reason: string;
+};
+
+/**
+ * Devolución total (ADR-0017). El monto y la moneda no viajan en la entrada:
+ * se toman del pago original para que el cliente no pueda elegirlos.
+ */
+export type ReturnSaleInput = {
+  saleId: string;
+  reason: string;
+};
+
+export type SaleReturnLineDto = {
+  id: string;
+  saleItemId: string;
+  productId: string;
+  stockItemId: string;
+  batchId: string | null;
+  quantityScaled: number;
+  quantityScale: number;
+  unitCostMinorUnits: number | null;
+  costCurrencyCode: string | null;
+};
+
+export type SaleReturnDto = {
+  id: string;
+  saleId: string;
+  originalDocumentId: string;
+  creditNoteId: string;
+  creditNoteStatus: string;
+  creditNoteFiscalNumber: string | null;
+  shiftId: string;
+  refundMinorUnits: number;
+  currencyCode: string;
+  paymentMethodCode: string;
+  reason: string;
+  occurredAt: Date;
+  lines: SaleReturnLineDto[];
+};
+
+/**
+ * `recipient: null` retira el snapshot. La venta anónima sigue siendo válida,
+ * así que retirar no es un error (ADR-0018).
+ */
+export type SetSaleRecipientInput = {
+  saleId: string;
+  recipient: {
+    country: string;
+    type?: string | null;
+    value: string;
+    name?: string | null;
+    address?: string | null;
+  } | null;
 };

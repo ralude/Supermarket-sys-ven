@@ -83,6 +83,21 @@ describe('desktop HTTP client', () => {
     }));
   });
 
+  it('sends a total return with its mandatory reason and idempotency key', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      id: 'return-1', saleId: 'sale-1', creditNoteStatus: 'ISSUED', occurredAt: '2026-09-04T12:00:00.000Z', lines: []
+    }), { status: 201, headers: { 'content-type': 'application/json' } }));
+    const api = createDesktopApi(fetcher as typeof fetch);
+
+    await api.returnSale('sale/1', { reason: 'Producto defectuoso' }, 'return-intent-1');
+
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/sales/sale%2F1/return', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ reason: 'Producto defectuoso' }),
+      headers: expect.objectContaining({ 'idempotency-key': 'return-intent-1' })
+    }));
+  });
+
   it('loads only active suppliers for the receipt selector', async () => {
     const fetcher = vi.fn(async () => new Response('[]', {
       status: 200, headers: { 'content-type': 'application/json' }
@@ -143,6 +158,31 @@ describe('desktop HTTP client', () => {
         receiptId: 'receipt-1', reason: 'Compra recibida'
       })
     }));
+  });
+
+  it('sends the optional recipient without deriving its type in the renderer', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ id: 'sale-1' }), {
+      status: 200, headers: { 'content-type': 'application/json' }
+    }));
+    const api = createDesktopApi(fetcher as typeof fetch);
+
+    await api.setSaleRecipient('sale-1', {
+      recipient: { country: 'VE', value: 'J-12345678-9', name: 'Bodega Central', address: null }
+    }, 'intent-recipient');
+    await api.setSaleRecipient('sale-1', { recipient: null }, 'intent-recipient-clear');
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, '/api/v1/sales/sale-1/recipient',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({
+          recipient: {
+            country: 'VE', value: 'J-12345678-9', name: 'Bodega Central', address: null
+          }
+        }),
+        headers: expect.objectContaining({ 'idempotency-key': 'intent-recipient' })
+      }));
+    expect(fetcher).toHaveBeenNthCalledWith(2, '/api/v1/sales/sale-1/recipient',
+      expect.objectContaining({ body: JSON.stringify({ recipient: null }) }));
   });
 
   it('parses decimal input into integer minor units without floating point', () => {

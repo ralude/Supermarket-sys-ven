@@ -56,6 +56,15 @@ class Repository implements FiscalDocumentRepository {
   async findById(id: string): Promise<FiscalDocument | null> {
     return this.stored?.id === id ? this.stored : null;
   }
+  async findByReference(
+    originNodeId: string,
+    type: FiscalDocument['content']['type'],
+    referenceId: string
+  ): Promise<FiscalDocument | null> {
+    return this.stored?.originNodeId === originNodeId &&
+      this.stored.content.type === type && this.stored.content.referenceId === referenceId
+      ? this.stored : null;
+  }
   async findByIdempotencyKey(originNodeId: string, key: string): Promise<FiscalDocument | null> {
     return this.stored?.originNodeId === originNodeId && this.stored.idempotencyKey === key
       ? this.stored : null;

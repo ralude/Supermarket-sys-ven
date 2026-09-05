@@ -9,6 +9,7 @@ import { Discount } from './discount.js';
 import { Payment } from './payment.js';
 import type { SaleDomainEvent } from './sale-events.js';
 import { SaleItem } from './sale-item.js';
+import { cloneSaleRecipientSnapshot, type SaleRecipientSnapshot } from './sale-recipient.js';
 
 export const SALE_STATUSES = ['DRAFT', 'COMPLETED', 'VOIDED'] as const;
 export type SaleStatus = (typeof SALE_STATUSES)[number];
@@ -67,6 +68,13 @@ export type RestoredSaleProps = {
   voidedAt: Date | null;
   voidReason: string | null;
   voidedBy: string | null;
+  recipient?: SaleRecipientSnapshot | null;
+};
+
+export type SetRecipientProps = {
+  recipient: SaleRecipientSnapshot | null;
+  occurredAt: Date;
+  eventId: string;
 };
 
 export class Sale {
@@ -80,6 +88,7 @@ export class Sale {
   private currentVoidedAt: Date | null = null;
   private currentVoidReason: string | null = null;
   private currentVoidedBy: string | null = null;
+  private currentRecipient: SaleRecipientSnapshot | null = null;
 
   private constructor(
     readonly id: string,
@@ -148,6 +157,9 @@ export class Sale {
     sale.currentVoidedAt = props.voidedAt === null ? null : new Date(props.voidedAt);
     sale.currentVoidReason = props.voidReason;
     sale.currentVoidedBy = props.voidedBy;
+    sale.currentRecipient = props.recipient
+      ? cloneSaleRecipientSnapshot(props.recipient)
+      : null;
     sale.events.splice(0);
     return sale;
   }
@@ -186,6 +198,12 @@ export class Sale {
 
   get voidedBy(): string | null {
     return this.currentVoidedBy;
+  }
+
+  get recipient(): SaleRecipientSnapshot | null {
+    return this.currentRecipient === null
+      ? null
+      : cloneSaleRecipientSnapshot(this.currentRecipient);
   }
 
   get domainEvents(): readonly SaleDomainEvent[] {
@@ -345,6 +363,36 @@ export class Sale {
           methodCode: payment.method.code
         }
       });
+    });
+  }
+
+  /**
+   * Adjunta, corrige o retira el receptor mientras la venta sigue en borrador.
+   * No usa `assertEditable` a propósito: ese cierre protege la consistencia
+   * monetaria después de registrar pagos, y el receptor no altera importes.
+   * Completar sí congela el valor, porque el documento fiscal ya lo copió.
+   */
+  setRecipient(props: SetRecipientProps): void {
+    if (this.currentStatus !== 'DRAFT') {
+      throw new DomainError('SALE_INVALID_STATE', 'Only draft sales can change their recipient.');
+    }
+    this.currentRecipient = props.recipient === null
+      ? null
+      : cloneSaleRecipientSnapshot(props.recipient);
+    this.recordEvent({
+      type: 'SaleRecipientChanged',
+      eventId: props.eventId,
+      occurredAt: props.occurredAt,
+      /**
+       * El ledger explica la acción sin acumular datos personales: la
+       * identificación, el nombre y la dirección viven solo en la venta, que
+       * es la fuente de verdad operativa (ADR-0018).
+       */
+      payload: {
+        attached: this.currentRecipient !== null,
+        country: this.currentRecipient?.country ?? null,
+        type: this.currentRecipient?.type ?? null
+      }
     });
   }
 

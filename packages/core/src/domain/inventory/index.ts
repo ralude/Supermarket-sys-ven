@@ -9,3 +9,10 @@ export {
 export { StockItem, type StockItemProps } from './stock-item.js';
 export type { RestoredStockItemProps } from './stock-item.js';
 export type { StockMovementRegisteredEvent } from './stock-events.js';
+export {
+  StockCount, StockCountLine, STOCK_COUNT_STATUSES
+} from './stock-count.js';
+export type {
+  RestoredStockCountProps, StockCountDifference, StockCountLineProps,
+  StockCountProps, StockCountStatus
+} from './stock-count.js';

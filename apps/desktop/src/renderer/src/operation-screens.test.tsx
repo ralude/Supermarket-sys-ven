@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DesktopApi, OperationApi } from './api-client.js';
 import {
   SalesScreen, CashScreen, CatalogScreen, InventoryScreen, ReportsScreen, SuppliersScreen,
-  canManageSuppliers, filterSuppliers, money, saleCompletionBlocker, supplierTaxTypeFor,
+  canManageConfig, canManageSuppliers, canWorkOnStockCounts, ConfigScreen, DEVICE_TYPE_LABELS,
+  filterSuppliers, money, saleCompletionBlocker, StockCountsScreen, supplierTaxTypeFor,
   supplierUpdatePayload, toFiscalAddress, toSupplierForm
 } from './operation-screens.js';
 import type { SaleResponse, SupplierResponse } from '@supermarket/shared';
@@ -37,10 +38,10 @@ const operationApi = (): OperationApi => {
   };
   return Object.assign(base, {
     getSale: vi.fn(), startSale: vi.fn(), addSaleItem: vi.fn(), removeSaleItem: vi.fn(),
-    applySaleDiscount: vi.fn(), registerSalePayments: vi.fn(), completeSale: vi.fn(), voidSale: vi.fn(),
+    applySaleDiscount: vi.fn(), registerSalePayments: vi.fn(), completeSale: vi.fn(), returnSale: vi.fn(), voidSale: vi.fn(), setSaleRecipient: vi.fn(),
     getOpenShift: vi.fn(), openShift: vi.fn(), registerCashMovement: vi.fn(), closeShift: vi.fn(),
     findProductByBarcode: vi.fn(), listProducts: vi.fn(), getPriceHistory: vi.fn(), createProduct: vi.fn(), updatePrice: vi.fn(), getKardex: vi.fn(),
-    receivePurchase: vi.fn(), registerStockAdjustment: vi.fn(), listSuppliers: vi.fn(), getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn(), listCategories: vi.fn(), listUnitsOfMeasure: vi.fn(), listPaymentMethods: vi.fn(), listCashRegisters: vi.fn(), createSupplier: vi.fn(), updateSupplier: vi.fn(), changeSupplierStatus: vi.fn(), correctSupplierTaxIdentity: vi.fn()
+    receivePurchase: vi.fn(), registerStockAdjustment: vi.fn(), listSuppliers: vi.fn(), getCurrentExchangeRate: vi.fn(), getExchangeRateHistory: vi.fn(), getSuggestedExchangeRate: vi.fn(), updateExchangeRate: vi.fn(), printXReport: vi.fn(), printZReport: vi.fn(), listCategories: vi.fn(), listUnitsOfMeasure: vi.fn(), listPaymentMethods: vi.fn(), listCashRegisters: vi.fn(), createSupplier: vi.fn(), updateSupplier: vi.fn(), changeSupplierStatus: vi.fn(), correctSupplierTaxIdentity: vi.fn(), openStockCount: vi.fn(), recordStockCountLine: vi.fn(), closeStockCount: vi.fn(), approveStockCount: vi.fn(), rejectStockCount: vi.fn(), getStockCount: vi.fn(), listStockCounts: vi.fn(), createBranch: vi.fn(), updateBranch: vi.fn(), changeBranchStatus: vi.fn(), getBranch: vi.fn(), listBranches: vi.fn(), declareDevice: vi.fn(), updateDevice: vi.fn(), changeDeviceStatus: vi.fn(), listDevices: vi.fn()
   }) as OperationApi;
 };
 
@@ -56,6 +57,7 @@ describe('operation screens', () => {
     expect(markup).toContain('Turno activo');
     expect(markup).toContain('No se aceptan cálculos locales');
   });
+
 
   it('exposes cash, catalog, inventory and report operations', () => {
     expect(renderToStaticMarkup(<CashScreen {...props()} />)).toContain('Abrir caja');
@@ -135,5 +137,40 @@ describe('operation screens', () => {
     expect(editor).not.toContain('Corregir identidad fiscal');
     expect(editor).not.toContain('Nuevo proveedor');
     expect(creator).toContain('Nuevo proveedor');
+  });
+
+  it('only offers the stock count screen to who can count or approve', () => {
+    expect(canWorkOnStockCounts([])).toBe(false);
+    expect(canWorkOnStockCounts(['inventory.purchase.receive'])).toBe(false);
+    expect(canWorkOnStockCounts(['inventory.count.perform'])).toBe(true);
+    expect(canWorkOnStockCounts(['inventory.count.approve'])).toBe(true);
+  });
+
+  it('offers opening a count only with the perform permission', () => {
+    const withPermission = renderToStaticMarkup(
+      <StockCountsScreen {...props(['inventory.count.perform'])} />
+    );
+    const withoutPermission = renderToStaticMarkup(
+      <StockCountsScreen {...props(['inventory.count.approve'])} />
+    );
+
+    expect(withPermission).toContain('Abrir conteo');
+    expect(withoutPermission).not.toContain('Abrir conteo');
+  });
+
+  it('only offers the config screen to who manages branches or devices', () => {
+    expect(canManageConfig([])).toBe(false);
+    expect(canManageConfig(['inventory.count.perform'])).toBe(false);
+    expect(canManageConfig(['config.branch.manage'])).toBe(true);
+    expect(canManageConfig(['config.device.manage'])).toBe(true);
+  });
+
+  it('labels every device type and marks the fiscal printer as simulation', () => {
+    expect(Object.keys(DEVICE_TYPE_LABELS)).toEqual([
+      'FISCAL_PRINTER', 'BARCODE_SCANNER', 'SCALE', 'CASH_DRAWER'
+    ]);
+    const markup = renderToStaticMarkup(<ConfigScreen {...props(['config.device.manage'])} />);
+    expect(markup).toContain('Declarar dispositivo');
+    expect(markup).not.toContain('Registrar sucursal');
   });
 });

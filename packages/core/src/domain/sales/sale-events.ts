@@ -61,6 +61,15 @@ export type SaleVoidedEvent = SaleEventBase & {
   payload: { reason: string; voidedBy: string };
 };
 
+/**
+ * El hecho registra que el receptor cambió, no quién es: la identificación,
+ * el nombre y la dirección no viajan al ledger (ADR-0018).
+ */
+export type SaleRecipientChangedEvent = SaleEventBase & {
+  type: 'SaleRecipientChanged';
+  payload: { attached: boolean; country: string | null; type: string | null };
+};
+
 export type SaleDomainEvent =
   | SaleStartedEvent
   | SaleItemAddedEvent
@@ -68,6 +77,7 @@ export type SaleDomainEvent =
   | DiscountAppliedEvent
   | PaymentRegisteredEvent
   | SaleCompletedEvent
-  | SaleVoidedEvent;
+  | SaleVoidedEvent
+  | SaleRecipientChangedEvent;
 
 export type SalePaymentEventSource = Payment;

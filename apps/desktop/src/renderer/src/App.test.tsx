@@ -121,7 +121,7 @@ describe('desktop renderer base states', () => {
   it('maps the numeric shortcuts to their routes', () => {
     expect(shortcutHash('2')).toBe('#/sales');
     expect(resolveRoute(shortcutHash('2') ?? '#/').id).toBe('sales');
-    expect(shortcutHash('9')).toBeNull();
+    expect(shortcutHash('a')).toBeNull();
   });
 
   it('reaches every operational screen with no permission at all, since each one has a read open to any valid session', () => {
@@ -139,6 +139,12 @@ describe('desktop renderer base states', () => {
     expect(isRouteReachable(resolveRoute('#/reports'), ['reports.audit.read'])).toBe(true);
     expect(isRouteReachable(resolveRoute('#/suppliers'), noPermission)).toBe(false);
     expect(isRouteReachable(resolveRoute('#/suppliers'), ['supplier.update'])).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/counts'), noPermission)).toBe(false);
+    expect(isRouteReachable(resolveRoute('#/counts'), ['inventory.count.perform'])).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/counts'), ['inventory.count.approve'])).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/config'), noPermission)).toBe(false);
+    expect(isRouteReachable(resolveRoute('#/config'), ['config.branch.manage'])).toBe(true);
+    expect(isRouteReachable(resolveRoute('#/config'), ['config.device.manage'])).toBe(true);
   });
 
   it('hides the Reportes entry and blocks the hash without a report permission, without touching the server', () => {

@@ -9,23 +9,23 @@ export { DrizzleAuditWriter } from './audit-writer.js';
 export { DrizzleIdempotencyStore } from './idempotency-store.js';
 export { DrizzleProductSnapshotProvider } from './product-snapshot-provider.js';
 export { DrizzleSupplierRepository } from './supplier-repository.js';
+export { DrizzlePurchaseReceiptRepository } from './purchase-receipt-repository.js';
+export { DrizzleSaleReturnRepository } from './sale-return-repository.js';
+export { DrizzleStockCountRepository } from './stock-count-repository.js';
+export { DrizzleBranchRepository } from './branch-repository.js';
+export { DrizzleDeviceRepository } from './device-repository.js';
 export {
   SqliteDiscountPolicyProvider,
   SqliteFinancialTransactionTaxPolicyProvider
 } from './operational-policy-providers.js';
 export { SqliteOperationalPolicyWriter } from './operational-policy-writer.js';
-export type {
-  DiscountPolicyInput,
-  FinancialTransactionTaxPolicyInput,
-  OperationalPolicyMetadata,
-  PolicyActivation
-} from './operational-policy-writer.js';
 export { DrizzleFiscalDocumentRepository } from './fiscal-document-repository.js';
 export { DrizzleCatalogReadRepository } from './catalog-read-repository.js';
 export {
   DrizzleAuditReportRepository,
   DrizzleCashClosureReportRepository,
-  DrizzleFiscalOperationsReportRepository
+  DrizzleFiscalOperationsReportRepository,
+  DrizzleMarginReportRepository
 } from './reporting-repositories.js';
 export { DrizzleFiscalDayRepository } from './fiscal-day-repository.js';
 export { SqliteAuthenticationStore, SqliteAuthorizationService } from './authentication-store.js';

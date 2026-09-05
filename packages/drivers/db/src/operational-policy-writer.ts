@@ -1,27 +1,12 @@
+import type {
+  DiscountPolicyInput,
+  FinancialTransactionTaxPolicyInput,
+  OperationalPolicyMetadata,
+  OperationalPolicyWriter,
+  PolicyActivation
+} from '@supermarket/core';
 import type { DatabaseHandle } from './connection.js';
 import { mapDatabaseError, requireTransaction } from './unit-of-work.js';
-
-export type OperationalPolicyMetadata = {
-  readonly policyId: string;
-  readonly createdBy: string;
-  readonly reason: string;
-  readonly now: Date;
-};
-
-export type DiscountPolicyInput = { readonly maximumBasisPoints: number };
-
-export type FinancialTransactionTaxPolicyInput = {
-  readonly rateBasisPoints: number;
-  readonly eligiblePaymentMethodCodes: readonly string[];
-  readonly eligibleCurrencies: readonly string[];
-};
-
-export type PolicyActivation = {
-  /** `false` cuando la política activa ya tenía exactamente la misma configuración. */
-  readonly created: boolean;
-  readonly policyId: string;
-  readonly version: number;
-};
 
 type ActiveRow = { id: string; version: number };
 
@@ -37,7 +22,7 @@ const normalizeCodes = (codes: readonly string[]): readonly string[] =>
  * versión nunca se edita ni se borra, solo se desactiva antes de insertar la
  * siguiente. Reactivar la misma configuración no crea una versión nueva.
  */
-export class SqliteOperationalPolicyWriter {
+export class SqliteOperationalPolicyWriter implements OperationalPolicyWriter {
   constructor(private readonly handle: DatabaseHandle) {}
 
   activateDiscountPolicy(

@@ -7,5 +7,8 @@ export * from './currency.contracts.js';
 export * from './sales.contracts.js';
 export * from './cash.contracts.js';
 export * from './inventory.contracts.js';
+export * from './stock-count.contracts.js';
+export * from './config.contracts.js';
+export * from './purchase-receipt.contracts.js';
 export * from './reports.contracts.js';
 export * from './supplier.contracts.js';

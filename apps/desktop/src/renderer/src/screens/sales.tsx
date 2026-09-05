@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PaymentMethodResponse, SaleResponse } from '@supermarket/shared';
-import { applySaleDiscountContract, isPermissionGranted, voidSaleContract } from '@supermarket/shared';
+import {
+  applySaleDiscountContract, isPermissionGranted, returnSaleContract, voidSaleContract,
+  type SaleReturnResponse
+} from '@supermarket/shared';
 import { ApiProblemError, createIdempotencyKey, formatScaledDecimal, parseMinorUnits } from '../api-client.js';
 import {
   ACTIVE_SALE_KEY, ACTIVE_SHIFT_KEY, ActionButton, EmptyState, Feedback, ScreenNote,
@@ -39,7 +42,13 @@ export const SalesScreen = ({ api, permissionCodes }: ScreenProps): React.JSX.El
   const [discountItemId, setDiscountItemId] = useState('');
   const [discountBasisPoints, setDiscountBasisPoints] = useState('');
   const [discountReason, setDiscountReason] = useState('');
+  const [recipientCountry, setRecipientCountry] = useState('VE');
+  const [recipientValue, setRecipientValue] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState('');
   const [voidReason, setVoidReason] = useState('');
+  const [returnReason, setReturnReason] = useState('');
+  const [saleReturn, setSaleReturn] = useState<SaleReturnResponse | null>(null);
   const [voidConfirming, setVoidConfirming] = useState(false);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -146,6 +155,24 @@ export const SalesScreen = ({ api, permissionCodes }: ScreenProps): React.JSX.El
     } catch (nextError) { setError(nextError); }
   };
   const complete = (): void => { if (sale) void run(() => api.completeSale(sale.id, intentKey('complete')), 'Venta completada.', 'complete'); };
+  /** La pantalla no deriva el tipo ni valida la forma: la API es la autoridad. */
+  const setRecipient = (event: React.FormEvent<HTMLFormElement>): void => {
+    event.preventDefault(); if (!sale) return;
+    const country = recipientCountry.trim().toUpperCase();
+    const value = recipientValue.trim();
+    const intent = 'recipient-' + country + '-' + value + '-' + recipientName.trim() + '-' + recipientAddress.trim();
+    void run(() => api.setSaleRecipient(sale.id, {
+      recipient: {
+        country, value,
+        name: recipientName.trim() || null, address: recipientAddress.trim() || null
+      }
+    }, intentKey(intent)), 'Receptor adjuntado a la venta.', intent);
+  };
+  const clearRecipient = (): void => {
+    if (!sale) return;
+    void run(() => api.setSaleRecipient(sale.id, { recipient: null }, intentKey('recipient-clear')), 'Venta sin receptor identificado.', 'recipient-clear')
+      .then((next) => { if (next) { setRecipientValue(''); setRecipientName(''); setRecipientAddress(''); } });
+  };
   const changeVoidReason = (value: string): void => { setVoidReason(value); setVoidConfirming(false); };
   /** Primer paso: pide confirmación dentro de la pantalla, sin bloquear el proceso con un diálogo nativo. */
   const requestVoid = (): void => {
@@ -158,14 +185,24 @@ export const SalesScreen = ({ api, permissionCodes }: ScreenProps): React.JSX.El
     setVoidConfirming(false);
     void run(() => api.voidSale(sale.id, { reason: voidReason.trim() }, intentKey('void')), 'Venta anulada.', 'void');
   };
+  const executeReturn = (): void => {
+    if (!sale || sale.status !== 'COMPLETED' || !returnReason.trim()) return;
+    setLoading(true); setError(null); setNotice(null);
+    void api.returnSale(sale.id, { reason: returnReason.trim() }, intentKey('return-' + sale.id))
+      .then((result) => { setSaleReturn(result); setNotice('Devolución registrada. Nota de crédito SIMULACIÓN emitida.'); })
+      .catch((nextError) => setError(nextError))
+      .finally(() => setLoading(false));
+  };
   const startAnotherSale = (): void => {
     setSale(null); setError(null); setNotice(null); setHighlightedItemId(null);
     setBarcode(''); setQuantity('1'); setPaymentAmount(''); setPaymentAmount2('');
     setPaymentMethodCode2(''); setVoidReason(''); setVoidConfirming(false);
-    setDiscountItemId(''); setDiscountBasisPoints(''); setDiscountReason('');
+    setDiscountItemId(''); setDiscountBasisPoints(''); setDiscountReason(''); setReturnReason(''); setSaleReturn(null);
+    setRecipientValue(''); setRecipientName(''); setRecipientAddress('');
   };
   const completionBlocker = saleCompletionBlocker(sale, scale);
   const voidAuthorized = isPermissionGranted(voidSaleContract.permission, permissionCodes);
+  const returnAuthorized = isPermissionGranted(returnSaleContract.permission, permissionCodes);
   return (
     <div className="operation-screen">
       <ScreenNote>El servidor conserva los totales, impuestos y estado fiscal. Esta pantalla solo coordina intenciones del operador. No se aceptan cálculos locales.</ScreenNote>
@@ -188,6 +225,15 @@ export const SalesScreen = ({ api, permissionCodes }: ScreenProps): React.JSX.El
           <div><dt>Estado</dt><dd>{sale.status}</dd></div>
         </dl>
         <span className="simulation-label">Fiscal · SIMULACIÓN</span>
+        {sale.status === 'COMPLETED' && returnAuthorized && <section className="panel danger-panel" aria-labelledby="return-title">
+          <p className="eyebrow">Acción sensible</p><h3 id="return-title">Devolver venta completa</h3>
+          <p className="muted">Restaura inventario y registra el reintegro en el turno de origen. Solo está disponible como simulación total.</p>
+          <label>Motivo<input value={returnReason} onChange={(event) => setReturnReason(event.target.value)} maxLength={500} required /></label>
+          <ActionButton className="primary-button" type="button" onClick={executeReturn} busy={loading} disabled={loading || !returnReason.trim() || saleReturn !== null}>
+            {saleReturn ? 'Devolución registrada' : 'Registrar devolución'}
+          </ActionButton>
+          {saleReturn && <p className="inline-status is-ready" role="status">Nota de crédito {saleReturn.creditNoteFiscalNumber ?? saleReturn.creditNoteId} · SIMULACIÓN</p>}
+        </section>}
         <ActionButton className="primary-button" type="button" onClick={startAnotherSale}>Iniciar otra venta</ActionButton>
       </section> : <>
         <div className="screen-toolbar"><span className="status-label">Venta {sale.id.slice(0, 8)} · {sale.status}</span><span className="status-label">{sale.items.length} líneas</span><span className="simulation-label">Fiscal · SIMULACIÓN</span><ActionButton type="button" onClick={() => void refresh(sale.id)} busy={loading} disabled={loading}>Actualizar</ActionButton></div>
@@ -199,6 +245,7 @@ export const SalesScreen = ({ api, permissionCodes }: ScreenProps): React.JSX.El
           <aside className="sales-side">
             <section className="panel totals-panel" aria-labelledby="totals-title"><p className="eyebrow">Resumen calculado por API</p><h3 id="totals-title">Total a cobrar</h3><dl className="totals"><div><dt>Subtotal</dt><dd>{money(sale.subtotalMinorUnits, sale.currencyCode, scale)}</dd></div><div><dt>Descuentos</dt><dd>−{money(sale.discountTotalMinorUnits, sale.currencyCode, scale)}</dd></div><div><dt>IVA</dt><dd>{money(sale.taxTotalMinorUnits, sale.currencyCode, scale)}</dd></div><div className="grand-total"><dt>Total</dt><dd>{money(sale.totalMinorUnits, sale.currencyCode, scale)}</dd></div><div><dt>Pagado</dt><dd>{money(sale.paidTotalMinorUnits, sale.currencyCode, scale)}</dd></div><div><dt>Saldo</dt><dd>{money(sale.balanceMinorUnits, sale.currencyCode, scale)}</dd></div></dl></section>
             <section className="panel" aria-labelledby="payment-title"><p className="eyebrow">Cobro</p><h3 id="payment-title">Registrar pagos mixtos</h3><form className="stack-form" onSubmit={registerPayment}><label>Método 1<select value={paymentMethodCode} onChange={(event) => setPaymentMethodCode(event.target.value)} required><option value="">Selecciona</option>{paymentMethods.map((method) => <option key={method.code} value={method.code}>{method.name} ({method.currencyCode})</option>)}</select></label><label>Importe 1 ({paymentCurrency || '…'})<input inputMode="decimal" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} placeholder="0,00" required /></label><p className="muted">Se sugiere el saldo pendiente: {money(sale.balanceMinorUnits, sale.currencyCode, scale)}.</p><label>Método 2 (opcional)<select value={paymentMethodCode2} onChange={(event) => setPaymentMethodCode2(event.target.value)}><option value="">Ninguno</option>{paymentMethods.map((method) => <option key={method.code} value={method.code}>{method.name} ({method.currencyCode})</option>)}</select></label>{paymentMethodCode2 && <label>Importe 2 ({paymentCurrency2 || '…'})<input inputMode="decimal" value={paymentAmount2} onChange={(event) => setPaymentAmount2(event.target.value)} placeholder="0,00" required={Boolean(paymentMethodCode2)} /></label>}<ActionButton className="primary-button" type="submit" busy={loading} disabled={loading || !paymentMethodCode}>{loading ? 'Registrando…' : 'Registrar lote de pagos'}</ActionButton></form></section>
+            <section className="panel" aria-labelledby="recipient-title"><p className="eyebrow">Receptor</p><h3 id="recipient-title">Identificación fiscal (opcional)</h3><p className="muted">La venta anónima es válida en simulación. El dato se guarda como copia en esta venta; no crea un cliente reutilizable.</p><form className="stack-form" onSubmit={setRecipient}><div className="form-grid"><label>País<input value={recipientCountry} onChange={(event) => setRecipientCountry(event.target.value)} maxLength={2} required /></label><label>Identificación<input value={recipientValue} onChange={(event) => setRecipientValue(event.target.value)} maxLength={64} placeholder="J-12345678-9" required /></label></div><label>Nombre o razón social (opcional)<input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} maxLength={200} /></label><label>Dirección (opcional)<input value={recipientAddress} onChange={(event) => setRecipientAddress(event.target.value)} maxLength={200} /></label><div className="button-row"><ActionButton type="submit" busy={loading} disabled={loading || !recipientValue.trim()}>{loading ? "Guardando…" : "Adjuntar receptor"}</ActionButton>{sale.recipient && <button type="button" onClick={clearRecipient} disabled={loading}>Quitar receptor</button>}</div></form>{sale.recipient ? <dl className="detail-grid"><div><dt>Identificación</dt><dd>{sale.recipient.type} {sale.recipient.normalizedValue}</dd></div><div><dt>Nombre</dt><dd>{sale.recipient.name ?? "—"}</dd></div><div><dt>Dirección</dt><dd>{sale.recipient.address ?? "—"}</dd></div></dl> : <p className="muted">Venta anónima.</p>}<span className="simulation-label">SIMULACIÓN · la captura no certifica una factura fiscal</span></section>
             <section className="panel" aria-labelledby="discount-title"><p className="eyebrow">Autorización</p><h3 id="discount-title">Descuento de línea</h3><form className="stack-form" onSubmit={applyDiscount}><label>Línea<select value={discountItemId} onChange={(event) => setDiscountItemId(event.target.value)} required><option value="">Selecciona</option>{sale.items.map((item) => <option key={item.id} value={item.id}>{item.description}</option>)}</select></label><label>Porcentaje (puntos base)<input type="number" min="1" max="10000" value={discountBasisPoints} onChange={(event) => setDiscountBasisPoints(event.target.value)} required /></label><label>Motivo<input value={discountReason} onChange={(event) => setDiscountReason(event.target.value)} maxLength={500} required /></label><ActionButton type="submit" busy={loading} disabled={loading || !isPermissionGranted(applySaleDiscountContract.permission, permissionCodes)}>{loading ? 'Solicitando…' : 'Solicitar descuento'}</ActionButton></form></section>
             <section className="panel danger-panel" aria-labelledby="void-title">
               <p className="eyebrow">Acción sensible</p><h3 id="void-title">Anular venta</h3>

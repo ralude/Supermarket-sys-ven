@@ -1,6 +1,7 @@
 import {
   FiscalDocument,
   type FiscalDocumentRepository,
+  type FiscalDocumentRecipient,
   type FiscalDocumentState,
   type FiscalDocumentTransition,
   type FiscalDocumentType
@@ -20,6 +21,27 @@ import {
   restoreFiscalOperationEvidence
 } from './fiscal-operation-evidence.js';
 import { mapDatabaseError, requireTransaction } from './unit-of-work.js';
+
+const restoreFiscalRecipient = (
+  row: typeof fiscalDocuments.$inferSelect
+): FiscalDocumentRecipient | null => {
+  if (row.recipientCountry === null) return null;
+  if (row.recipientType === null || row.recipientValue === null ||
+    row.recipientNormalizedValue === null) {
+    throw new InfrastructureError(
+      'FISCAL_DOCUMENT_CONTENT_CONFLICT',
+      'Persisted fiscal recipient snapshot is incomplete.'
+    );
+  }
+  return {
+    country: row.recipientCountry,
+    type: row.recipientType,
+    value: row.recipientValue,
+    normalizedValue: row.recipientNormalizedValue,
+    name: row.recipientName,
+    address: row.recipientAddress
+  };
+};
 
 const activeStates: FiscalDocumentState[] = ['PENDING', 'PRINTING', 'ERROR', 'RETRYING'];
 const recoverableStates: FiscalDocumentState[] = ['PENDING', 'PRINTING', 'ERROR', 'RETRYING'];
@@ -110,6 +132,18 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
   findById(id: string): Promise<FiscalDocument | null> {
     return this.read(() => this.restore(this.handle.db.select().from(fiscalDocuments)
       .where(eq(fiscalDocuments.id, id)).get()));
+  }
+
+  findByReference(
+    originNodeId: string,
+    type: FiscalDocumentType,
+    referenceId: string
+  ): Promise<FiscalDocument | null> {
+    return this.read(() => this.restore(this.handle.db.select().from(fiscalDocuments).where(and(
+      eq(fiscalDocuments.originNodeId, originNodeId),
+      eq(fiscalDocuments.documentType, type),
+      eq(fiscalDocuments.referenceId, referenceId)
+    )).get()));
   }
 
   findByIdempotencyKey(originNodeId: string, key: string): Promise<FiscalDocument | null> {
@@ -203,7 +237,8 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
           methodCode: payment.methodCode,
           amountMinorUnits: payment.amountMinorUnits
         })),
-        totalMinorUnits: row.totalMinorUnits
+        totalMinorUnits: row.totalMinorUnits,
+        recipient: restoreFiscalRecipient(row)
       },
       idempotencyKey: row.idempotencyKey,
       requestFingerprint: row.requestFingerprint,
@@ -255,6 +290,12 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
       attempts: document.attempts,
       fiscalNumber: document.fiscalNumber,
       lastErrorCode: document.lastErrorCode,
+      recipientCountry: document.content.recipient?.country ?? null,
+      recipientType: document.content.recipient?.type ?? null,
+      recipientValue: document.content.recipient?.value ?? null,
+      recipientNormalizedValue: document.content.recipient?.normalizedValue ?? null,
+      recipientName: document.content.recipient?.name ?? null,
+      recipientAddress: document.content.recipient?.address ?? null,
       lastDispatchState: evidence.dispatchState,
       lastCommandEffect: evidence.commandEffect,
       lastFiscalCommit: evidence.fiscalCommit,
@@ -302,6 +343,7 @@ export class DrizzleFiscalDocumentRepository implements FiscalDocumentRepository
       row.documentType !== document.content.type ||
       row.currencyCode !== document.content.currencyCode ||
       row.totalMinorUnits !== document.content.totalMinorUnits ||
+      row.recipientNormalizedValue !== (document.content.recipient?.normalizedValue ?? null) ||
       row.idempotencyKey !== document.idempotencyKey ||
       row.requestFingerprint !== document.requestFingerprint) {
       throw new InfrastructureError(

@@ -3,8 +3,10 @@ export { ApplyDiscountToSale } from './apply-discount-to-sale.js';
 export { CompleteSale } from './complete-sale.js';
 export { RemoveItemFromSale } from './remove-item-from-sale.js';
 export { RegisterMixedPayment } from './register-mixed-payment.js';
+export { SetSaleRecipient } from './set-sale-recipient.js';
 export { StartSale } from './start-sale.js';
 export { VoidSale } from './void-sale.js';
+export { ReturnSale } from './return-sale.js';
 export { GetSaleHistory, type SaleHistoryVersion } from './get-sale-history.js';
 export { GetSale } from './get-sale.js';
 export { SALE_PERMISSIONS } from './permissions.js';
@@ -17,6 +19,11 @@ export type {
   SaleDto,
   SaleItemDto,
   SalePaymentDto,
+  SaleRecipientDto,
+  SetSaleRecipientInput,
   StartSaleInput,
-  VoidSaleInput
+  VoidSaleInput,
+  ReturnSaleInput,
+  SaleReturnDto,
+  SaleReturnLineDto
 } from './dtos.js';

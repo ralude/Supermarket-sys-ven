@@ -15,6 +15,20 @@ export type FiscalDocumentPayment = {
   readonly amountMinorUnits: number;
 };
 
+/**
+ * Copia del receptor capturado en el origen. El documento no referencia un
+ * maestro mutable: conserva el snapshot recibido para que corregir el dato
+ * más tarde no reescriba un documento ya emitido (ADR-0018).
+ */
+export type FiscalDocumentRecipient = {
+  readonly country: string;
+  readonly type: string;
+  readonly value: string;
+  readonly normalizedValue: string;
+  readonly name: string | null;
+  readonly address: string | null;
+};
+
 export type FiscalDocumentContent = {
   readonly referenceId: string;
   readonly type: FiscalDocumentType;
@@ -22,6 +36,8 @@ export type FiscalDocumentContent = {
   readonly lines: readonly FiscalDocumentLine[];
   readonly payments: readonly FiscalDocumentPayment[];
   readonly totalMinorUnits: number;
+  /** Ausente o `null` en una venta anónima, que sigue siendo válida. */
+  readonly recipient?: FiscalDocumentRecipient | null;
 };
 
 export type FiscalDispatchState = 'NOT_STARTED' | 'STARTED' | 'RESULT_RECEIVED';

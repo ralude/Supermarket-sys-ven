@@ -2,12 +2,14 @@ import {
   applySaleDiscountContract,
   closeShiftContract,
   changeSupplierStatusContract,
+  completePurchaseReceiptContract,
   correctSupplierTaxIdentityContract,
   createProductContract,
   createSupplierContract,
   getAuditReportContract,
   getCashClosureReportContract,
   getFiscalOperationsReportContract,
+  getMarginReportContract,
   issueSimulatedFiscalDocumentContract,
   openShiftContract,
   printSimulatedXReportContract,
@@ -16,6 +18,8 @@ import {
   reconcileSimulatedFiscalDocumentContract,
   registerCashMovementContract,
   registerStockAdjustmentContract,
+  reversePurchaseReceiptContract,
+  startPurchaseReceiptContract,
   updateExchangeRateContract,
   updatePriceContract,
   updateProductContract,
@@ -78,6 +82,7 @@ describe('el permiso declarado por cada contrato coincide con el que su caso de 
     expectedPermission(getCashClosureReportContract, application.REPORT_PERMISSIONS.READ_CASH);
     expectedPermission(getAuditReportContract, application.REPORT_PERMISSIONS.READ_AUDIT);
     expectedPermission(getFiscalOperationsReportContract, application.REPORT_PERMISSIONS.READ_FISCAL);
+    expectedPermission(getMarginReportContract, application.REPORT_PERMISSIONS.READ_MARGIN);
   });
 
   it('proveedores', () => {
@@ -88,6 +93,12 @@ describe('el permiso declarado por cada contrato coincide con el que su caso de 
       correctSupplierTaxIdentityContract,
       application.SUPPLIER_PERMISSIONS.CORRECT_TAX_IDENTITY
     );
+  });
+
+  it('recepciones de compra', () => {
+    expectedPermission(startPurchaseReceiptContract, application.PURCHASE_RECEIPT_PERMISSIONS.START);
+    expectedPermission(completePurchaseReceiptContract, application.PURCHASE_RECEIPT_PERMISSIONS.COMPLETE);
+    expectedPermission(reversePurchaseReceiptContract, application.PURCHASE_RECEIPT_PERMISSIONS.REVERSE);
   });
 
   it('venta', () => {

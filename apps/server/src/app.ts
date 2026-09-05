@@ -29,6 +29,9 @@ import { registerInventoryRoutes } from './routes/inventory.ts';
 import { registerFiscalDocumentRoutes } from './routes/fiscal-documents.ts';
 import { registerReportRoutes } from './routes/reports.ts';
 import { registerSupplierRoutes } from './routes/suppliers.ts';
+import { registerPurchaseReceiptRoutes } from './routes/purchase-receipts.ts';
+import { registerStockCountRoutes } from './routes/stock-counts.ts';
+import { registerConfigRoutes } from './routes/config.ts';
 
 type FiscalReportUseCase = {
   execute(
@@ -75,6 +78,8 @@ export type ServerDependencies = {
     readonly registerMixedPayment: application.RegisterMixedPayment;
     readonly completeSale: application.CompleteSale;
     readonly voidSale: application.VoidSale;
+    readonly returnSale: application.ReturnSale;
+    readonly setSaleRecipient: application.SetSaleRecipient;
   };
   readonly cash: {
     readonly openShift: application.OpenShift;
@@ -87,6 +92,30 @@ export type ServerDependencies = {
     readonly registerStockAdjustment: application.RegisterStockAdjustment;
     readonly getKardex: application.GetKardex;
   };
+  readonly stockCounts: {
+    readonly open: application.OpenStockCount;
+    readonly recordLine: application.RecordStockCountLine;
+    readonly close: application.CloseStockCount;
+    readonly approve: application.ApproveStockCount;
+    readonly reject: application.RejectStockCount;
+    readonly get: application.GetStockCount;
+    readonly list: application.ListStockCounts;
+  };
+  readonly config: {
+    readonly branches: {
+      readonly create: application.CreateBranch;
+      readonly update: application.UpdateBranch;
+      readonly changeStatus: application.ChangeBranchStatus;
+      readonly get: application.GetBranch;
+      readonly list: application.ListBranches;
+    };
+    readonly devices: {
+      readonly declare: application.DeclareDevice;
+      readonly update: application.UpdateDevice;
+      readonly changeStatus: application.ChangeDeviceStatus;
+      readonly list: application.ListDevices;
+    };
+  };
   readonly suppliers: {
     readonly create: application.CreateSupplier;
     readonly get: application.GetSupplier;
@@ -94,6 +123,12 @@ export type ServerDependencies = {
     readonly update: application.UpdateSupplier;
     readonly changeStatus: application.ChangeSupplierStatus;
     readonly correctTaxIdentity: application.CorrectSupplierTaxIdentity;
+  };
+  readonly purchaseReceipts: {
+    readonly start: application.StartPurchaseReceipt;
+    readonly complete: application.CompletePurchaseReceipt;
+    readonly reverse: application.ReversePurchaseReceipt;
+    readonly get: application.GetPurchaseReceipt;
   };
   readonly fiscalDocuments: {
     readonly issue: application.IssueFiscalDocument;
@@ -104,6 +139,7 @@ export type ServerDependencies = {
     readonly getCashClosureReport: application.GetCashClosureReport;
     readonly getAuditReport: application.GetAuditReport;
     readonly getFiscalOperationsReport: application.GetFiscalOperationsReport;
+    readonly getMarginReport: application.GetMarginReport;
   };
   readonly fiscalReports?: {
     readonly printX: FiscalReportUseCase;
@@ -126,6 +162,7 @@ const statusFor = (code: string): number => {
     return 409;
   }
   if (code === 'SUPPLIER_NOT_ACTIVE') return 409;
+  if (code === 'PURCHASE_RECEIPT_SOURCE_DUPLICATED' || code === 'PURCHASE_RECEIPT_NOT_DRAFT') return 409;
   if (code === 'POLICY_NOT_CONFIGURED') return 409;
   if (code === 'DATABASE_BUSY' || code === 'NETWORK_UNAVAILABLE') return 503;
   return 400;
@@ -240,7 +277,10 @@ export const buildApp = (dependencies?: ServerDependencies): FastifyInstance => 
     registerSalesRoutes(app, dependencies);
     registerCashRoutes(app, dependencies);
     registerInventoryRoutes(app, dependencies);
+    registerStockCountRoutes(app, dependencies);
+    registerConfigRoutes(app, dependencies);
     registerSupplierRoutes(app, dependencies);
+    registerPurchaseReceiptRoutes(app, dependencies);
     registerFiscalDocumentRoutes(app, dependencies);
     registerReportRoutes(app, dependencies);
     if (dependencies.simulatedReportsEnabled && dependencies.fiscalReports) {

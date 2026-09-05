@@ -83,8 +83,9 @@ publica una pantalla de alta de operadores.
 - La sucursal se modela unicamente como dato maestro y etiqueta de pertenencia. Su autoridad
   de escritura multi-nodo pertenece a Fase 10 y a
   [`12-sincronizacion-y-ownership.md`](../architecture/12-sincronizacion-y-ownership.md).
-- La transferencia de existencia se limita a almacenes gobernados por el mismo nodo. Una
-  transferencia entre nodos requiere Fase 10 y se recorta de esta fase.
+- La existencia conserva un almacén implícito por nodo. Las transferencias, tanto entre
+  almacenes como entre nodos, quedan diferidas; una futura transferencia entre nodos requiere
+  Fase 10 por cambiar la autoridad de escritura.
 - La Fase 8 sigue suspendida. La nota de credito de una devolucion se emite contra
   `FiscalPrinterFake`, se rotula `SIMULACION` y no declara emision fiscal real.
 - No se optimiza rendimiento. La Fase 12 conserva su alcance de medicion antes y despues.
@@ -98,6 +99,24 @@ La Fase 10 se retoma desde 10.01 cuando las dieciocho sub-fases activas de la Fa
 completadas, o cuando una decision documentada posterior recorte el alcance de la Fase 9B y
 declare cuales de sus sub-fases quedan diferidas. La correccion del 2026-09-04 ya ejercio esa
 salida al retirar 9B.09.
+
+Antes de iniciar 10.01 también debe asignarse de forma explícita la decisión nodo↔sucursal
+que 9B.11 dejó fuera de alcance. Declarar que pertenece a Fase 10 no basta mientras ninguna
+sub-fase 10.01-10.04 la incluya: una decisión posterior debe incorporarla a una sub-fase
+concreta o registrar un diferimiento con dueño y criterio de salida. Esto no autoriza a
+ejecutar trabajo de Fase 10 durante 9B.
+
+## Corrección de alcance YAGNI — 2026-09-04
+
+La revisión posterior aplicó [ADR-0021](../architecture/adr/0021-mvp-referencia-no-certificado.md)
+y sustituyó el gate global por defaults explícitos de referencia. La versión anterior de este
+documento, que marcaba seis bloqueos directos, queda supersedida: sirve como historial de por
+qué se investigaron las decisiones, no como condición vigente de implementación.
+
+9B.04, 9B.05, 9B.06 y 9B.10 avanzan con alcance mínimo y reemplazable. 9B.12 avanza con
+arqueos, lecturas e historia; la reapertura se difiere. 9B.08 se difiere porque el MVP conserva
+un almacén implícito por nodo. Los perfiles 9B.14-9B.18 se componen de forma incremental y
+declaran las capacidades que todavía no están disponibles.
 
 ## Efecto sobre los niveles de entrega
 

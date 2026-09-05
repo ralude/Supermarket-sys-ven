@@ -17,6 +17,7 @@ Los módulos representan bounded contexts. Cada uno debe tener un lenguaje, dato
 | `customers` | Clientes, RIF/CI y datos fiscales | ninguno de negocio |
 | `reports` | Consultas y reportes de lectura | eventos y proyecciones |
 | `sync` | Replicación futura y entrega de outbox | infraestructura |
+| `config` | Configuración operativa, sucursales y dispositivos declarados (9B.10, 9B.11) | ninguno de negocio |
 
 ## Alcance del MVP
 
@@ -54,4 +55,15 @@ sesiones no forman parte del dominio de Fase 2.
 
 `inventory` usa `StockItem` como raíz del agregado. El saldo se deriva de
 movimientos append-only con la escala del producto; los lotes son opcionales y
-se exigen únicamente cuando el artículo declara `tracksBatches`.
+se exigen únicamente cuando el artículo declara `tracksBatches`. Desde 9B.07,
+`StockCount` es una segunda raíz del mismo módulo que documenta el conteo
+físico sin mutar existencia por sí misma; solo `ApproveStockCount` coordina
+ambas raíces por puertos.
+
+`config` (9B.11) modela `Branch` como dato maestro y etiqueta de pertenencia, y
+`Device` como inventario administrativo de aparatos declarados por una
+estación. Ninguno de los dos gobierna autoridad de escritura ni sincronización
+entre nodos: esa decisión sigue perteneciendo a la Fase 10. `Device` puede
+etiquetar opcionalmente una sucursal, pero el módulo no decide ni modela la
+relación entre un nodo y su sucursal — esa relación queda diferida hasta que el
+negocio la defina.

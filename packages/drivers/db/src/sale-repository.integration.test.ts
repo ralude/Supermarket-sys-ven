@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createSaleRecipientSnapshot,
   Payment,
   PaymentMethod,
   ProductSnapshot,
@@ -88,6 +89,48 @@ describe('DrizzleSaleRepository integration', () => {
     expect((await repository.findById('sale-001'))?.status).toBe('COMPLETED');
     await expect(unitOfWork.execute(() => repository.save(staleDraft)))
       .rejects.toMatchObject({ code: 'SALE_FINAL_STATE_IMMUTABLE' });
+    handle.close();
+  });
+
+  it('persists and rehydrates the recipient snapshot, including its removal', async () => {
+    const handle = openDatabase(':memory:');
+    applyMigrations(handle.sqlite);
+    const repository = new DrizzleSaleRepository(handle);
+    const unitOfWork = new SqliteUnitOfWork(handle.sqlite);
+    const sale = paidDraftSale();
+    sale.setRecipient({
+      recipient: createSaleRecipientSnapshot({
+        country: 'VE', type: 'RIF', value: 'J-12.345.678-9', name: 'Bodega Central',
+        address: 'Av. Urdaneta'
+      }),
+      occurredAt: instant(4), eventId: 'event-005'
+    });
+    await unitOfWork.execute(() => repository.save(sale));
+
+    expect((await repository.findById('sale-001'))?.recipient).toEqual({
+      country: 'VE', type: 'RIF', value: 'J-12.345.678-9', normalizedValue: 'J123456789',
+      name: 'Bodega Central', address: 'Av. Urdaneta'
+    });
+
+    const withoutRecipient = await repository.findById('sale-001');
+    if (!withoutRecipient) throw new Error('Sale fixture was not restored.');
+    withoutRecipient.setRecipient({
+      recipient: null, occurredAt: instant(5), eventId: 'event-006'
+    });
+    await unitOfWork.execute(() => repository.save(withoutRecipient));
+
+    expect((await repository.findById('sale-001'))?.recipient).toBeNull();
+    handle.close();
+  });
+
+  it('keeps an anonymous sale valid without a recipient', async () => {
+    const handle = openDatabase(':memory:');
+    applyMigrations(handle.sqlite);
+    const repository = new DrizzleSaleRepository(handle);
+    const unitOfWork = new SqliteUnitOfWork(handle.sqlite);
+    await unitOfWork.execute(() => repository.save(paidDraftSale()));
+
+    expect((await repository.findById('sale-001'))?.recipient).toBeNull();
     handle.close();
   });
 

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  completePurchaseReceiptContract,
   isPermissionGranted,
   receivePurchaseContract,
   registerStockAdjustmentContract,
+  startPurchaseReceiptContract,
   type KardexDto,
   type SupplierResponse
 } from '@supermarket/shared';
@@ -38,6 +40,10 @@ export const InventoryScreen = ({ api, permissionCodes }: ScreenProps): React.JS
   const [receiveQuantity, setReceiveQuantity] = useState('');
   const [lotNumber, setLotNumber] = useState('');
   const [lotExpiresAt, setLotExpiresAt] = useState('');
+  const [documentType, setDocumentType] = useState<'INVOICE' | 'DELIVERY_NOTE'>('INVOICE');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [unitCostMinorUnits, setUnitCostMinorUnits] = useState('');
+  const [purchaseCurrency, setPurchaseCurrency] = useState('USD');
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -110,6 +116,41 @@ export const InventoryScreen = ({ api, permissionCodes }: ScreenProps): React.JS
       }, createIdempotencyKey());
       setKardex(await api.getKardex(consultedProductId));
       setNotice('Recepción registrada.');
+    } catch (nextError) { setError(nextError); }
+    finally { setLoading(false); }
+  };
+
+  /**
+   * Recepción documentada (9B.04): crea el borrador con su documento de origen
+   * y su costo, y lo completa en un segundo comando explícito. El promedio
+   * ponderado y la valoración los calcula el caso de uso, no esta pantalla.
+   */
+  const receiveWithDocument = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!consultedProductId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const draft = await api.startPurchaseReceipt({
+        supplierId,
+        sourceDocument: { type: documentType, number: documentNumber.trim() },
+        effectiveAt: new Date().toISOString(),
+        reason: reason.trim(),
+        lines: [{
+          productId: consultedProductId, quantity: receiveQuantity.trim(),
+          purchaseUnitCostMinorUnits: Number(unitCostMinorUnits),
+          purchaseCurrency: purchaseCurrency.trim().toUpperCase(),
+          ...(lotNumber.trim() ? {
+            lot: {
+              lotNumber: lotNumber.trim(),
+              ...(lotExpiresAt ? { expiresAt: new Date(lotExpiresAt).toISOString() } : {})
+            }
+          } : {})
+        }]
+      }, createIdempotencyKey());
+      await api.completePurchaseReceipt(draft.id, { reason: reason.trim() }, createIdempotencyKey());
+      setKardex(await api.getKardex(consultedProductId));
+      setNotice('Recepción documentada completada con su costo.');
     } catch (nextError) { setError(nextError); }
     finally { setLoading(false); }
   };
@@ -210,6 +251,40 @@ export const InventoryScreen = ({ api, permissionCodes }: ScreenProps): React.JS
               <ActionButton className="primary-button" type="submit" busy={loading}
                 disabled={loading || !isPermissionGranted(receivePurchaseContract.permission, permissionCodes)}>
                 {loading ? 'Registrando…' : 'Registrar recepción'}
+              </ActionButton>
+            </form>
+            <p className="eyebrow">Recepción documentada</p>
+            <h3>Compra con documento y costo</h3>
+            <form className="stack-form" onSubmit={receiveWithDocument}>
+              <p className="muted">
+                Usa el proveedor, la cantidad, el lote y el motivo capturados arriba. El costo
+                unitario viaja en unidades menores enteras y el nodo calcula la valoración y el
+                promedio ponderado.
+              </p>
+              <label>Documento de origen
+                <select value={documentType}
+                  onChange={(event) => setDocumentType(event.target.value as typeof documentType)}>
+                  <option value="INVOICE">Factura</option>
+                  <option value="DELIVERY_NOTE">Guía de despacho</option>
+                </select>
+              </label>
+              <label>Número del documento
+                <input value={documentNumber} onChange={(event) => setDocumentNumber(event.target.value)} />
+              </label>
+              <label>Costo unitario (unidades menores)
+                <input type="number" min="0" value={unitCostMinorUnits}
+                  onChange={(event) => setUnitCostMinorUnits(event.target.value)} />
+              </label>
+              <label>Moneda de compra
+                <input value={purchaseCurrency} maxLength={3}
+                  onChange={(event) => setPurchaseCurrency(event.target.value)} />
+              </label>
+              <ActionButton className="primary-button" type="submit" busy={loading}
+                disabled={loading
+                  || !documentNumber.trim() || !unitCostMinorUnits.trim()
+                  || !isPermissionGranted(startPurchaseReceiptContract.permission, permissionCodes)
+                  || !isPermissionGranted(completePurchaseReceiptContract.permission, permissionCodes)}>
+                {loading ? 'Registrando…' : 'Completar recepción documentada'}
               </ActionButton>
             </form>
             {kardex && (

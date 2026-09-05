@@ -1,5 +1,5 @@
-import type { StockItem, StockMovement } from '../../domain/inventory/index.js';
-import type { StockItemDto, StockMovementDto } from './dtos.js';
+import type { StockCount, StockCountLine, StockItem, StockMovement } from '../../domain/inventory/index.js';
+import type { StockCountDto, StockCountLineDto, StockItemDto, StockMovementDto } from './dtos.js';
 
 export const toStockMovementDto = (movement: StockMovement): StockMovementDto => ({
   id: movement.id,
@@ -22,4 +22,29 @@ export const toStockItemDto = (item: StockItem): StockItemDto => ({
   tracksBatches: item.tracksBatches,
   balanceScaled: item.balance.scaledValue,
   movements: item.movements.map(toStockMovementDto)
+});
+
+export const toStockCountLineDto = (line: StockCountLine): StockCountLineDto => ({
+  id: line.id,
+  productId: line.productId,
+  stockItemId: line.stockItemId,
+  batchId: line.batchId,
+  countedQuantityScaled: line.countedQuantity.scaledValue,
+  quantityScale: line.countedQuantity.scale
+});
+
+export const toStockCountDto = (count: StockCount): StockCountDto => ({
+  id: count.id,
+  status: count.status,
+  openedBy: count.openedBy,
+  openedAt: count.openedAt,
+  lines: count.lines.map(toStockCountLineDto),
+  differences: count.differences === null ? null : count.differences.map((difference) => ({ ...difference })),
+  closedAt: count.closedAt,
+  approvedBy: count.approvedBy,
+  approvedAt: count.approvedAt,
+  rejectedBy: count.rejectedBy,
+  rejectedAt: count.rejectedAt,
+  rejectionReason: count.rejectionReason,
+  version: count.version
 });

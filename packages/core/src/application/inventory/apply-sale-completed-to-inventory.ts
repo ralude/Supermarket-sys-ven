@@ -68,11 +68,18 @@ export class ApplySaleCompletedToInventory {
           const beforeBalance = item.balance.scaledValue;
           const quantity = Quantity.fromScaled(line.quantityScaled, line.quantityScale);
           const allocations = item.allocateForIssue(quantity);
+          /**
+           * El costo de la salida se congela en el promedio ponderado vigente
+           * al momento de la venta (ADR-0016); una recepción posterior no
+           * revaloriza esta salida.
+           */
+          const unitCostAtIssue = item.averageUnitCost;
           allocations.forEach((allocation, index) => item.registerMovement({
             id: `${event.eventId}:${line.itemId}:${index}`, type: 'SALE_ISSUE', quantity: allocation.quantity,
             ...(allocation.batchId ? { batchId: allocation.batchId } : {}), actorId: event.actorId,
             reason: 'Completed sale issue', referenceId, occurredAt: event.occurredAt,
-            eventId: this.eventIdGenerator.generate()
+            eventId: this.eventIdGenerator.generate(),
+            ...(unitCostAtIssue ? { unitCost: unitCostAtIssue } : {})
           }));
           const events = item.domainEvents.slice(beforeEventCount);
           allEvents.push(...events);

@@ -5,14 +5,18 @@ import {
   completeSaleContract,
   getSaleContract,
   registerSalePaymentsContract,
+  returnSaleContract,
   removeSaleItemContract,
+  setSaleRecipientContract,
   startSaleContract,
   voidSaleContract,
   type AddSaleItemRequest,
   type ApplySaleDiscountRequest,
   type RegisterSalePaymentsRequest,
+  type SetSaleRecipientRequest,
   type StartSaleRequest,
-  type VoidSaleRequest
+  type VoidSaleRequest,
+  type ReturnSaleRequest
 } from '@supermarket/shared';
 import {
   createExecutionContext,
@@ -128,6 +132,21 @@ export const registerSalesRoutes = (
       : sendProblem(reply, request, result.error.code, result.error.message);
   });
 
+  app.put<{ Params: { saleId: string }; Body: SetSaleRecipientRequest }>(
+    setSaleRecipientContract.path,
+    { schema: setSaleRecipientContract.schema as FastifySchema },
+    async (request, reply) => {
+      const principal = await requirePrincipal(request, reply, dependencies);
+      if (!principal) return;
+      const result = await dependencies.sales.setSaleRecipient.execute({
+        saleId: request.params.saleId,
+        recipient: request.body.recipient === null ? null : { ...request.body.recipient }
+      }, createExecutionContext(request, principal, dependencies));
+      return result.ok ? reply.send(saleResponse(result.value))
+        : sendProblem(reply, request, result.error.code, result.error.message);
+    }
+  );
+
   app.post<{ Params: { saleId: string }; Body: VoidSaleRequest }>(voidSaleContract.path, {
     schema: voidSaleContract.schema as FastifySchema
   }, async (request, reply) => {
@@ -138,5 +157,21 @@ export const registerSalesRoutes = (
     }, createExecutionContext(request, principal, dependencies));
     return result.ok ? reply.send(saleResponse(result.value))
       : sendProblem(reply, request, result.error.code, result.error.message);
+  });
+
+  app.post<{ Params: { saleId: string }; Body: ReturnSaleRequest }>(returnSaleContract.path, {
+    schema: returnSaleContract.schema as FastifySchema
+  }, async (request, reply) => {
+    const principal = await requirePrincipal(request, reply, dependencies);
+    if (!principal) return;
+    const result = await dependencies.sales.returnSale.execute({
+      saleId: request.params.saleId,
+      reason: request.body.reason
+    }, createExecutionContext(request, principal, dependencies));
+    if (!result.ok) return sendProblem(reply, request, result.error.code, result.error.message);
+    return reply.code(201).send({
+      ...result.value,
+      occurredAt: result.value.occurredAt.toISOString()
+    });
   });
 };

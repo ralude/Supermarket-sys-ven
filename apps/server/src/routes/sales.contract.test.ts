@@ -3,17 +3,21 @@ import {
   CashRegister,
   Barcode,
   Category,
+  FiscalDocument,
   PaymentMethod,
   Product,
   Shift,
+  StockItem,
   UnitOfMeasure
 } from '@supermarket/core';
-import { Money, TaxRate, type StartSaleRequest } from '@supermarket/shared';
+import { Money, Quantity, TaxRate, type StartSaleRequest } from '@supermarket/shared';
 import {
   DrizzleCashRegisterRepository,
   DrizzleCategoryRepository,
   DrizzlePaymentMethodRepository,
   DrizzleProductRepository,
+  DrizzleFiscalDocumentRepository,
+  DrizzleStockItemRepository,
   DrizzleShiftRepository,
   DrizzleUnitOfMeasureRepository,
   SqliteUnitOfWork
@@ -161,6 +165,70 @@ describe('sales HTTP contracts', () => {
     expect(response.json()).toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
+  it('publishes the total return contract and validates its sensitive reason', async () => {
+    const { app, cookie } = await setup();
+    const response = await app.inject({
+      method: 'POST', url: '/api/v1/sales/sale-unknown/return',
+      headers: { cookie, 'idempotency-key': 'sale-return-001' }, payload: {}
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: 'HTTP_VALIDATION_FAILED' });
+  });
+
+  it('returns a completed sale through SQLite and replays the same evidence', async () => {
+    const { app, runtime, cookie } = await setup();
+    const started = await app.inject({
+      method: 'POST', url: '/api/v1/sales',
+      headers: { cookie, 'idempotency-key': 'return-sale-start' },
+      payload: { currencyCode: 'USD', shiftId: 'shift-001' }
+    });
+    const saleId = started.json<{ id: string }>().id;
+    const itemResponse = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/items`,
+      headers: { cookie, 'idempotency-key': 'return-sale-item' },
+      payload: { barcode: '759000000001', quantityScaled: 1, quantityScale: 0 }
+    });
+    const item = itemResponse.json<{ id: string; productId: string; description: string; quantityScaled: number; quantityScale: number; grossMinorUnits: number; taxMinorUnits: number; totalMinorUnits: number }>();
+    const paid = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/payments`,
+      headers: { cookie, 'idempotency-key': 'return-sale-payment' },
+      payload: { payments: [{ methodCode: 'CASH_USD', amountMinorUnits: item.totalMinorUnits, currencyCode: 'USD' }] }
+    });
+    expect(paid.statusCode).toBe(200);
+    const completed = await app.inject({
+      method: 'POST', url: `/api/v1/sales/${saleId}/complete`,
+      headers: { cookie, 'idempotency-key': 'return-sale-complete' }
+    });
+    expect(completed.statusCode).toBe(200);
+
+    const stock = StockItem.create({ id: 'stock-return', productId: item.productId, unitCode: 'UNIT', quantityScale: 0, tracksBatches: false });
+    stock.registerMovement({ id: 'return-purchase', type: 'PURCHASE_RECEIPT', quantity: Quantity.fromScaled(1, 0), actorId: 'seed-user', reason: 'Fixture', referenceId: 'receipt-return', occurredAt: new Date('2026-09-01T08:00:00.000Z'), eventId: 'return-purchase-event', unitCost: Money.fromMinorUnits(500, 'USD') });
+    stock.registerMovement({ id: 'return-sale-issue', type: 'SALE_ISSUE', quantity: Quantity.fromScaled(1, 0), actorId: 'seed-user', reason: 'Fixture', referenceId: `event:${item.id}`, occurredAt: new Date('2026-09-01T08:00:00.000Z'), eventId: 'return-sale-issue-event', unitCost: Money.fromMinorUnits(500, 'USD') });
+    const completedBody = completed.json<{ currencyCode: string; totalMinorUnits: number; payments: readonly [{ methodCode: string; amountMinorUnits: number }] }>();
+    const invoice = FiscalDocument.create({
+      id: 'invoice-return', idempotencyKey: 'invoice-return-key', requestFingerprint: 'invoice-return-fingerprint',
+      terminalId: 'terminal-001', originNodeId: 'node-001', createdBy: 'seed-user', createdAt: new Date('2026-09-01T08:00:00.000Z'), eventId: 'invoice-return-pending',
+      content: { referenceId: saleId, type: 'INVOICE', currencyCode: completedBody.currencyCode, totalMinorUnits: completedBody.totalMinorUnits,
+        lines: [{ id: item.id, description: item.description, quantityScaled: item.quantityScaled, quantityScale: item.quantityScale, unitPriceMinorUnits: item.grossMinorUnits, taxRateBasisPoints: 1600, totalMinorUnits: item.totalMinorUnits }],
+        payments: [{ methodCode: completedBody.payments[0]!.methodCode, amountMinorUnits: completedBody.payments[0]!.amountMinorUnits }] }
+    });
+    invoice.startPrinting({ actorId: 'seed-user', occurredAt: new Date('2026-09-01T08:00:00.000Z'), eventId: 'invoice-return-printing' });
+    invoice.markIssued({ actorId: 'seed-user', occurredAt: new Date('2026-09-01T08:00:00.000Z'), eventId: 'invoice-return-issued', fiscalNumber: 'F-RETURN-001', evidence: { dispatchState: 'RESULT_RECEIVED', commandEffect: 'APPLIED', fiscalCommit: 'COMMITTED', printDelivery: 'COMPLETE' } });
+    const seed = new SqliteUnitOfWork(runtime.handle.sqlite);
+    await seed.execute(async () => {
+      await new DrizzleStockItemRepository(runtime.handle).save(stock);
+      await new DrizzleFiscalDocumentRepository(runtime.handle).save(invoice);
+    });
+
+    const headers = { cookie, 'idempotency-key': 'return-sale-command' };
+    const returned = await app.inject({ method: 'POST', url: `/api/v1/sales/${saleId}/return`, headers, payload: { reason: 'Devolución de prueba' } });
+    expect(returned.statusCode).toBe(201);
+    expect(returned.json()).toMatchObject({ saleId, refundMinorUnits: item.totalMinorUnits, creditNoteStatus: 'ISSUED' });
+    const replay = await app.inject({ method: 'POST', url: `/api/v1/sales/${saleId}/return`, headers, payload: { reason: 'Devolución de prueba' } });
+    expect(replay.statusCode).toBe(201);
+    expect(replay.json()).toEqual(returned.json());
+  });
+
   it('fails closed when the IGTF policy is not configured', async () => {
     const { app, cookie } = await setup(false);
     const started = await app.inject({
@@ -233,5 +301,65 @@ describe('sales HTTP contracts', () => {
     expect(runtime.handle.sqlite.prepare(
       'select action from audit_log order by occurred_at'
     ).pluck().all()).toEqual(['SALE_DISCOUNT_OVERRIDE_APPLIED', 'SALE_VOIDED']);
+  });
+
+  it('attaches, corrects and removes an optional recipient without auditing its data', async () => {
+    const { app, cookie, runtime } = await setup();
+    const started = await app.inject({
+      method: 'POST', url: '/api/v1/sales',
+      headers: { cookie, 'idempotency-key': 'sale-start-recipient' },
+      payload: { currencyCode: 'USD', shiftId: 'shift-001' }
+    });
+    const saleId = started.json<{ id: string }>().id;
+    expect(started.json<{ recipient: unknown }>().recipient).toBeNull();
+
+    const attached = await app.inject({
+      method: 'PUT', url: `/api/v1/sales/${saleId}/recipient`,
+      headers: { cookie, 'idempotency-key': 'sale-recipient-001' },
+      payload: {
+        recipient: {
+          country: 'VE', type: 'RIF', value: 'J-12.345.678-9', name: 'Bodega Central',
+          address: 'Av. Urdaneta'
+        }
+      }
+    });
+    expect(attached.statusCode).toBe(200);
+    expect(attached.json()).toMatchObject({
+      recipient: {
+        country: 'VE', type: 'RIF', normalizedValue: 'J123456789', name: 'Bodega Central'
+      }
+    });
+
+    const malformed = await app.inject({
+      method: 'PUT', url: `/api/v1/sales/${saleId}/recipient`,
+      headers: { cookie, 'idempotency-key': 'sale-recipient-002' },
+      payload: { recipient: { country: 'VE', type: 'RIF', value: 'J-123' } }
+    });
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json()).toMatchObject({ code: 'SALE_RECIPIENT_IDENTIFICATION_INVALID' });
+
+    const removed = await app.inject({
+      method: 'PUT', url: `/api/v1/sales/${saleId}/recipient`,
+      headers: { cookie, 'idempotency-key': 'sale-recipient-003' },
+      payload: { recipient: null }
+    });
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json<{ recipient: unknown }>().recipient).toBeNull();
+
+    /**
+     * ADR-0018: la identificación no se acumula en auditoría ni en el ledger;
+     * el hecho registrado explica la acción sin copiar datos personales.
+     */
+    expect(runtime.handle.sqlite.prepare(
+      'select action from audit_log'
+    ).pluck().all()).toEqual([]);
+    const payloads = runtime.handle.sqlite.prepare(
+      "select payload from business_event where event_type = 'SaleRecipientChanged'"
+    ).pluck().all().join('');
+    expect(payloads).not.toContain('J123456789');
+    expect(payloads).not.toContain('Bodega Central');
+    expect(payloads).not.toContain('Urdaneta');
+    expect(JSON.parse(payloads.slice(0, payloads.indexOf('}') + 1) || '{}'))
+      .toMatchObject({ attached: true, country: 'VE', type: 'RIF' });
   });
 });

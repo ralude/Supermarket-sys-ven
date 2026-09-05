@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Quantity } from '@supermarket/shared';
+import { Money, Quantity } from '@supermarket/shared';
 import { StockItem } from './stock-item.js';
 
 const timestamp = new Date('2026-08-17T10:00:00.000Z');
@@ -33,6 +33,22 @@ function movement(
 }
 
 describe('StockItem', () => {
+  it('derives a moving weighted unit cost from valued movements', () => {
+    const item = StockItem.create({
+      id: 'stock-costed', productId: 'product-costed', unitCode: 'UND',
+      quantityScale: 0, tracksBatches: false
+    });
+    item.registerMovement({ ...movement('PURCHASE_RECEIPT', 10, { id: 'cost-1', eventId: 'cost-event-1' }),
+      unitCost: Money.fromMinorUnits(100, 'USD') });
+    expect(item.averageUnitCost?.minorUnits).toBe(100);
+    item.registerMovement({ ...movement('PURCHASE_RECEIPT', 10, { id: 'cost-2', eventId: 'cost-event-2' }),
+      unitCost: Money.fromMinorUnits(200, 'USD') });
+    expect(item.averageUnitCost?.minorUnits).toBe(150);
+    item.registerMovement({ ...movement('SALE_ISSUE', 4, { id: 'cost-3', eventId: 'cost-event-3' }),
+      unitCost: item.averageUnitCost! });
+    expect(item.inventoryValue?.minorUnits).toBe(2_400);
+    expect(item.averageUnitCost?.minorUnits).toBe(150);
+  });
   it('starts at zero and increases stock only through a purchase movement', () => {
     const item = stockItem();
 

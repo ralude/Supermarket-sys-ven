@@ -94,6 +94,17 @@ La Fase 2 expone únicamente el agregado puro `StockItem`; no crea casos de uso,
 DTO ni repositorios. Recepciones operativas, consumo de `SaleCompleted`, mermas,
 ajustes autorizados y consultas de kardex se implementan en la Fase 6.
 
+Desde 9B.07 se agrega el conteo físico sobre la raíz `StockCount`:
+`OpenStockCount`, `RecordStockCountLine`, `CloseStockCount`, `ApproveStockCount`,
+`RejectStockCount`, `GetStockCount` y `ListStockCounts`. Contar y aprobar
+autorizan permisos distintos — `inventory.count.perform` e
+`inventory.count.approve` — porque separar quién cuenta de quién aprueba es el
+objetivo de negocio de la sub-fase. `CloseStockCount` deriva la diferencia de
+cada línea leyendo el saldo vigente del `StockItem` y el dominio la congela;
+`ApproveStockCount` usa esa evidencia congelada para registrar los ajustes
+derivados, coordinando `StockCount` y `StockItem` por puertos dentro de una
+sola `UnitOfWork`.
+
 ### `purchasing`
 
 - `CreateSupplier`
@@ -118,6 +129,25 @@ unidad y su escala los resuelve la aplicación mediante los puertos de inventari
 y catálogo; ningún transporte los envía. La cantidad se escala con la unidad
 derivada, de modo que más decimales de los admitidos se rechazan antes de crear
 evidencia.
+
+### `config`
+
+- `CreateBranch`, `UpdateBranch`, `ChangeBranchStatus`, `GetBranch`, `ListBranches`
+- `DeclareDevice`, `UpdateDevice`, `ChangeDeviceStatus`, `ListDevices`
+
+Desde 9B.11, los comandos de sucursal autorizan `config.branch.manage` y los de
+dispositivo `config.device.manage`; las lecturas exigen sesión verificada. Un
+dispositivo se filtra por estación (`terminalId`) o por estado en `ListDevices`.
+Declarar un dispositivo no toca `capabilities` ni el modo fiscal vigente.
+
+El mismo corte movió el puerto `OperationalPolicyWriter` (activación de las
+políticas versionadas de IGTF y descuento máximo que ADR-0012 fija) desde
+`packages/drivers/db`, donde vivía sin interfaz de aplicación, a
+`core/application/ports`. `SqliteOperationalPolicyWriter` ahora implementa ese
+puerto en vez de declarar sus propios tipos, cerrando una excepción a la regla
+de `core/application` como dueña de sus puertos. Este movimiento no agrega
+casos de uso propios; los deja listos para que 9B.10 los use sin nueva cirugía
+arquitectónica.
 
 ### `fiscal`
 

@@ -267,7 +267,13 @@ export const sales = sqliteTable('sales', {
   completedAt: integer('completed_at'),
   voidedAt: integer('voided_at'),
   voidReason: text('void_reason'),
-  voidedBy: text('voided_by')
+  voidedBy: text('voided_by'),
+  recipientCountry: text('recipient_country'),
+  recipientType: text('recipient_type'),
+  recipientValue: text('recipient_value'),
+  recipientNormalizedValue: text('recipient_normalized_value'),
+  recipientName: text('recipient_name'),
+  recipientAddress: text('recipient_address')
 });
 
 export const saleItems = sqliteTable('sale_items', {
@@ -385,7 +391,66 @@ export const stockMovements = sqliteTable('stock_movements', {
   actorId: text('actor_id').notNull(),
   reason: text('reason').notNull(),
   referenceId: text('reference_id').notNull(),
-  occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull()
+  occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
+  unitCostMinorUnits: integer('unit_cost_minor_units'),
+  costCurrencyCode: text('cost_currency_code')
+});
+
+export const stockCounts = sqliteTable('stock_counts', {
+  id: text('id').primaryKey(),
+  status: text('status').notNull(),
+  openedBy: text('opened_by').notNull(),
+  openedAt: integer('opened_at', { mode: 'timestamp_ms' }).notNull(),
+  closedAt: integer('closed_at', { mode: 'timestamp_ms' }),
+  approvedBy: text('approved_by'),
+  approvedAt: integer('approved_at', { mode: 'timestamp_ms' }),
+  rejectedBy: text('rejected_by'),
+  rejectedAt: integer('rejected_at', { mode: 'timestamp_ms' }),
+  rejectionReason: text('rejection_reason'),
+  version: integer('version').notNull()
+});
+
+export const stockCountLines = sqliteTable('stock_count_lines', {
+  id: text('id').primaryKey(),
+  stockCountId: text('stock_count_id').notNull().references(() => stockCounts.id),
+  productId: text('product_id').notNull(),
+  stockItemId: text('stock_item_id').notNull(),
+  batchId: text('batch_id'),
+  countedQuantityScaled: integer('counted_quantity_scaled').notNull(),
+  countedQuantityScale: integer('counted_quantity_scale').notNull()
+});
+
+export const stockCountDifferences = sqliteTable('stock_count_differences', {
+  lineId: text('line_id').primaryKey().references(() => stockCountLines.id),
+  stockCountId: text('stock_count_id').notNull().references(() => stockCounts.id),
+  stockItemId: text('stock_item_id').notNull(),
+  batchId: text('batch_id'),
+  quantityScale: integer('quantity_scale').notNull(),
+  expectedScaled: integer('expected_scaled').notNull(),
+  countedScaled: integer('counted_scaled').notNull(),
+  differenceScaled: integer('difference_scaled').notNull()
+});
+
+export const branches = sqliteTable('branches', {
+  id: text('id').primaryKey(),
+  code: text('code').notNull().unique(),
+  name: text('name').notNull(),
+  status: text('status').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  version: integer('version').notNull()
+});
+
+export const devices = sqliteTable('devices', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),
+  identifier: text('identifier').notNull(),
+  terminalId: text('terminal_id').notNull(),
+  branchId: text('branch_id').references(() => branches.id),
+  status: text('status').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  version: integer('version').notNull()
 });
 
 export const fiscalDocuments = sqliteTable('fiscal_documents', {
@@ -409,7 +474,13 @@ export const fiscalDocuments = sqliteTable('fiscal_documents', {
   lastCommandEffect: text('last_command_effect'),
   lastFiscalCommit: text('last_fiscal_commit'),
   lastPrintDelivery: text('last_print_delivery'),
-  lastFailureRetryable: integer('last_failure_retryable', { mode: 'boolean' }).notNull()
+  lastFailureRetryable: integer('last_failure_retryable', { mode: 'boolean' }).notNull(),
+  recipientCountry: text('recipient_country'),
+  recipientType: text('recipient_type'),
+  recipientValue: text('recipient_value'),
+  recipientNormalizedValue: text('recipient_normalized_value'),
+  recipientName: text('recipient_name'),
+  recipientAddress: text('recipient_address')
 });
 
 export const fiscalDocumentLines = sqliteTable('fiscal_document_lines', {
@@ -491,4 +562,84 @@ export const fiscalReportTransitions = sqliteTable('fiscal_report_transitions', 
   commandEffect: text('command_effect'),
   fiscalCommit: text('fiscal_commit'),
   printDelivery: text('print_delivery')
+});
+
+export const purchaseReceipts = sqliteTable('purchase_receipts', {
+  id: text('id').primaryKey(),
+  supplierId: text('supplier_id').notNull().references(() => suppliers.id),
+  supplierLegalName: text('supplier_legal_name').notNull(),
+  supplierTradeName: text('supplier_trade_name'),
+  supplierTaxCountry: text('supplier_tax_country').notNull(),
+  supplierTaxType: text('supplier_tax_type').notNull(),
+  supplierTaxValue: text('supplier_tax_value').notNull(),
+  supplierTaxNormalizedValue: text('supplier_tax_normalized_value').notNull(),
+  supplierFiscalAddressCountry: text('supplier_fiscal_address_country'),
+  supplierFiscalAddressLine: text('supplier_fiscal_address_line'),
+  sourceType: text('source_type').notNull(),
+  sourceNumber: text('source_number').notNull(),
+  sourceSeries: text('source_series'),
+  sourceControlNumber: text('source_control_number'),
+  sourceIssuedAt: integer('source_issued_at', { mode: 'timestamp_ms' }),
+  effectiveAt: integer('effective_at', { mode: 'timestamp_ms' }).notNull(),
+  status: text('status').notNull(),
+  version: integer('version').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+  reversedAt: integer('reversed_at', { mode: 'timestamp_ms' }),
+  reversedBy: text('reversed_by'),
+  reversalReason: text('reversal_reason'),
+  replacesReceiptId: text('replaces_receipt_id')
+});
+
+export const purchaseReceiptLines = sqliteTable('purchase_receipt_lines', {
+  id: text('id').primaryKey(),
+  receiptId: text('receipt_id').notNull().references(() => purchaseReceipts.id),
+  productId: text('product_id').notNull(),
+  stockItemId: text('stock_item_id').notNull().references(() => stockItems.id),
+  quantityScaled: integer('quantity_scaled').notNull(),
+  quantityScale: integer('quantity_scale').notNull(),
+  batchId: text('batch_id').references(() => stockBatches.id),
+  purchaseUnitCostMinorUnits: integer('purchase_unit_cost_minor_units').notNull(),
+  purchaseCurrencyCode: text('purchase_currency_code').notNull(),
+  valuationUnitCostMinorUnits: integer('valuation_unit_cost_minor_units').notNull(),
+  valuationCurrencyCode: text('valuation_currency_code').notNull(),
+  exchangeRateId: text('exchange_rate_id'),
+  exchangeRateBaseCurrency: text('exchange_rate_base_currency'),
+  exchangeRateQuoteCurrency: text('exchange_rate_quote_currency'),
+  exchangeRateValue: integer('exchange_rate_value'),
+  exchangeRateScale: integer('exchange_rate_scale'),
+  exchangeRateSource: text('exchange_rate_source'),
+  exchangeRateValidFrom: integer('exchange_rate_valid_from', { mode: 'timestamp_ms' }),
+  exchangeRateValidUntil: integer('exchange_rate_valid_until', { mode: 'timestamp_ms' }),
+  exchangeRateRegisteredBy: text('exchange_rate_registered_by')
+});
+
+export const saleReturns = sqliteTable('sale_returns', {
+  id: text('id').primaryKey(),
+  saleId: text('sale_id').notNull().references(() => sales.id),
+  originalDocumentId: text('original_document_id').notNull().references(() => fiscalDocuments.id),
+  creditNoteId: text('credit_note_id').notNull().unique().references(() => fiscalDocuments.id),
+  shiftId: text('shift_id').notNull().references(() => shifts.id),
+  refundMinorUnits: integer('refund_minor_units').notNull(),
+  currencyCode: text('currency_code').notNull(),
+  paymentMethodCode: text('payment_method_code').notNull(),
+  reason: text('reason').notNull(),
+  actorId: text('actor_id').notNull(),
+  terminalId: text('terminal_id').notNull(),
+  originNodeId: text('origin_node_id').notNull(),
+  occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull()
+});
+
+export const saleReturnLines = sqliteTable('sale_return_lines', {
+  id: text('id').primaryKey(),
+  saleReturnId: text('sale_return_id').notNull().references(() => saleReturns.id),
+  saleItemId: text('sale_item_id').notNull(),
+  productId: text('product_id').notNull(),
+  stockItemId: text('stock_item_id').notNull().references(() => stockItems.id),
+  batchId: text('batch_id').references(() => stockBatches.id),
+  quantityScaled: integer('quantity_scaled').notNull(),
+  quantityScale: integer('quantity_scale').notNull(),
+  unitCostMinorUnits: integer('unit_cost_minor_units'),
+  costCurrencyCode: text('cost_currency_code')
 });

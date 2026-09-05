@@ -8,7 +8,7 @@ import {
   type SessionResponse
 } from '@supermarket/shared';
 import { ApiProblemError, createDesktopApi, type DesktopApi, type OperationApi } from './api-client.js';
-import { canManageSuppliers, routeScreen } from './operation-screens.js';
+import { canManageConfig, canManageSuppliers, canWorkOnStockCounts, routeScreen } from './operation-screens.js';
 
 export const PRODUCT_NAME = 'Cullen';
 
@@ -24,8 +24,10 @@ type AppRoute = {
    * cualquier sesión válida. La mayoría de las pantallas mezclan lecturas sin
    * permiso con comandos que sí lo exigen, así que ocultar la pantalla entera
    * solo es correcto cuando ninguna de sus acciones es de solo sesión — hoy
-   * ocurre en Reportes y en Proveedores, cuya lectura solo existe para el
-   * selector de recepción.
+   * ocurre en Reportes, en Proveedores (cuya lectura solo existe para el
+   * selector de recepción), en Conteos (cuya lectura solo tiene sentido para
+   * quien cuenta o aprueba) y en Config. (sucursales y dispositivos son
+   * administración pura, sin trabajo de solo lectura para el resto).
    */
   readonly isReachable?: (permissionCodes: readonly string[]) => boolean;
 };
@@ -62,14 +64,24 @@ const ROUTES: readonly AppRoute[] = [
     isReachable: canManageSuppliers
   },
   {
-    id: 'reports', hash: '#/reports', label: 'Reportes', title: 'Reportes y cierres', shortcut: '7',
+    id: 'counts', hash: '#/counts', label: 'Conteos', title: 'Conteos físicos', shortcut: '7',
+    description: 'Conteo de existencia, diferencias congeladas y aprobación con ajuste.',
+    isReachable: canWorkOnStockCounts
+  },
+  {
+    id: 'reports', hash: '#/reports', label: 'Reportes', title: 'Reportes y cierres', shortcut: '8',
     description: 'Cierres de caja, auditoría y estados fiscales del período.',
     isReachable: (permissionCodes) => REPORTS_READ_CONTRACTS.some(
       (contract) => isPermissionGranted(contract.permission, permissionCodes)
     )
   },
   {
-    id: 'rates', hash: '#/rates', label: 'Tasas', title: 'Tasas de cambio', shortcut: '8',
+    id: 'config', hash: '#/config', label: 'Config.', title: 'Sucursales y dispositivos', shortcut: '0',
+    description: 'Sucursales y dispositivos declarados por la estación.',
+    isReachable: canManageConfig
+  },
+  {
+    id: 'rates', hash: '#/rates', label: 'Tasas', title: 'Tasas de cambio', shortcut: '9',
     description: 'Tasa vigente, histórico local y confirmación de sugerencias externas.'
   }
 ];

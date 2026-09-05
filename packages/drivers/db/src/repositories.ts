@@ -24,6 +24,7 @@ import {
   type PaymentMethodKind,
   type PaymentMethodRepository,
   type ProductRepository,
+  type SaleRecipientSnapshot,
   type SaleRepository,
   type ShiftRepository,
   type StockItemRepository,
@@ -321,6 +322,33 @@ export class DrizzleProductRepository implements ProductRepository {
   }
 }
 
+const recipientColumns = (sale: Sale) => ({
+  recipientCountry: sale.recipient?.country ?? null,
+  recipientType: sale.recipient?.type ?? null,
+  recipientValue: sale.recipient?.value ?? null,
+  recipientNormalizedValue: sale.recipient?.normalizedValue ?? null,
+  recipientName: sale.recipient?.name ?? null,
+  recipientAddress: sale.recipient?.address ?? null
+});
+
+const restoreRecipient = (
+  row: typeof sales.$inferSelect
+): SaleRecipientSnapshot | null => {
+  if (row.recipientCountry === null) return null;
+  if (row.recipientType === null || row.recipientValue === null ||
+    row.recipientNormalizedValue === null) {
+    throw new Error('Persisted sale recipient snapshot is incomplete.');
+  }
+  return {
+    country: row.recipientCountry,
+    type: row.recipientType,
+    value: row.recipientValue,
+    normalizedValue: row.recipientNormalizedValue,
+    name: row.recipientName,
+    address: row.recipientAddress
+  };
+};
+
 export class DrizzleSaleRepository implements SaleRepository {
   constructor(private readonly handle: DatabaseHandle) {}
 
@@ -352,7 +380,8 @@ export class DrizzleSaleRepository implements SaleRepository {
       completedAt: sale.completedAt?.getTime() ?? null,
       voidedAt: sale.voidedAt?.getTime() ?? null,
       voidReason: sale.voidReason,
-      voidedBy: sale.voidedBy
+      voidedBy: sale.voidedBy,
+      ...recipientColumns(sale)
     }).onConflictDoUpdate({
       target: sales.id,
       set: {
@@ -362,7 +391,8 @@ export class DrizzleSaleRepository implements SaleRepository {
         completedAt: sale.completedAt?.getTime() ?? null,
         voidedAt: sale.voidedAt?.getTime() ?? null,
         voidReason: sale.voidReason,
-        voidedBy: sale.voidedBy
+        voidedBy: sale.voidedBy,
+        ...recipientColumns(sale)
       }
     }).run();
     this.handle.db.delete(saleDiscounts).where(eq(saleDiscounts.saleId, sale.id)).run();
@@ -492,7 +522,8 @@ export class DrizzleSaleRepository implements SaleRepository {
         completedAt: row.completedAt === null ? null : new Date(row.completedAt),
         voidedAt: row.voidedAt === null ? null : new Date(row.voidedAt),
         voidReason: row.voidReason,
-        voidedBy: row.voidedBy
+        voidedBy: row.voidedBy,
+        recipient: restoreRecipient(row)
       });
     });
   }
@@ -708,7 +739,9 @@ export class DrizzleStockItemRepository implements StockItemRepository {
         actorId: movement.actorId,
         reason: movement.reason,
         referenceId: movement.referenceId,
-        occurredAt: movement.occurredAt
+        occurredAt: movement.occurredAt,
+        unitCostMinorUnits: movement.unitCost?.minorUnits ?? null,
+        costCurrencyCode: movement.unitCost?.currency ?? null
       }))).run();
     }
   }
@@ -750,7 +783,10 @@ export class DrizzleStockItemRepository implements StockItemRepository {
         reason: movement.reason,
         referenceId: movement.referenceId,
         occurredAt: movement.occurredAt,
-        eventId: movement.eventId
+        eventId: movement.eventId,
+        unitCost: movement.unitCostMinorUnits === null || movement.costCurrencyCode === null
+          ? null
+          : Money.fromMinorUnits(movement.unitCostMinorUnits, movement.costCurrencyCode)
       }))
     });
   }

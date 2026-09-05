@@ -4,6 +4,7 @@ import {
   capabilitiesContract,
   closeShiftContract,
   completeSaleContract,
+  returnSaleContract,
   currentSessionContract,
   findProductByBarcodeContract,
   getAuditReportContract,
@@ -11,6 +12,10 @@ import {
   getCurrentExchangeRateContract,
   getExchangeRateHistoryContract,
   getFiscalOperationsReportContract,
+  getMarginReportContract,
+  startPurchaseReceiptContract,
+  completePurchaseReceiptContract,
+  reversePurchaseReceiptContract,
   getKardexContract,
   getOpenShiftContract,
   getSaleContract,
@@ -23,6 +28,7 @@ import {
   registerSalePaymentsContract,
   registerStockAdjustmentContract,
   removeSaleItemContract,
+  setSaleRecipientContract,
   listCashRegistersContract,
   listCategoriesContract,
   listPaymentMethodsContract,
@@ -34,6 +40,22 @@ import {
   updateSupplierContract,
   changeSupplierStatusContract,
   correctSupplierTaxIdentityContract,
+  openStockCountContract,
+  recordStockCountLineContract,
+  closeStockCountContract,
+  approveStockCountContract,
+  rejectStockCountContract,
+  getStockCountContract,
+  listStockCountsContract,
+  createBranchContract,
+  updateBranchContract,
+  changeBranchStatusContract,
+  getBranchContract,
+  listBranchesContract,
+  declareDeviceContract,
+  updateDeviceContract,
+  changeDeviceStatusContract,
+  listDevicesContract,
   logoutContract,
   startSaleContract,
   createProductContract,
@@ -48,6 +70,7 @@ import {
   type OpenShiftRequest,
   type RegisterCashMovementRequest,
   type RegisterSalePaymentsRequest,
+  type SetSaleRecipientRequest,
   type RegisterStockAdjustmentRequest,
   type ReceivePurchaseRequest,
   type CreateProductRequest,
@@ -57,6 +80,11 @@ import {
   type AuditReportResponse,
   type CashClosureReportResponse,
   type FiscalOperationsReportResponse,
+  type MarginReportResponse,
+  type PurchaseReceiptResponse,
+  type StartPurchaseReceiptRequest,
+  type CompletePurchaseReceiptRequest,
+  type ReversePurchaseReceiptRequest,
   type ProductResponse,
   type PriceHistoryResponse,
   type StartSaleRequest,
@@ -64,6 +92,8 @@ import {
   type ApplySaleDiscountRequest,
   type UpdateExchangeRateRequest,
   type VoidSaleRequest,
+  type ReturnSaleRequest,
+  type SaleReturnResponse,
   type SimulatedFiscalReportRequest,
   type SimulatedFiscalReportResponse,
   type LoginRequest,
@@ -75,6 +105,23 @@ import {
   type UpdateSupplierRequest,
   type ChangeSupplierStatusRequest,
   type CorrectSupplierTaxIdentityRequest,
+  type OpenStockCountRequest,
+  type RecordStockCountLineRequest,
+  type CloseStockCountRequest,
+  type ApproveStockCountRequest,
+  type RejectStockCountRequest,
+  type StockCountResponse,
+  type StockCountStatusResponse,
+  type CreateBranchRequest,
+  type UpdateBranchRequest,
+  type ChangeBranchStatusRequest,
+  type BranchResponse,
+  type BranchStatusResponse,
+  type DeclareDeviceRequest,
+  type UpdateDeviceRequest,
+  type ChangeDeviceStatusRequest,
+  type DeviceResponse,
+  type DeviceStatusResponse,
   type CashRegisterResponse,
   type CategoryResponse,
   type PaymentMethodResponse,
@@ -131,6 +178,7 @@ export type ReportQuery = {
   readonly from?: string; readonly to?: string; readonly limit?: number;
   readonly cashRegisterId?: string; readonly actorId?: string;
   readonly action?: string; readonly entityType?: string;
+  readonly currencyCode?: string;
 };
 
 export type ExchangeRateHistoryQuery = {
@@ -212,6 +260,14 @@ export const createDesktopApi = (fetcher: typeof fetch = globalThis.fetch) => ({
     fetcher, path(completeSaleContract.path, saleId),
     { method: completeSaleContract.method, headers: withIdempotency(idempotencyKey) }
   ),
+  returnSale: (saleId: string, input: ReturnSaleRequest, idempotencyKey: string): Promise<SaleReturnResponse> => requestJson(
+    fetcher, path(returnSaleContract.path, saleId),
+    { method: returnSaleContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  setSaleRecipient: (saleId: string, input: SetSaleRecipientRequest, idempotencyKey: string): Promise<SaleResponse> => requestJson(
+    fetcher, path(setSaleRecipientContract.path, saleId),
+    { method: setSaleRecipientContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
   voidSale: (saleId: string, input: VoidSaleRequest, idempotencyKey: string): Promise<SaleResponse> => requestJson(
     fetcher, path(voidSaleContract.path, saleId),
     { method: voidSaleContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
@@ -262,6 +318,66 @@ export const createDesktopApi = (fetcher: typeof fetch = globalThis.fetch) => ({
     fetcher, path(correctSupplierTaxIdentityContract.path, supplierId),
     { method: correctSupplierTaxIdentityContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
   ),
+  openStockCount: (input: OpenStockCountRequest, idempotencyKey: string): Promise<StockCountResponse> => requestJson(
+    fetcher, openStockCountContract.path,
+    { method: openStockCountContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  recordStockCountLine: (stockCountId: string, input: RecordStockCountLineRequest, idempotencyKey: string): Promise<StockCountResponse> => requestJson(
+    fetcher, path(recordStockCountLineContract.path, stockCountId),
+    { method: recordStockCountLineContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  closeStockCount: (stockCountId: string, input: CloseStockCountRequest, idempotencyKey: string): Promise<StockCountResponse> => requestJson(
+    fetcher, path(closeStockCountContract.path, stockCountId),
+    { method: closeStockCountContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  approveStockCount: (stockCountId: string, input: ApproveStockCountRequest, idempotencyKey: string): Promise<StockCountResponse> => requestJson(
+    fetcher, path(approveStockCountContract.path, stockCountId),
+    { method: approveStockCountContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  rejectStockCount: (stockCountId: string, input: RejectStockCountRequest, idempotencyKey: string): Promise<StockCountResponse> => requestJson(
+    fetcher, path(rejectStockCountContract.path, stockCountId),
+    { method: rejectStockCountContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  getStockCount: (stockCountId: string): Promise<StockCountResponse> => requestJson(
+    fetcher, path(getStockCountContract.path, stockCountId), { method: getStockCountContract.method }
+  ),
+  listStockCounts: (status?: StockCountStatusResponse): Promise<readonly StockCountResponse[]> => requestJson(
+    fetcher, listStockCountsContract.path + search({ status }),
+    { method: listStockCountsContract.method }
+  ),
+  createBranch: (input: CreateBranchRequest, idempotencyKey: string): Promise<BranchResponse> => requestJson(
+    fetcher, createBranchContract.path,
+    { method: createBranchContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  updateBranch: (branchId: string, input: UpdateBranchRequest, idempotencyKey: string): Promise<BranchResponse> => requestJson(
+    fetcher, path(updateBranchContract.path, branchId),
+    { method: updateBranchContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  changeBranchStatus: (branchId: string, input: ChangeBranchStatusRequest, idempotencyKey: string): Promise<BranchResponse> => requestJson(
+    fetcher, path(changeBranchStatusContract.path, branchId),
+    { method: changeBranchStatusContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  getBranch: (branchId: string): Promise<BranchResponse> => requestJson(
+    fetcher, path(getBranchContract.path, branchId), { method: getBranchContract.method }
+  ),
+  listBranches: (status?: BranchStatusResponse): Promise<readonly BranchResponse[]> => requestJson(
+    fetcher, listBranchesContract.path + search({ status }), { method: listBranchesContract.method }
+  ),
+  declareDevice: (input: DeclareDeviceRequest, idempotencyKey: string): Promise<DeviceResponse> => requestJson(
+    fetcher, declareDeviceContract.path,
+    { method: declareDeviceContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  updateDevice: (deviceId: string, input: UpdateDeviceRequest, idempotencyKey: string): Promise<DeviceResponse> => requestJson(
+    fetcher, path(updateDeviceContract.path, deviceId),
+    { method: updateDeviceContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  changeDeviceStatus: (deviceId: string, input: ChangeDeviceStatusRequest, idempotencyKey: string): Promise<DeviceResponse> => requestJson(
+    fetcher, path(changeDeviceStatusContract.path, deviceId),
+    { method: changeDeviceStatusContract.method, headers: withIdempotency(idempotencyKey), body: JSON.stringify(input) }
+  ),
+  listDevices: (query: { terminalId?: string; status?: DeviceStatusResponse } = {}): Promise<readonly DeviceResponse[]> => requestJson(
+    fetcher, listDevicesContract.path + search(query), { method: listDevicesContract.method }
+  ),
   getPriceHistory: (productId: string): Promise<readonly PriceHistoryResponse[]> => requestJson(
     fetcher, path(getPriceHistoryContract.path, productId), { method: getPriceHistoryContract.method }
   ),
@@ -291,6 +407,31 @@ export const createDesktopApi = (fetcher: typeof fetch = globalThis.fetch) => ({
   getFiscalOperationsReport: (query: ReportQuery = {}): Promise<FiscalOperationsReportResponse> => requestJson(
     fetcher, getFiscalOperationsReportContract.path + search(query),
     { method: getFiscalOperationsReportContract.method }
+  ),
+  getMarginReport: (query: ReportQuery = {}): Promise<readonly MarginReportResponse[]> => requestJson(
+    fetcher, getMarginReportContract.path + search(query),
+    { method: getMarginReportContract.method }
+  ),
+  startPurchaseReceipt: (input: StartPurchaseReceiptRequest, idempotencyKey: string): Promise<PurchaseReceiptResponse> => requestJson(
+    fetcher, startPurchaseReceiptContract.path,
+    {
+      method: startPurchaseReceiptContract.method,
+      headers: withIdempotency(idempotencyKey), body: JSON.stringify(input)
+    }
+  ),
+  completePurchaseReceipt: (receiptId: string, input: CompletePurchaseReceiptRequest, idempotencyKey: string): Promise<PurchaseReceiptResponse> => requestJson(
+    fetcher, path(completePurchaseReceiptContract.path, receiptId),
+    {
+      method: completePurchaseReceiptContract.method,
+      headers: withIdempotency(idempotencyKey), body: JSON.stringify(input)
+    }
+  ),
+  reversePurchaseReceipt: (receiptId: string, input: ReversePurchaseReceiptRequest, idempotencyKey: string): Promise<PurchaseReceiptResponse> => requestJson(
+    fetcher, path(reversePurchaseReceiptContract.path, receiptId),
+    {
+      method: reversePurchaseReceiptContract.method,
+      headers: withIdempotency(idempotencyKey), body: JSON.stringify(input)
+    }
   ),
   getCurrentExchangeRate: (query: ExchangeRatePairQuery): Promise<ExchangeRateResponse> => requestJson(
     fetcher, getCurrentExchangeRateContract.path + search(query),

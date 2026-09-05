@@ -27,6 +27,11 @@ import { identitySecuritySql } from './migrations/0013-identity-security.js';
 import { operationalPoliciesSql } from './migrations/0014-operational-policies.js';
 import { suppliersSql } from './migrations/0015-suppliers.js';
 import { supplierFiscalAddressSql } from './migrations/0016-supplier-fiscal-address.js';
+import { stockCountsSql } from './migrations/0017-stock-counts.js';
+import { branchesAndDevicesSql } from './migrations/0018-branches-and-devices.js';
+import { purchaseReceiptsAndCostSql } from './migrations/0019-purchase-receipts-and-cost.js';
+import { saleRecipientSql } from './migrations/0020-sale-recipient.js';
+import { saleReturnsSql } from './migrations/0021-sale-returns.js';
 
 export type Migration = {
   readonly version: number;
@@ -98,6 +103,26 @@ export const migrations: readonly Migration[] = [{
   version: 16,
   name: 'supplier_fiscal_address',
   sql: supplierFiscalAddressSql
+}, {
+  version: 17,
+  name: 'stock_counts',
+  sql: stockCountsSql
+}, {
+  version: 18,
+  name: 'branches_and_devices',
+  sql: branchesAndDevicesSql
+}, {
+  version: 19,
+  name: 'purchase_receipts_and_cost',
+  sql: purchaseReceiptsAndCostSql
+}, {
+  version: 20,
+  name: 'sale_recipient',
+  sql: saleRecipientSql
+}, {
+  version: 21,
+  name: 'sale_returns',
+  sql: saleReturnsSql
 }];
 
 const checksum = (migration: Migration): string => createHash('sha256')

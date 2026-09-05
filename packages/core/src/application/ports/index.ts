@@ -16,10 +16,19 @@ export type {
 export type { PaymentMethodRepository } from './payment-method-repository.js';
 export type { ProductSnapshotProvider } from './product-snapshot-provider.js';
 export type { SaleRepository } from './sale-repository.js';
+export type { SaleReturnRepository } from './sale-return-repository.js';
 export type { CashRegisterRepository } from './cash-register-repository.js';
 export type { ShiftRepository } from './shift-repository.js';
 export type { StockItemRepository } from './stock-item-repository.js';
+export type { StockCountRepository } from './stock-count-repository.js';
+export type {
+  DiscountPolicyInput, FinancialTransactionTaxPolicyInput, OperationalPolicyMetadata,
+  OperationalPolicyWriter, PolicyActivation
+} from './operational-policy-writer.js';
+export type { BranchRepository } from './branch-repository.js';
+export type { DeviceRepository } from './device-repository.js';
 export type { SupplierRepository } from './supplier-repository.js';
+export type { PurchaseReceiptRepository } from './purchase-receipt-repository.js';
 export type { UnitOfWork } from './unit-of-work.js';
 export type { BusinessEventStore } from './business-event-store.js';
 export type { AuditEntry, AuditWriter } from './audit-writer.js';
@@ -31,7 +40,8 @@ export type { FiscalDayRepository } from './fiscal-day-repository.js';
 export type {
   AuditReportRepository,
   CashClosureReportRepository,
-  FiscalOperationsReportRepository
+  FiscalOperationsReportRepository,
+  MarginReportRepository
 } from './reporting-repositories.js';
 export type {
   FiscalDocumentLinePayload,

@@ -286,6 +286,50 @@ describe('inventory application', () => {
     expect(recorded.audit).toMatchObject([{ action: 'SALE_STOCK_ISSUED' }]);
   });
 
+  it('freezes the sale issue cost at the average vigente when the sale is applied', async () => {
+    const item = StockItem.create({
+      id: 'stock-002', productId: 'product-002', unitCode: 'UNIT', quantityScale: 0, tracksBatches: false
+    });
+    item.registerMovement({
+      id: 'receipt-1', eventId: 'receipt-event-1', type: 'PURCHASE_RECEIPT',
+      quantity: Quantity.fromScaled(10, 0), actorId: 'user-001', reason: 'Purchase', referenceId: 'r-1',
+      occurredAt: new Date('2026-08-01T10:00:00.000Z'), unitCost: Money.fromMinorUnits(100, 'USD')
+    });
+    item.registerMovement({
+      id: 'receipt-2', eventId: 'receipt-event-2', type: 'PURCHASE_RECEIPT',
+      quantity: Quantity.fromScaled(10, 0), actorId: 'user-001', reason: 'Purchase', referenceId: 'r-2',
+      occurredAt: new Date('2026-08-02T10:00:00.000Z'), unitCost: Money.fromMinorUnits(200, 'USD')
+    });
+    const repository = new FakeStockItemRepository(item);
+    const recorded = evidence();
+    const service = new ApplySaleCompletedToInventory(
+      repository, sequence('stock-event'), sequence('audit'), unitOfWork,
+      eventStore(recorded.ledger), auditWriter(recorded.audit)
+    );
+    const sale: BusinessEventV1 = {
+      eventId: 'sale-event-002', eventType: 'SaleCompleted', contractVersion: 1,
+      aggregateId: 'sale-002', aggregateType: 'Sale', aggregateVersion: 1,
+      originNodeId: 'node-001', correlationId: 'correlation-001', actorId: 'user-001',
+      occurredAt: new Date('2026-08-20T11:00:00.000Z'),
+      payload: {
+        terminalId: 'terminal-001',
+        items: [{ itemId: 'line-001', productId: 'product-002', quantityScaled: 4, quantityScale: 0 }]
+      }
+    };
+
+    expect((await service.execute(sale)).ok).toBe(true);
+    const saleIssue = repository.stored?.movements.find((movement) => movement.type === 'SALE_ISSUE');
+    expect(saleIssue?.unitCost?.minorUnits).toBe(150);
+    expect(repository.stored?.averageUnitCost?.minorUnits).toBe(150);
+
+    item.registerMovement({
+      id: 'receipt-3', eventId: 'receipt-event-3', type: 'PURCHASE_RECEIPT',
+      quantity: Quantity.fromScaled(10, 0), actorId: 'user-001', reason: 'Purchase', referenceId: 'r-3',
+      occurredAt: new Date('2026-08-25T10:00:00.000Z'), unitCost: Money.fromMinorUnits(1000, 'USD')
+    });
+    expect(saleIssue?.unitCost?.minorUnits).toBe(150);
+  });
+
   it('authorizes waste and records the balance before and after the adjustment', async () => {
     const repository = new FakeStockItemRepository(stockedBatches());
     const recorded = evidence();

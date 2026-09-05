@@ -16,13 +16,16 @@ Este directorio es la fuente única de verdad para el avance por fases. Cada fas
 | 7 | Driver fiscal fake | ~~Completada~~ |
 | 8 | Integracion serial | Suspendida por dependencia externa |
 | 9 | UI | ~~Completada~~ |
-| 9B | Perfiles operativos | En progreso (4 de 18 sub-fases activas completadas) |
+| 9B | Perfiles operativos | En progreso (9 de 18 sub-fases activas completadas) |
 | 10 | Sincronizacion | Pendiente |
 | 11 | Seguridad | Pendiente (corte minimo pre-UI adelantado) |
 | 12 | Optimizacion | Pendiente |
 
 **Fase actual:** Fase 9B - Perfiles operativos y capacidades faltantes
-**Sub-fase actual:** 9B.03 - Proveedores quedó **completada** el 2026-09-04. Su
+**Trabajo actual:** capacidades de referencia de la Fase 9B, según [ADR-0021](../architecture/adr/0021-mvp-referencia-no-certificado.md).
+9B.11 - Sucursales y dispositivos quedó **completada** el 2026-09-04, con alcance recortado
+(ver más abajo). 9B.07 - Conteos físicos quedó **completada** el 2026-09-04. 9B.03 -
+Proveedores quedó **completada** el 2026-09-04. Su
 [plan](./fase-09b-perfiles/plan-9b.03-proveedores.md) detectó que el snapshot de una recepción
 `COMPLETED` exige costos de 9B.04 y que la arquitectura aún no reconocía `Supplier` ni
 `PurchaseReceipt` como raíces. [ADR-0019](../architecture/adr/0019-proveedores-y-recepciones-de-compra.md)
@@ -31,21 +34,51 @@ entregó el maestro persistido y auditado, la pantalla administrativa con contro
 de los permisos efectivos, la recepción sin datos técnicos escritos por el renderer y, en su
 corte de cierre, las reglas fiscales aprobadas por el negocio: RIF venezolano estructural sin
 checksum, identidad genérica `TAX_ID` fuera de Venezuela, dirección fiscal estructurada y
-semántica diferenciada de `BLOCKED` e `INACTIVE`. La siguiente sub-fase con trabajo
-disponible es 9B.07; 9B.04, 9B.05 y 9B.06 siguen bloqueadas por ADR-0016, ADR-0017 y
-ADR-0018. La fundación de la fase
-(9B.00 permisos efectivos en la sesión, 9B.01 reestructuración del renderer,
-9B.02 datos maestros seleccionables) se completó el 2026-09-04; el detalle de
-cada una vive en sus archivos de sub-fase. Las siguientes capacidades de
-negocio bloqueadas por una decisión pendiente (9B.04, 9B.05, 9B.06) no se
-inician hasta que su ADR esté aceptado. La Fase 9 cerró sus ocho sub-fases el
-2026-09-04 y recibió el mismo día la sub-fase correctiva 9.08 sobre pantallas ya
-entregadas; la Fase 8 permanece suspendida por dependencia externa y no bloquea
-el avance porque así lo aprobó la
-[replanificación del 2026-09-01](./replanificacion-fase-08-a-09.md). La Fase 9B
-se insertó antes de la Fase 10 por la
-[replanificación del 2026-09-04](./replanificacion-fase-09b.md); la Fase 10
-conserva sus cuatro sub-fases intactas y ninguna ha iniciado.
+semántica diferenciada de `BLOCKED` e `INACTIVE`.
+
+9B.07 - Conteos físicos entregó `StockCount` como raíz separada de `StockItem`, con ciclo de
+vida `OPEN -> COUNTED -> APPROVED|REJECTED`: `CloseStockCount` congela la diferencia de cada
+línea contra el saldo vigente y `ApproveStockCount` la usa para registrar los ajustes
+derivados, coordinando ambas raíces dentro de una sola `UnitOfWork`. Su
+[plan](./fase-09b-perfiles/plan-9b.07-conteos-fisicos.md) dejó cuatro decisiones abiertas que
+se resolvieron con el criterio más conservador y consistente con el código existente —
+diferencia congelada al cierre, granularidad por lote impuesta por la invariante ya vigente de
+`StockItem`, alcance del conteo limitado a las líneas registradas y separación de funciones
+solo por asignación de permiso — documentadas en el corte de la sub-fase para que el negocio
+las confirme o las corrija. No requirió ADR porque ninguna es una regla fiscal, contable o
+legal: son decisiones de diseño reversibles.
+
+9B.11 - Sucursales y dispositivos entregó `Branch` (maestro con código elegido por el
+administrador, no generado por secuencia) y `Device` (raíz con tipo inmutable de lista
+cerrada, identificador editable y `branchId` opcional). Su
+[plan](./fase-09b-perfiles/plan-9b.11-sucursales-y-dispositivos.md) dejó abierta la relación
+entre un nodo y su sucursal (¿un nodo pertenece a una sola sucursal, o una sucursal agrupa
+varios nodos?); en vez de bloquear la sub-fase completa por esa pregunta no resuelta, se
+recortó el alcance a lo que no depende de ella: administrar sucursales y etiquetar
+opcionalmente qué dispositivo pertenece a cuál, sin que la estación declare su propia
+sucursal como identidad de nodo. Una prueba de contrato demuestra que declarar una impresora
+fiscal no altera `GET /api/v1/system/capabilities`, que sigue reportando `SIMULATION`.
+
+El mismo 2026-09-04 se corrigió una excepción arquitectónica que el ADR-0012 dejó pendiente:
+`OperationalPolicyWriter` (activación de las políticas versionadas de IGTF y descuento
+máximo) vivía solo en `packages/drivers/db`, sin puerto en `core/application`. Se movió el
+puerto a `core/application/ports` y `SqliteOperationalPolicyWriter` pasó a implementarlo; sin
+cambio de comportamiento, `pnpm test` completo sigue en verde. Esto deja lista la base para
+que 9B.10 publique sus casos de uso de administración fiscal sin nueva cirugía.
+
+La Fase 9B ya no tiene un gate legal global. 9B.04, 9B.05 y 9B.10 avanzan con los
+defaults de referencia de ADR-0016, ADR-0018, ADR-0017 y ADR-0021; 9B.12 avanza con lecturas,
+arqueos e historia y deja la reapertura fuera del MVP. 9B.08 queda diferida por ADR-0020.
+Los perfiles 9B.14-9B.18 se ensamblan de forma incremental según las capacidades disponibles.
+Todas las sub-fases activas de 9B tienen ahora un plan de ejecución enlazado desde el índice de
+la fase. 9B.08 conserva su plan de diferimiento y 9B.09 queda excluida por haber sido retirada.
+
+La fundación de 9B (9B.00 permisos efectivos, 9B.01 renderer y 9B.02 datos maestros) y las
+sub-fases 9B.03, 9B.06, 9B.07 y 9B.11 se completaron el 2026-09-04. 9B.06 dejó la devolución
+total simulada con restauración de inventario, reintegro en el turno, nota recuperable y
+auditoría, sin declarar cumplimiento fiscal. La Fase 9 cerró sus sub-fases y
+la Fase 8 permanece suspendida: su validación de hardware y cumplimiento solo es requisito del
+piloto o la producción. La Fase 10 conserva sus cuatro sub-fases y no ha iniciado.
 
 ## Fases
 
@@ -134,11 +167,11 @@ conserva sus cuatro sub-fases intactas y ninguna ha iniciado.
   esas diecinueve sub-fases sin renumerar ninguna fase; la administración de
   identidad que adelantaba de 11.02 se devolvió a la Fase 11 el 2026-09-04 y la
   fase quedó con dieciocho activas. No ejecuta trabajo de Fase 10: la
-  sucursal es solo dato maestro y la transferencia se limita a un mismo nodo.
-  Tres sub-fases quedan bloqueadas hasta que el negocio decida método de costeo
-  (ADR-0016), política de devolución (ADR-0017) y datos obligatorios del cliente
-  (ADR-0018). La Fase 8 sigue suspendida: la nota de crédito se rotula
-  `SIMULACIÓN`. La Fase 12 conserva su alcance de optimización medida.
+  sucursal es solo dato maestro y las transferencias quedan diferidas.
+  El análisis de decisiones se conserva en el [registro de disposición de 9B](./fase-09b-perfiles/gate-decisiones-9b.md),
+  que ya no bloquea el MVP: las reglas faltantes se cubren con defaults explícitos o se difieren.
+  La Fase 8 sigue suspendida: la nota de crédito se rotula `SIMULACIÓN`. La Fase 12 conserva su
+  alcance de optimización medida.
 - El 2026-09-04 se completó la fundación de la Fase 9B (9B.00-9B.02). 9B.00
   agregó `permissionCodes` a la sesión (ADR-0015) y derivó de ahí la navegación
   y doce botones de comando del renderer. 9B.01 dividió `operation-screens.tsx`
@@ -197,6 +230,17 @@ conserva sus cuatro sub-fases intactas y ninguna ha iniciado.
   publica lecturas que la Fase 12 no planifica. Queda declarado que hasta
   implementar 11.02 el único rol disponible es el administrador provisionado por
   CLI, y que 9B.17 deja de presentar usuarios y roles.
+- El 2026-09-04 se planificaron las capacidades de negocio restantes de la Fase
+  9B. El análisis confirmó que `stock_items.product_id` no puede representar varios
+  almacenes sin cambiar la identidad de un agregado persistido; [ADR-0020](../architecture/adr/0020-modelo-de-almacenes-y-transferencias.md)
+  dejó esa capacidad diferida. Los ADR-0016, ADR-0017 y ADR-0018 se redactaron inicialmente
+  como bloqueos de negocio; [ADR-0021](../architecture/adr/0021-mvp-referencia-no-certificado.md)
+  los convirtió en defaults de referencia reemplazables para el MVP no certificado. Este
+  registro conserva el análisis original, pero el gate vigente es el de la Fase 8 y el piloto.
+- El 2026-09-04 se completó la planificación de todas las sub-fases activas de 9B. Los planes
+  9B.04-9B.06 y 9B.13-9B.18 fijan línea base comprobada, decisiones de frontera, orden
+  outside-in, criterios verificables y fuera de alcance. 9B.08 mantiene su plan de
+  diferimiento y 9B.09 no recibe plan porque su alcance fue trasladado íntegramente a 11.02.
 - El 2026-09-04 se agregó la sub-fase correctiva 9.08 tras una auditoría de
   `apps/desktop`. Corrige el defecto reportado en la venta (barcode aceptado y
   pantalla en blanco), cuya causa raíz es del renderer: `Intl.NumberFormat` con
@@ -220,6 +264,14 @@ conserva sus cuatro sub-fases intactas y ninguna ha iniciado.
   falla cerrado con `EXCHANGE_RATE_PROVIDER_NOT_CONFIGURED` sin bloquear la
   tasa vigente, el histórico ni la carga manual. El avance a Fase 10 no inicia
   su implementación; solo refleja que Fase 9 no tiene tareas abiertas.
+- La auditoría focal del 2026-09-04 quedó documentada en el [registro de puntos
+  clave de la Fase 11](./fase-11-seguridad/auditoria-puntos-clave-2026-09-04.md).
+  Confirma la base arquitectónica, pero deja como deudas trazables la composición
+  venta → caja → inventario, el redondeo de costo de 9B.04, la consolidación de
+  `typecheck`, el arranque empaquetado, el uso de migraciones con respaldo, el
+  transporte LAN, la administración de identidad, la política offline y la
+  medición de crecimiento del inventario. Cada punto conserva su fase propietaria
+  y no adelanta trabajo de Fase 10, 11 o 12.
 - La planificacion regulatoria de Fase 8 reconoce que SNAT/2026/00084 derogo la SNAT/2024/000121 el 2026-08-12. La autorizacion por modelo y el registro del desarrollador ante el fabricante de SNAT/2018/0141 se verifican nuevamente antes del piloto.
 - La Fase 1 se completó con Electron, React, Fastify, SQLite, Drizzle y ESLint instalados y verificados mediante smoke tests.
 - ADR-0008 establece terminales POS autonomas con Fastify y SQLite local; el nodo coordinador sincroniza eventos y datos de referencia.

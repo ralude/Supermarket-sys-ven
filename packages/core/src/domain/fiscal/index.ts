@@ -30,6 +30,7 @@ export type {
   FiscalDocumentContent,
   FiscalDocumentLine,
   FiscalDocumentPayment,
+  FiscalDocumentRecipient,
   FiscalDocumentType,
   FiscalOperationEvidence,
   FiscalPrintDelivery

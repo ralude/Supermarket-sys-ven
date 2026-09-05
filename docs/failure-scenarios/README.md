@@ -40,6 +40,9 @@ brecha y no debe interpretarse como comportamiento vigente.
    — stock no negativo e inventario append-only implementados en el nodo
    autoritativo; la concurrencia multi-terminal offline no ofrece garantía
    global y su política definitiva pertenece a Fase 10.
+6. [FS-006: devolución y nota de crédito simulada](./FS-006-devolucion-nota-credito-simulada.md)
+   — devolución total atómica e idempotente implementada con estado fiscal
+   recuperable; parcialidad, pagos mixtos y hardware real siguen fuera de alcance.
 
 ## Regla de mantenimiento
 
@@ -53,4 +56,3 @@ Cada ficha conserva las secciones obligatorias: riesgo, estado inicial, trigger,
 comportamiento prohibido, comportamiento esperado, garantía, retry,
 recuperación, observabilidad, impacto, componentes, pruebas y documentos
 relacionados.
-

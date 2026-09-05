@@ -1,4 +1,4 @@
-import { DomainError, Quantity } from '@supermarket/shared';
+import { DomainError, Money, Quantity } from '@supermarket/shared';
 import { Batch, type BatchProps } from './batch.js';
 import { StockMovement, type StockMovementProps } from './stock-movement.js';
 import type { StockMovementRegisteredEvent } from './stock-events.js';
@@ -67,7 +67,8 @@ export class StockItem {
       reason: movement.reason,
       referenceId: movement.referenceId,
       occurredAt: movement.occurredAt,
-      eventId: movement.eventId
+      eventId: movement.eventId,
+      unitCost: movement.unitCost
     });
     item.events.length = 0;
     return item;
@@ -79,6 +80,27 @@ export class StockItem {
 
   get movements(): readonly StockMovement[] {
     return [...this.currentMovements];
+  }
+
+  get inventoryValue(): Money | null {
+    if (this.currentMovements.length === 0 || this.currentMovements.some(({ unitCost }) => unitCost === null)) {
+      return null;
+    }
+    const currency = this.currentMovements[0]!.unitCost!.currency;
+    let value = Money.zero(currency);
+    for (const movement of this.currentMovements) {
+      if (movement.unitCost!.currency !== currency) {
+        throw new DomainError('STOCK_COST_CURRENCY_MISMATCH', 'Valued stock movements must use one currency.');
+      }
+      const movementValue = movement.unitCost!.multiplyByQuantity(movement.quantity);
+      value = movement.direction === 'IN' ? value.add(movementValue) : value.subtract(movementValue);
+    }
+    return value;
+  }
+
+  get averageUnitCost(): Money | null {
+    const value = this.inventoryValue;
+    return value === null || this.balance.isZero() ? null : value.divideByQuantity(this.balance);
   }
 
   get domainEvents(): readonly StockMovementRegisteredEvent[] {

@@ -91,6 +91,35 @@ primera recepción según traiga lote o no: el catálogo todavía no modela ese
 atributo y esta sub-fase no lo inventa; queda declarado como brecha para la
 configuración de datos maestros de 9B.10.
 
+## Agregado `StockCount`
+
+`StockCount` (9B.07) es una raíz separada del módulo `inventory`, distinta de
+`StockItem`: documenta el conteo físico y sus líneas contadas, pero no muta
+existencia por sí misma. Su ciclo de vida es `OPEN -> COUNTED -> APPROVED` o
+`OPEN -> COUNTED -> REJECTED`; un conteo `APPROVED` o `REJECTED` es inmutable.
+
+Mientras está `OPEN`, cada línea registrada reemplaza en memoria a la anterior
+del mismo artículo/lote — es estado de borrador, no evidencia cerrada, y así lo
+refleja la persistencia: solo entonces se resincroniza físicamente la tabla de
+líneas. Al cerrar, la aplicación calcula la diferencia de cada línea contra el
+saldo vigente del `StockItem` correspondiente (`balance` o `balanceForBatch`
+según trackee lotes) y el dominio **congela** esas diferencias — no se
+recalculan después contra el saldo del momento de aprobar. Esa evidencia
+congelada nunca se borra ni se reescribe.
+
+Aprobar un conteo cerrado coordina ambas raíces por puertos dentro de una sola
+`UnitOfWork`: por cada línea con diferencia distinta de cero se registra un
+movimiento `ADJUSTMENT_IN` o `ADJUSTMENT_OUT` sobre el `StockItem`
+correspondiente, referenciando el conteo; o se aprueba todo el conteo con sus
+ajustes, o no se confirma nada. Rechazar un conteo cerrado no produce ningún
+efecto de inventario.
+
+El alcance del conteo es exactamente la lista de líneas registradas: un
+producto no incluido no se toca ni se interpreta como saldo cero. Registrar
+una línea es una acción rutinaria de alta frecuencia y no exige motivo, igual
+que agregar un artículo a una venta; abrir, cerrar, aprobar y rechazar sí lo
+exigen, por ser transiciones de estado del documento.
+
 ## Agregado `Supplier`
 
 `Supplier` es una raíz del módulo `purchasing`. Su ID técnico y código humano
@@ -115,6 +144,29 @@ despacho se implementa con `PurchaseReceipt` en 9B.04.
 uso coordinará su confirmación con el movimiento de `StockItem` mediante puertos
 y una sola unidad de trabajo; no se crea en 9B.03 una recepción completada sin
 costo.
+
+## Agregados `Branch` y `Device`
+
+`Branch` (9B.11) es un maestro simple: código humano inmutable elegido por el
+administrador, nombre editable y estado `ACTIVE`/`INACTIVE` sin borrado físico,
+con el mismo patrón de auditoría que `Supplier`. Es dato maestro y etiqueta de
+pertenencia — no decide autoridad de escritura, no enruta operaciones y no
+participa en ninguna resolución de conflictos, que siguen siendo de Fase 10.
+
+`Device` (9B.11) es raíz independiente que declara un aparato asignado a una
+estación (`terminalId`), con tipo inmutable de una lista cerrada
+(`FISCAL_PRINTER`, `BARCODE_SCANNER`, `SCALE`, `CASH_DRAWER`), identificador
+editable y estado propio. Puede etiquetar opcionalmente una `branchId`, que se
+puede reasignar o retirar mediante `update`. Declarar un dispositivo, incluida
+una impresora fiscal, es inventario administrativo puro: no habilita ninguna
+capacidad real ni cambia el modo fiscal que expone `capabilities`.
+
+**Decisión de alcance deliberadamente no tomada aquí:** la relación entre un
+nodo y su sucursal (si un nodo pertenece a exactamente una sucursal o si una
+sucursal agrupa varios nodos) no está definida. `Device.branchId` es una
+etiqueta opcional por dispositivo, no una declaración de topología del nodo;
+extenderla a "la estación declara su sucursal" exige esa decisión, ausente del
+plan de 9B.11 y no inventada aquí.
 
 ## Agregado `FiscalDocument`
 

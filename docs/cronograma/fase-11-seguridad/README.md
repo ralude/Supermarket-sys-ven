@@ -9,6 +9,12 @@ Aplicar identidad, autorizacion, proteccion de datos y observabilidad segura.
 
 Las sub-fases 11.01 a 11.03 tienen un corte minimo obligatorio antes de la Fase 9 mediante el [gate de seguridad antes de UI operativa](../gate-seguridad-pre-ui.md). La Fase 11 completa politicas, cifrado y hardening sin posponer las fronteras basicas de seguridad.
 
+La auditoría focal del 2026-09-04 quedó registrada en
+[auditoria-puntos-clave-2026-09-04.md](./auditoria-puntos-clave-2026-09-04.md).
+El registro asigna cada deuda a su fase propietaria y reserva para Fase 11 los
+fixes de identidad, transporte, protección de datos y observabilidad. No convierte
+la Fase 11 en dueña de caja, inventario, costeo o sincronización.
+
 La 11.02 recupero el 2026-09-04 la administracion de identidad —alta de usuarios, creacion de
 roles y asignacion de permisos desde la interfaz— que la Fase 9B habia adelantado como
 sub-fase 9B.09. La Fase 11 vuelve a ser la unica duena de identidad y autorizacion; la

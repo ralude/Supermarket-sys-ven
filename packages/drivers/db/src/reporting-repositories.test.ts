@@ -4,7 +4,8 @@ import { applyMigrations } from './migrations.js';
 import {
   DrizzleAuditReportRepository,
   DrizzleCashClosureReportRepository,
-  DrizzleFiscalOperationsReportRepository
+  DrizzleFiscalOperationsReportRepository,
+  DrizzleMarginReportRepository
 } from './reporting-repositories.js';
 
 const at = (iso: string): number => new Date(iso).getTime();
@@ -120,5 +121,40 @@ describe('reporting read repositories', () => {
       referenceId: 'sale-1', operationType: 'INVOICE', fiscalNumber: 'A-00000001',
       evidence: { lastPrintDelivery: 'COMPLETE' }
     });
+  });
+
+  it('aggregates margin by product and currency from frozen sale-issue cost and completed sale revenue', async () => {
+    const handle = setup();
+    handle.sqlite.exec(`
+      insert into stock_items (id, product_id, unit_code, quantity_scale, tracks_batches)
+      values ('stock-1', 'product-1', 'UND', 0, 0);
+      insert into stock_movements (id, stock_item_id, event_id, aggregate_version, type, direction,
+        quantity_scaled, quantity_scale, actor_id, reason, reference_id, occurred_at,
+        unit_cost_minor_units, cost_currency_code)
+      values
+        ('movement-1', 'stock-1', 'event-1', 1, 'PURCHASE_RECEIPT', 'IN', 10, 0, 'user-1', 'Compra', 'ref-1', ${at('2026-09-01T09:00:00.000Z')}, 100, 'USD'),
+        ('movement-2', 'stock-1', 'event-2', 2, 'SALE_ISSUE', 'OUT', 4, 0, 'user-1', 'Venta', 'ref-2', ${at('2026-09-02T10:00:00.000Z')}, 100, 'USD');
+      insert into sales (id, shift_id, currency_code, terminal_id, origin_node_id, started_by, started_at,
+        status, version, financial_transaction_tax_minor_units, completed_at)
+      values ('sale-1', 'shift-1', 'USD', 'terminal-001', 'node-001', 'user-1', ${at('2026-09-02T09:55:00.000Z')},
+        'COMPLETED', 3, 0, ${at('2026-09-02T10:00:00.000Z')});
+      insert into sale_items (id, sale_id, product_id, description, price_minor_units, currency_code,
+        tax_rate_basis_points, unit_code, unit_scale, quantity_scaled, quantity_scale)
+      values ('sale-item-1', 'sale-1', 'product-1', 'Producto uno', 150, 'USD', 1600, 'UND', 0, 4, 0);
+    `);
+
+    const repository = new DrizzleMarginReportRepository(handle);
+    const entries = await repository.findMargins({ limit: 100 });
+
+    expect(entries).toEqual([{
+      productId: 'product-1', currencyCode: 'USD',
+      quantitySoldScaled: 4, quantityScale: 0,
+      revenueMinorUnits: 600, costMinorUnits: 400, marginMinorUnits: 200
+    }]);
+
+    expect(await repository.findMargins({
+      limit: 100, from: new Date('2026-09-03T00:00:00.000Z')
+    })).toEqual([]);
+    expect(await repository.findMargins({ limit: 100, currencyCode: 'EUR' })).toEqual([]);
   });
 });

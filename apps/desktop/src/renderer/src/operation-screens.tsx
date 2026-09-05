@@ -11,6 +11,8 @@ import { InventoryScreen } from './screens/inventory.js';
 import { ReportsScreen } from './screens/reports.js';
 import { SalesScreen } from './screens/sales.js';
 import { SuppliersScreen } from './screens/suppliers.js';
+import { StockCountsScreen } from './screens/stock-counts.js';
+import { ConfigScreen } from './screens/config.js';
 import type { ScreenProps } from './screens/shared.js';
 
 export const routeScreen = (routeId: string, props: ScreenProps): React.JSX.Element | null => {
@@ -19,6 +21,8 @@ export const routeScreen = (routeId: string, props: ScreenProps): React.JSX.Elem
   if (routeId === 'catalog') return <CatalogScreen {...props} />;
   if (routeId === 'inventory') return <InventoryScreen {...props} />;
   if (routeId === 'suppliers') return <SuppliersScreen {...props} />;
+  if (routeId === 'counts') return <StockCountsScreen {...props} />;
+  if (routeId === 'config') return <ConfigScreen {...props} />;
   if (routeId === 'reports') return <ReportsScreen {...props} />;
   if (routeId === 'rates') return <CurrencyScreen {...props} />;
   return null;
@@ -35,6 +39,10 @@ export {
   toFiscalAddress, toSupplierForm, SUPPLIER_STATUS_HINTS, SUPPLIER_STATUS_LABELS,
   type SupplierForm
 } from './screens/suppliers.js';
+export {
+  StockCountsScreen, canWorkOnStockCounts, STOCK_COUNT_STATUS_LABELS
+} from './screens/stock-counts.js';
+export { ConfigScreen, canManageConfig, DEVICE_TYPE_LABELS } from './screens/config.js';
 export {
   ReportsScreen, loadOperationalReports, toCsv, toReportQuery, type OperationalReports
 } from './screens/reports.js';

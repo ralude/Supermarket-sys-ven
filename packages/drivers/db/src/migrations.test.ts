@@ -50,7 +50,12 @@ describe('database migrations', () => {
       expect.objectContaining({ version: 13, name: 'identity_security' }),
       expect.objectContaining({ version: 14, name: 'operational_policies' }),
       expect.objectContaining({ version: 15, name: 'suppliers' }),
-      expect.objectContaining({ version: 16, name: 'supplier_fiscal_address' })
+      expect.objectContaining({ version: 16, name: 'supplier_fiscal_address' }),
+      expect.objectContaining({ version: 17, name: 'stock_counts' }),
+      expect.objectContaining({ version: 18, name: 'branches_and_devices' }),
+      expect.objectContaining({ version: 19, name: 'purchase_receipts_and_cost' }),
+      expect.objectContaining({ version: 20, name: 'sale_recipient' })
+      , expect.objectContaining({ version: 21, name: 'sale_returns' })
     ]);
 
     const tables = handle.sqlite.prepare(
@@ -89,11 +94,18 @@ describe('database migrations', () => {
       'sale_discounts',
       'sale_items',
       'sale_payments',
+      'sale_return_lines',
+      'sale_returns',
       'sales',
       'schema_migrations',
       'shift_closing_balances',
       'shifts',
       'stock_batches',
+      'stock_count_differences',
+      'stock_count_lines',
+      'stock_counts',
+      'branches',
+      'devices',
       'stock_items',
       'stock_movements',
       'supplier_code_sequence',
@@ -602,7 +614,7 @@ describe('database migrations', () => {
       );
     `);
 
-    expect(applyMigrations(handle.sqlite)).toEqual([10, 11, 12, 13, 14, 15, 16]);
+    expect(applyMigrations(handle.sqlite)).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
     expect(handle.sqlite.prepare(`
       select last_dispatch_state as dispatchState,
         last_command_effect as commandEffect,
@@ -906,7 +918,7 @@ describe('database migrations', () => {
           'CO', 'TAX_ID', '900123456', '900123456', 'INACTIVE', 1, 1, 1);
     `);
 
-    expect(applyMigrations(handle.sqlite)).toEqual([16]);
+    expect(applyMigrations(handle.sqlite, migrations.filter(({ version }) => version <= 16))).toEqual([16]);
 
     expect(handle.sqlite.prepare(`
       select id, fiscal_address_country as country, fiscal_address_line as line
@@ -919,5 +931,41 @@ describe('database migrations', () => {
       update suppliers set fiscal_address_line = 'Av. Urdaneta'
       where id = 'legacy-without-address'
     `).run()).toThrowError('supplier fiscal address requires country and line');
+  });
+
+  it('keeps an existing sale anonymous and rejects a partial recipient snapshot', () => {
+    const handle = openDatabase(':memory:');
+    handles.push(handle);
+    applyMigrations(handle.sqlite, migrations.filter(({ version }) => version <= 19));
+    handle.sqlite.exec(`
+      insert into sales (
+        id, shift_id, currency_code, terminal_id, origin_node_id, started_by, started_at,
+        status, version, financial_transaction_tax_minor_units
+      ) values ('legacy-sale', 'shift-001', 'USD', 'terminal-001', 'node-001', 'user-001',
+        1, 'COMPLETED', 2, 0);
+    `);
+
+    expect(applyMigrations(handle.sqlite)).toEqual([20, 21]);
+
+    expect(handle.sqlite.prepare(`
+      select recipient_country as country, recipient_normalized_value as identification
+      from sales where id = 'legacy-sale'
+    `).get()).toEqual({ country: null, identification: null });
+    expect(() => handle.sqlite.prepare(`
+      update sales set recipient_country = 'VE' where id = 'legacy-sale'
+    `).run()).toThrowError('sale recipient snapshot must be complete or absent');
+    expect(() => handle.sqlite.prepare(`
+      update sales set recipient_name = 'Bodega Central' where id = 'legacy-sale'
+    `).run()).toThrowError('sale recipient snapshot must be complete or absent');
+
+    handle.sqlite.prepare(`
+      update sales set recipient_country = 'VE', recipient_type = 'RIF',
+        recipient_value = 'J-12345678-9', recipient_normalized_value = 'J123456789',
+        recipient_name = 'Bodega Central'
+      where id = 'legacy-sale'
+    `).run();
+    expect(handle.sqlite.prepare(`
+      select recipient_normalized_value as identification from sales where id = 'legacy-sale'
+    `).get()).toEqual({ identification: 'J123456789' });
   });
 });

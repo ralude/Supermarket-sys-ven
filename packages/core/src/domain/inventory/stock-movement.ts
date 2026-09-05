@@ -1,4 +1,4 @@
-import { DomainError, type Quantity } from '@supermarket/shared';
+import { DomainError, type Money, type Quantity } from '@supermarket/shared';
 
 export const STOCK_MOVEMENT_TYPES = [
   'PURCHASE_RECEIPT',
@@ -21,6 +21,7 @@ export type StockMovementProps = {
   referenceId: string;
   occurredAt: Date;
   eventId: string;
+  unitCost?: Money | null;
 };
 
 const MOVEMENT_DIRECTIONS: Record<StockMovementType, StockMovementDirection> = {
@@ -44,7 +45,8 @@ export class StockMovement {
     readonly reason: string,
     readonly referenceId: string,
     occurredAt: Date,
-    readonly eventId: string
+    readonly eventId: string,
+    readonly unitCost: Money | null
   ) {
     this.occurrenceTimestamp = new Date(occurredAt);
   }
@@ -104,7 +106,8 @@ export class StockMovement {
       reason,
       referenceId,
       props.occurredAt,
-      eventId
+      eventId,
+      props.unitCost ?? null
     );
   }
 
@@ -118,7 +121,9 @@ export class StockMovement {
       this.actorId === props.actorId.trim() && this.reason === props.reason.trim() &&
       this.referenceId === props.referenceId.trim() &&
       this.occurrenceTimestamp.getTime() === props.occurredAt.getTime() &&
-      this.eventId === props.eventId.trim();
+      this.eventId === props.eventId.trim() &&
+      this.unitCost?.minorUnits === (props.unitCost?.minorUnits ?? null) &&
+      this.unitCost?.currency === (props.unitCost?.currency ?? null);
   }
 
   private static requireText(value: string, code: string, message: string): string {

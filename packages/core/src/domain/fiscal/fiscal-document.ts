@@ -69,7 +69,8 @@ export type RestoreFiscalDocumentProps = Omit<CreateFiscalDocumentProps, 'eventI
 const cloneContent = (content: FiscalDocumentContent): FiscalDocumentContent => ({
   ...content,
   lines: content.lines.map((line) => ({ ...line })),
-  payments: content.payments.map((payment) => ({ ...payment }))
+  payments: content.payments.map((payment) => ({ ...payment })),
+  recipient: content.recipient ? { ...content.recipient } : null
 });
 
 export class FiscalDocument {
@@ -361,6 +362,23 @@ export class FiscalDocument {
         !Number.isSafeInteger(line.totalMinorUnits) || line.totalMinorUnits < 0) {
         throw new DomainError('FISCAL_LINE_INVALID', 'Fiscal document line is invalid.');
       }
+    }
+    /**
+     * El receptor es opcional: una venta anónima sigue siendo válida. Cuando
+     * existe, tipo y valor son obligatorios; la forma por país ya se validó en
+     * el módulo que capturó el dato y no se vuelve a interpretar aquí.
+     */
+    if (content.recipient) {
+      FiscalDocument.requireText(
+        content.recipient.type,
+        'FISCAL_RECIPIENT_TYPE_REQUIRED',
+        'Fiscal recipient type is required.'
+      );
+      FiscalDocument.requireText(
+        content.recipient.normalizedValue,
+        'FISCAL_RECIPIENT_IDENTIFICATION_REQUIRED',
+        'Fiscal recipient identification is required.'
+      );
     }
     for (const payment of content.payments) {
       FiscalDocument.requireText(

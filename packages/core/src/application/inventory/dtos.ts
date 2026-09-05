@@ -62,3 +62,57 @@ export type KardexDto = {
   batches: { id: string; lotNumber: string; expiresAt: Date | null }[];
   movements: StockMovementDto[];
 };
+
+/**
+ * Conteo físico (9B.07). El artículo, su unidad y su escala no viajan en la
+ * entrada: se derivan del producto y del `StockItem` existente, igual que en
+ * la recepción de compra.
+ */
+export type OpenStockCountInput = { reason: string };
+
+export type RecordStockCountLineInput = {
+  stockCountId: string;
+  productId: string;
+  quantity: string;
+  batchId?: string;
+};
+
+export type CloseStockCountInput = { stockCountId: string; reason: string };
+export type ApproveStockCountInput = { stockCountId: string; reason: string };
+export type RejectStockCountInput = { stockCountId: string; reason: string };
+export type GetStockCountInput = { stockCountId: string };
+
+export type StockCountLineDto = {
+  id: string;
+  productId: string;
+  stockItemId: string;
+  batchId: string | null;
+  countedQuantityScaled: number;
+  quantityScale: number;
+};
+
+export type StockCountDifferenceDto = {
+  lineId: string;
+  stockItemId: string;
+  batchId: string | null;
+  quantityScale: number;
+  expectedScaled: number;
+  countedScaled: number;
+  differenceScaled: number;
+};
+
+export type StockCountDto = {
+  id: string;
+  status: string;
+  openedBy: string;
+  openedAt: Date;
+  lines: StockCountLineDto[];
+  differences: StockCountDifferenceDto[] | null;
+  closedAt: Date | null;
+  approvedBy: string | null;
+  approvedAt: Date | null;
+  rejectedBy: string | null;
+  rejectedAt: Date | null;
+  rejectionReason: string | null;
+  version: number;
+};

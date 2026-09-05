@@ -204,7 +204,7 @@ export class Shift {
     for (const movement of this.currentMovements) {
       const key = balanceKey(movement.method.code, movement.amount.currency);
       const existing = balances.get(key)?.amount ?? Money.zero(movement.amount.currency);
-      const amount = movement.type === 'WITHDRAWAL'
+      const amount = movement.type === 'WITHDRAWAL' || movement.type === 'SALE_REFUND'
         ? existing.subtract(movement.amount)
         : existing.add(movement.amount);
       balances.set(key, { paymentMethodCode: movement.method.code, amount });

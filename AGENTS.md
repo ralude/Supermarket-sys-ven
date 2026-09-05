@@ -68,6 +68,20 @@ Las restricciones de la fase actual son obligatorias: no implementar negocio dur
 
 Si una tarea requiere cambiar el alcance o el orden, detén la implementación y registra una decisión o solicita confirmación.
 
+### MVP de referencia no certificado
+
+El núcleo, los drivers fake y la UI pueden avanzar como implementación de referencia
+explícitamente no certificada. Una ambigüedad legal, contable o de fabricante no bloquea
+ese trabajo cuando el comportamiento se rotula como `SIMULACION` y no se presenta como
+cumplimiento normativo.
+
+Los defaults reversibles del MVP se registran como decisiones técnicas reemplazables. La
+validación profesional, el modelo de impresora, el protocolo, el firmware y la evidencia
+regulatoria son gates del driver fiscal real y del piloto/producción, no del núcleo fake ni
+de las pantallas genéricas. Un ADR sigue siendo obligatorio para cambios arquitectónicos,
+invariantes de datos o semántica de fallos; no se exige un ADR legal para cada regla que el
+MVP todavía no pretende certificar.
+
 ## 3. Lectura obligatoria
 
 Antes de modificar algo:

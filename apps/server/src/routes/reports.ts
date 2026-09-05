@@ -2,7 +2,8 @@ import type { FastifyInstance, FastifySchema } from 'fastify';
 import {
   getAuditReportContract,
   getCashClosureReportContract,
-  getFiscalOperationsReportContract
+  getFiscalOperationsReportContract,
+  getMarginReportContract
 } from '@supermarket/shared';
 import {
   createExecutionContext,
@@ -85,6 +86,22 @@ export const registerReportRoutes = (
             ...entry, requestedAt: entry.requestedAt.toISOString()
           }))
         })
+        : sendProblem(reply, request, result.error.code, result.error.message);
+    }
+  );
+
+  app.get<{ Querystring: PeriodQuery & { currencyCode?: string } }>(
+    getMarginReportContract.path,
+    { schema: getMarginReportContract.schema as FastifySchema },
+    async (request, reply) => {
+      const principal = await requirePrincipal(request, reply, dependencies);
+      if (!principal) return;
+      const result = await reports.getMarginReport.execute({
+        ...period(request.query),
+        ...(request.query.currencyCode ? { currencyCode: request.query.currencyCode } : {})
+      }, createExecutionContext(request, principal, dependencies));
+      return result.ok
+        ? reply.send(result.value)
         : sendProblem(reply, request, result.error.code, result.error.message);
     }
   );

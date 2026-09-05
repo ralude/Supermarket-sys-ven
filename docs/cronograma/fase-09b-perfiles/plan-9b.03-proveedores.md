@@ -31,9 +31,9 @@ documento de recepción completo y no adelanta sincronización.
 - `05-agregados.md` reconoce `PurchaseOrder`, pero no `Supplier` ni
   `PurchaseReceipt`; el cronograma y las reglas aprobadas sí exigen al primero y
   presuponen al segundo.
-- 9B.04 declara que hoy no existe costo de compra y prohíbe elegir un método sin
-  ADR-0016. Por eso 9B.03 no puede sellar una recepción `COMPLETED` que, según la
-  regla aprobada, debería incluir costos inmutables.
+- 9B.04 declara que hoy no existe costo de compra. La recepción `COMPLETED` se
+  implementará en 9B.04 con el default reemplazable de ADR-0016 y debe incluir
+  costos inmutables.
 - `audit_log` admite evidencia antes/después, pero ADR-0013 excluye esos
   resúmenes de la lectura operativa. Los logs técnicos prohíben copiar RIF,
   nombres, direcciones, teléfonos y correos.

@@ -4,7 +4,9 @@ import type {
   CashClosureReportEntryDto,
   CashClosureReportInput,
   FiscalOperationReportEntryDto,
-  FiscalOperationsReportInput
+  FiscalOperationsReportInput,
+  MarginReportEntryDto,
+  MarginReportInput
 } from '../reporting/dtos.js';
 import type { ResolvedReportQuery } from '../reporting/row-limit.js';
 
@@ -24,4 +26,8 @@ export interface FiscalOperationsReportRepository {
   findFiscalOperations(
     query: ResolvedReportQuery<FiscalOperationsReportInput>
   ): Promise<readonly FiscalOperationReportEntryDto[]>;
+}
+
+export interface MarginReportRepository {
+  findMargins(query: ResolvedReportQuery<MarginReportInput>): Promise<readonly MarginReportEntryDto[]>;
 }

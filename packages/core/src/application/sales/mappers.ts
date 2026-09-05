@@ -1,5 +1,7 @@
+import type { FiscalDocument } from '../../domain/fiscal/index.js';
 import type { Sale } from '../../domain/sales/index.js';
-import type { SaleDto } from './dtos.js';
+import type { SaleReturn } from '../../domain/sales/index.js';
+import type { SaleDto, SaleReturnDto } from './dtos.js';
 
 export function toSaleDto(sale: Sale): SaleDto {
   return {
@@ -43,6 +45,35 @@ export function toSaleDto(sale: Sale): SaleDto {
     balanceMinorUnits: sale.balance.minorUnits,
     completedAt: sale.completedAt,
     voidedAt: sale.voidedAt,
-    voidReason: sale.voidReason
+    voidReason: sale.voidReason,
+    recipient: sale.recipient
+  };
+}
+
+export function toSaleReturnDto(saleReturn: SaleReturn, creditNote: FiscalDocument): SaleReturnDto {
+  return {
+    id: saleReturn.id,
+    saleId: saleReturn.saleId,
+    originalDocumentId: saleReturn.originalDocumentId,
+    creditNoteId: saleReturn.creditNoteId,
+    creditNoteStatus: creditNote.status,
+    creditNoteFiscalNumber: creditNote.fiscalNumber,
+    shiftId: saleReturn.shiftId,
+    refundMinorUnits: saleReturn.refund.minorUnits,
+    currencyCode: saleReturn.refund.currency,
+    paymentMethodCode: saleReturn.paymentMethodCode,
+    reason: saleReturn.reason,
+    occurredAt: new Date(saleReturn.occurredAt),
+    lines: saleReturn.lines.map((line) => ({
+      id: line.id,
+      saleItemId: line.saleItemId,
+      productId: line.productId,
+      stockItemId: line.stockItemId,
+      batchId: line.batchId,
+      quantityScaled: line.quantity.scaledValue,
+      quantityScale: line.quantity.scale,
+      unitCostMinorUnits: line.unitCost?.minorUnits ?? null,
+      costCurrencyCode: line.unitCost?.currency ?? null
+    }))
   };
 }

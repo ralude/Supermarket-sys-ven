@@ -14,6 +14,15 @@ export type RegisterSalePaymentsRequest = {
   }[];
 };
 export type VoidSaleRequest = { readonly reason: string };
+export type ReturnSaleRequest = { readonly reason: string };
+
+/** `recipient: null` retira el snapshot; la venta anónima sigue siendo válida. */
+export type SetSaleRecipientRequest = {
+  readonly recipient: {
+    readonly country: string; readonly type?: string | null; readonly value: string;
+    readonly name?: string | null; readonly address?: string | null;
+  } | null;
+};
 
 export type SaleResponse = {
   readonly id: string; readonly shiftId: string; readonly currencyCode: string;
@@ -37,6 +46,25 @@ export type SaleResponse = {
   readonly paidTotalMinorUnits: number; readonly balanceMinorUnits: number;
   readonly completedAt: string | null; readonly voidedAt: string | null;
   readonly voidReason: string | null;
+  readonly recipient: {
+    readonly country: string; readonly type: string; readonly value: string;
+    readonly normalizedValue: string; readonly name: string | null;
+    readonly address: string | null;
+  } | null;
+};
+
+export type SaleReturnResponse = {
+  readonly id: string; readonly saleId: string; readonly originalDocumentId: string;
+  readonly creditNoteId: string; readonly creditNoteStatus: string;
+  readonly creditNoteFiscalNumber: string | null; readonly shiftId: string;
+  readonly refundMinorUnits: number; readonly currencyCode: string;
+  readonly paymentMethodCode: string; readonly reason: string; readonly occurredAt: string;
+  readonly lines: readonly {
+    readonly id: string; readonly saleItemId: string; readonly productId: string;
+    readonly stockItemId: string; readonly batchId: string | null;
+    readonly quantityScaled: number; readonly quantityScale: number;
+    readonly unitCostMinorUnits: number | null; readonly costCurrencyCode: string | null;
+  }[];
 };
 
 const id = { type: 'string', minLength: 1, maxLength: 128 } as const;
@@ -55,6 +83,20 @@ const saleItemParams = {
   properties: { saleId: id, itemId: id }
 } as const;
 
+const identification = { type: 'string', minLength: 1, maxLength: 64 } as const;
+const recipientText = { type: 'string', minLength: 1, maxLength: 200 } as const;
+const recipientSchema = {
+  type: 'object', additionalProperties: false,
+  required: ['country', 'type', 'value', 'normalizedValue', 'name', 'address'],
+  properties: {
+    country: { type: 'string', pattern: '^[A-Z]{2}$' },
+    type: { type: 'string', minLength: 1, maxLength: 32 },
+    value: identification, normalizedValue: identification,
+    name: { anyOf: [recipientText, { type: 'null' }] },
+    address: { anyOf: [recipientText, { type: 'null' }] }
+  }
+} as const;
+
 const saleResponseSchema = {
   type: 'object', additionalProperties: false,
   required: [
@@ -62,7 +104,7 @@ const saleResponseSchema = {
     'items', 'payments', 'subtotalMinorUnits', 'discountTotalMinorUnits',
     'taxableBaseMinorUnits', 'taxTotalMinorUnits', 'financialTransactionTaxMinorUnits',
     'totalMinorUnits', 'paidTotalMinorUnits', 'balanceMinorUnits', 'completedAt',
-    'voidedAt', 'voidReason'
+    'voidedAt', 'voidReason', 'recipient'
   ],
   properties: {
     id, shiftId: id, currencyCode: currency, terminalId: id, originNodeId: id,
@@ -109,7 +151,41 @@ const saleResponseSchema = {
     balanceMinorUnits: { type: 'integer' },
     completedAt: { anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }] },
     voidedAt: { anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }] },
-    voidReason: { anyOf: [{ type: 'string' }, { type: 'null' }] }
+    voidReason: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    recipient: { anyOf: [recipientSchema, { type: 'null' }] }
+  }
+} as const;
+
+const saleReturnResponseSchema = {
+  type: 'object', additionalProperties: false,
+  required: [
+    'id', 'saleId', 'originalDocumentId', 'creditNoteId', 'creditNoteStatus',
+    'creditNoteFiscalNumber', 'shiftId', 'refundMinorUnits', 'currencyCode',
+    'paymentMethodCode', 'reason', 'occurredAt', 'lines'
+  ],
+  properties: {
+    id, saleId: id, originalDocumentId: id, creditNoteId: id,
+    creditNoteStatus: { type: 'string' },
+    creditNoteFiscalNumber: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    shiftId: id, refundMinorUnits: { type: 'integer', minimum: 1 }, currencyCode: currency,
+    paymentMethodCode: id, reason: { type: 'string', minLength: 1, maxLength: 500 },
+    occurredAt: { type: 'string', format: 'date-time' },
+    lines: {
+      type: 'array', minItems: 1, items: {
+        type: 'object', additionalProperties: false,
+        required: [
+          'id', 'saleItemId', 'productId', 'stockItemId', 'batchId', 'quantityScaled',
+          'quantityScale', 'unitCostMinorUnits', 'costCurrencyCode'
+        ],
+        properties: {
+          id, saleItemId: id, productId: id, stockItemId: id,
+          batchId: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          quantityScaled: { type: 'integer', minimum: 1 }, quantityScale: { type: 'integer', minimum: 0 },
+          unitCostMinorUnits: { anyOf: [{ type: 'integer', minimum: 0 }, { type: 'null' }] },
+          costCurrencyCode: { anyOf: [currency, { type: 'null' }] }
+        }
+      }
+    }
   }
 } as const;
 
@@ -215,6 +291,41 @@ export const completeSaleContract = {
   errorCodes: [...commonCommandErrors, 'SALE_PAYMENT_TOTAL_MISMATCH', 'SALE_INVALID_STATE']
 } as const satisfies HttpContractV1;
 
+/**
+ * La identificación del receptor no tiene permiso propio: comparte la frontera
+ * de sesión de la edición ordinaria de la venta (ADR-0018).
+ */
+export const setSaleRecipientContract = {
+  method: 'PUT', path: '/api/v1/sales/:saleId/recipient', permission: null,
+  idempotency: 'REQUIRED',
+  schema: {
+    params: saleParams, headers: idempotencyHeaders,
+    body: {
+      type: 'object', additionalProperties: false, required: ['recipient'],
+      properties: {
+        recipient: {
+          anyOf: [{
+            type: 'object', additionalProperties: false,
+            required: ['country', 'value'],
+            properties: {
+              country: { type: 'string', minLength: 2, maxLength: 2 },
+              type: { type: 'string', minLength: 1, maxLength: 32 },
+              value: identification,
+              name: { anyOf: [recipientText, { type: 'null' }] },
+              address: { anyOf: [recipientText, { type: 'null' }] }
+            }
+          }, { type: 'null' }]
+        }
+      }
+    }, response: commandResponses
+  },
+  errorCodes: [
+    ...commonCommandErrors, 'SALE_INVALID_STATE', 'SALE_RECIPIENT_COUNTRY_INVALID',
+    'SALE_RECIPIENT_TYPE_INVALID', 'SALE_RECIPIENT_IDENTIFICATION_REQUIRED',
+    'SALE_RECIPIENT_IDENTIFICATION_INVALID'
+  ]
+} as const satisfies HttpContractV1;
+
 export const voidSaleContract = {
   method: 'POST', path: '/api/v1/sales/:saleId/void', permission: 'sale.void',
   idempotency: 'REQUIRED',
@@ -226,4 +337,27 @@ export const voidSaleContract = {
     }, response: commandResponses
   },
   errorCodes: [...commonCommandErrors, 'FORBIDDEN', 'SALE_INVALID_STATE']
+} as const satisfies HttpContractV1;
+
+export const returnSaleContract = {
+  method: 'POST', path: '/api/v1/sales/:saleId/return', permission: 'sale.return',
+  idempotency: 'REQUIRED',
+  schema: {
+    params: saleParams, headers: idempotencyHeaders,
+    body: {
+      type: 'object', additionalProperties: false, required: ['reason'],
+      properties: { reason: { type: 'string', minLength: 1, maxLength: 500 } }
+    },
+    response: { 201: saleReturnResponseSchema, 200: saleReturnResponseSchema,
+      400: problemDetailsSchema, 401: problemDetailsSchema, 403: problemDetailsSchema,
+      404: problemDetailsSchema, 409: problemDetailsSchema, 503: problemDetailsSchema }
+  },
+  errorCodes: [
+    ...commonCommandErrors, 'FORBIDDEN', 'SALE_INVALID_STATE',
+    'SALE_RETURN_REASON_REQUIRED', 'SALE_RETURN_MIXED_PAYMENT_UNSUPPORTED',
+    'SALE_ALREADY_RETURNED', 'SALE_RETURN_DOCUMENT_NOT_ISSUED', 'SHIFT_NOT_OPEN',
+    'STOCK_ITEM_NOT_FOUND', 'SALE_RETURN_STOCK_NOT_RESTORABLE',
+    'FISCAL_DOCUMENT_NOT_FOUND', 'FISCAL_RECONCILIATION_REQUIRED',
+    'FISCAL_DOCUMENT_FAILED'
+  ]
 } as const satisfies HttpContractV1;

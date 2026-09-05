@@ -26,10 +26,10 @@ La arquitectura vigente presenta dos contradicciones:
    snapshot del proveedor, el documento de origen o el estado `COMPLETED`.
 
 Además, la regla aprobada indica que una recepción completada conserva costos
-inmutables. El costo y su método de valoración pertenecen expresamente a 9B.04,
-que está bloqueada por ADR-0016 y no puede adelantarse mientras 9B.03 esté
-abierta. Crear en 9B.03 una recepción `COMPLETED` sin costo incumpliría la regla;
-agregar el costo después mutaría evidencia ya completada.
+inmutables. El costo y su método de valoración pertenecen expresamente a 9B.04 y
+se implementan con el default reemplazable de ADR-0016. Crear en 9B.03 una
+recepción `COMPLETED` sin costo incumpliría la regla; agregar el costo después
+mutaría evidencia ya completada.
 
 ## Decisiones de negocio ya aprobadas
 

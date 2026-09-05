@@ -4,11 +4,13 @@ import type {
   AuditReportRepository,
   AuthorizationService,
   CashClosureReportRepository,
-  FiscalOperationsReportRepository
+  FiscalOperationsReportRepository,
+  MarginReportRepository
 } from '../ports/index.js';
 import { GetAuditReport } from './get-audit-report.js';
 import { GetCashClosureReport } from './get-cash-closure-report.js';
 import { GetFiscalOperationsReport } from './get-fiscal-operations-report.js';
+import { GetMarginReport } from './get-margin-report.js';
 import { REPORT_PERMISSIONS } from './permissions.js';
 import { REPORT_ROW_LIMIT } from './row-limit.js';
 
@@ -27,7 +29,7 @@ class RecordingAuthorization implements AuthorizationService {
 }
 
 class RecordingRepositories
-implements CashClosureReportRepository, AuditReportRepository, FiscalOperationsReportRepository {
+implements CashClosureReportRepository, AuditReportRepository, FiscalOperationsReportRepository, MarginReportRepository {
   readonly queries: { readonly kind: string; readonly limit: number }[] = [];
   async findCashClosures(query: { readonly limit: number }): Promise<[]> {
     this.queries.push({ kind: 'cash', limit: query.limit });
@@ -41,6 +43,10 @@ implements CashClosureReportRepository, AuditReportRepository, FiscalOperationsR
     this.queries.push({ kind: 'fiscal', limit: query.limit });
     return [];
   }
+  async findMargins(query: { readonly limit: number }): Promise<[]> {
+    this.queries.push({ kind: 'margin', limit: query.limit });
+    return [];
+  }
 }
 
 describe('reporting read models', () => {
@@ -50,14 +56,16 @@ describe('reporting read models', () => {
     const results = await Promise.all([
       new GetCashClosureReport(repositories, authorization).execute({}, context),
       new GetAuditReport(repositories, authorization).execute({}, context),
-      new GetFiscalOperationsReport(repositories, authorization).execute({}, context)
+      new GetFiscalOperationsReport(repositories, authorization).execute({}, context),
+      new GetMarginReport(repositories, authorization).execute({}, context)
     ]);
 
     expect(results.every((result) => !result.ok)).toBe(true);
     expect(results.map((result) => result.ok ? null : result.error.code))
-      .toEqual(['FORBIDDEN', 'FORBIDDEN', 'FORBIDDEN']);
+      .toEqual(['FORBIDDEN', 'FORBIDDEN', 'FORBIDDEN', 'FORBIDDEN']);
     expect(authorization.asked).toEqual([
-      REPORT_PERMISSIONS.READ_CASH, REPORT_PERMISSIONS.READ_AUDIT, REPORT_PERMISSIONS.READ_FISCAL
+      REPORT_PERMISSIONS.READ_CASH, REPORT_PERMISSIONS.READ_AUDIT, REPORT_PERMISSIONS.READ_FISCAL,
+      REPORT_PERMISSIONS.READ_MARGIN
     ]);
     expect(repositories.queries).toEqual([]);
   });
@@ -87,11 +95,12 @@ describe('reporting read models', () => {
     await audit.execute({ limit: 1.5 }, context);
     await new GetCashClosureReport(repositories, authorization).execute({}, context);
     await new GetFiscalOperationsReport(repositories, authorization).execute({}, context);
+    await new GetMarginReport(repositories, authorization).execute({}, context);
 
     expect(repositories.queries.map((query) => query.limit)).toEqual([
       REPORT_ROW_LIMIT.default, 50, REPORT_ROW_LIMIT.maximum,
       REPORT_ROW_LIMIT.default, REPORT_ROW_LIMIT.default,
-      REPORT_ROW_LIMIT.default, REPORT_ROW_LIMIT.default
+      REPORT_ROW_LIMIT.default, REPORT_ROW_LIMIT.default, REPORT_ROW_LIMIT.default
     ]);
   });
 });

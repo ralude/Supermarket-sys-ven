@@ -37,6 +37,9 @@ El diseño parte de nodos operativos autónomos:
 - **Configuration over constants:** tasas, impuestos, monedas y límites fiscales son configuración versionada.
 - **Auditability:** toda operación sensible identifica actor, terminal, momento y motivo.
 - **Least privilege:** Electron renderer no tiene acceso directo al sistema operativo ni a la base de datos.
+- **Referencia no certificada:** el core y `FiscalPrinterFake` pueden avanzar con defaults
+  explícitos y reemplazables. La validación legal, de fabricante y de hardware pertenece al
+  adaptador fiscal real y al gate de piloto/producción; no se infiere del modo simulación.
 
 ## Decisiones pendientes para fases posteriores
 
@@ -45,3 +48,11 @@ El diseño parte de nodos operativos autónomos:
 - proveedor oficial de tasa de cambio y frecuencia de actualización;
 - política de retención y exportación de datos;
 - requisitos definitivos de hardware por modelo de tienda.
+
+## Política de cumplimiento por nivel
+
+El MVP técnico conserva la semántica de documentos, estados, auditoría y recuperación, pero
+su fiscalidad es simulada y no certificada. Las reglas específicas de Venezuela se integran
+como un perfil o driver versionado cuando exista evidencia profesional vigente. Una brecha de
+ese perfil se declara sin impedir el desarrollo de capacidades comerciales que no dependan del
+hardware real.

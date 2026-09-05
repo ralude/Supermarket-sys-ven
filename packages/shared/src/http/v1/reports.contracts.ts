@@ -30,6 +30,15 @@ export type FiscalOperationsReportResponse = {
   readonly fiscalMode: 'SIMULATION';
   readonly operations: readonly FiscalOperationReportResponse[];
 };
+export type MarginReportResponse = {
+  readonly productId: string;
+  readonly currencyCode: string;
+  readonly quantitySoldScaled: number;
+  readonly quantityScale: number;
+  readonly revenueMinorUnits: number | null;
+  readonly costMinorUnits: number | null;
+  readonly marginMinorUnits: number | null;
+};
 
 const id = { type: 'string', minLength: 1, maxLength: 128 } as const;
 const timestamp = { type: 'string', format: 'date-time' } as const;
@@ -131,6 +140,34 @@ export const getAuditReportContract = {
       }
     },
     response: { 200: { type: 'array', items: auditSchema }, ...readResponses }
+  },
+  errorCodes: ['HTTP_VALIDATION_FAILED', 'UNAUTHORIZED', 'FORBIDDEN']
+} as const satisfies HttpContractV1;
+
+const marginSchema = {
+  type: 'object', additionalProperties: false,
+  required: [
+    'productId', 'currencyCode', 'quantitySoldScaled', 'quantityScale',
+    'revenueMinorUnits', 'costMinorUnits', 'marginMinorUnits'
+  ],
+  properties: {
+    productId: id, currencyCode: { type: 'string' },
+    quantitySoldScaled: { type: 'integer' }, quantityScale: { type: 'integer', minimum: 0 },
+    revenueMinorUnits: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+    costMinorUnits: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+    marginMinorUnits: { anyOf: [{ type: 'integer' }, { type: 'null' }] }
+  }
+} as const;
+
+export const getMarginReportContract = {
+  method: 'GET', path: '/api/v1/reports/margin',
+  permission: 'reports.margin.read', idempotency: 'NONE',
+  schema: {
+    querystring: {
+      type: 'object', additionalProperties: false,
+      properties: { ...period, currencyCode: { type: 'string', pattern: '^[A-Za-z]{3}$' } }
+    },
+    response: { 200: { type: 'array', items: marginSchema }, ...readResponses }
   },
   errorCodes: ['HTTP_VALIDATION_FAILED', 'UNAUTHORIZED', 'FORBIDDEN']
 } as const satisfies HttpContractV1;

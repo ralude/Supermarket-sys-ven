@@ -58,7 +58,12 @@ Incluye:
 - [ADR-0013: Reportes operativos de lectura, permisos y exportación](./adr/0013-reportes-operativos-de-lectura.md)
 - [ADR-0014: Tasas de cambio — histórico, sugerencia externa y confirmación humana](./adr/0014-tasas-de-cambio-sugerencia-y-confirmacion.md)
 - [ADR-0015: Permisos efectivos en la sesión y navegación derivada en el renderer](./adr/0015-permisos-efectivos-en-la-sesion.md)
+- [ADR-0016: Método de costeo de inventario y cálculo del margen](./adr/0016-metodo-de-costeo-y-margen.md) — **aceptado para MVP no certificado**, default reemplazable
+- [ADR-0017: Política de devolución y nota de crédito simulada](./adr/0017-politica-de-devolucion.md) — **aceptado para MVP no certificado**, alcance mínimo
+- [ADR-0018: Identificación del cliente en la venta](./adr/0018-datos-obligatorios-del-cliente.md) — **aceptado para MVP no certificado**, snapshot opcional
 - [ADR-0019: Proveedores y evidencia de recepciones de compra](./adr/0019-proveedores-y-recepciones-de-compra.md)
+- [ADR-0020: Modelo de almacenes y transferencias de existencia](./adr/0020-modelo-de-almacenes-y-transferencias.md) — **aceptado**, un almacén implícito por nodo; transferencias diferidas
+- [ADR-0021: MVP de referencia no certificado y defaults reemplazables](./adr/0021-mvp-referencia-no-certificado.md) — **aceptado**, política de alcance
 
 ## Alcance del producto
 
